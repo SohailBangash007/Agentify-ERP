@@ -1,0 +1,41 @@
+.lp{--g:#0e7c6b;--g2:#0a5c50;--ink:#10231f;--mut:#51635e;--bg:#f6faf9;--card:#fff;--line:#dbe7e4;font-family:'Inter',system-ui,sans-serif;color:var(--ink);background:var(--bg);line-height:1.55}
+.lp *{box-sizing:border-box}.lp h1,.lp h2,.lp h3{font-family:'Plus Jakarta Sans','Inter',sans-serif;line-height:1.15;margin:0}
+.lp a{color:inherit}.lp .lwrap{max-width:1120px;margin:0 auto;padding:0 20px}
+.lp .lbtn{display:inline-block;padding:12px 22px;border-radius:10px;font-weight:600;text-decoration:none;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:15px}
+.lp .lbtn.p{background:var(--g);border-color:var(--g);color:#fff}.lp .lbtn.p:hover{background:var(--g2)}
+.lp .lbtn.sm{padding:8px 16px;font-size:14px}
+.lp header{position:sticky;top:0;z-index:5;background:rgba(246,250,249,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.lp header .lwrap{display:flex;align-items:center;justify-content:space-between;height:64px;gap:12px}
+.lp .llogo{display:flex;align-items:center;gap:8px;font:800 19px 'Plus Jakarta Sans',sans-serif;text-decoration:none}
+.lp .llogo i{width:28px;height:28px;border-radius:7px;background:var(--g);display:grid;place-items:center;color:#fff;font-style:normal;font-size:15px}
+.lp nav{display:flex;gap:22px;align-items:center}.lp nav a{text-decoration:none;color:var(--mut);font-size:15px}.lp nav a:hover{color:var(--ink)}
+.lp .lhero{padding:72px 0 56px;text-align:center}
+.lp .lhero h1{font-size:clamp(34px,5.4vw,58px);font-weight:800;letter-spacing:-.02em;max-width:820px;margin:0 auto}
+.lp .lhero h1 em{font-style:normal;color:var(--g)}
+.lp .lhero p{font-size:19px;color:var(--mut);max-width:640px;margin:20px auto 30px}
+.lp .lcta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.lp .lfine{font-size:13.5px;color:var(--mut);margin-top:14px}
+.lp .lchips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:34px}
+.lp .lchips span{background:#fff;border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-size:13.5px;color:var(--mut)}
+.lp section{padding:64px 0}.lp section.alt{background:#fff;border-block:1px solid var(--line)}
+.lp .lsh{text-align:center;max-width:680px;margin:0 auto 38px}.lp .lsh h2{font-size:clamp(26px,3.6vw,38px);font-weight:800}.lp .lsh p{color:var(--mut);margin:12px 0 0;font-size:17px}
+.lp .lgrid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.lp .lcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
+.lp .lcard h3{font-size:18px;margin-bottom:8px}.lp .lcard p{margin:0;color:var(--mut);font-size:15px}
+.lp .lcard ul{margin:10px 0 0;padding-left:18px;color:var(--mut);font-size:14.5px}
+.lp .lnum{width:34px;height:34px;border-radius:50%;background:var(--g);color:#fff;display:grid;place-items:center;font-weight:700;margin-bottom:12px}
+.lp .ltog{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:26px}
+.lp .ltog div{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.lp .ltog button{border:0;background:none;padding:8px 16px;font:600 14px 'Inter',sans-serif;cursor:pointer;color:var(--mut)}.lp .ltog button.on{background:var(--g);color:#fff}
+.lp .lplan{display:flex;flex-direction:column}.lp .lplan.hot{border:2px solid var(--g);position:relative}
+.lp .lplan .ltag{position:absolute;top:-12px;left:20px;background:var(--g);color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:99px}
+.lp .lprice{font:800 34px 'Plus Jakarta Sans',sans-serif;margin:10px 0 2px}.lp .lprice small{font:500 14px 'Inter',sans-serif;color:var(--mut)}
+.lp .lplan ul{list-style:none;padding:0;margin:14px 0 20px;flex:1}.lp .lplan li{padding:5px 0 5px 24px;position:relative;font-size:14.5px}.lp .lplan li:before{content:'✓';position:absolute;left:0;color:var(--g);font-weight:700}
+.lp details{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:10px;max-width:760px;margin-inline:auto}
+.lp summary{font-weight:600;cursor:pointer}.lp details p{color:var(--mut);margin:10px 0 0}
+.lp .lfind{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+.lp .lfind input{padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:15px;width:170px}
+.lp .lband{background:var(--g);color:#fff;text-align:center;border-radius:20px;padding:48px 20px}.lp .lband h2{font-size:clamp(26px,3.6vw,36px);margin-bottom:12px}.lp .lband p{opacity:.9;margin:0 0 22px}
+.lp .lband .lbtn{background:#fff;color:var(--g2);border-color:#fff}
+.lp footer{padding:36px 0;color:var(--mut);font-size:14px;border-top:1px solid var(--line)}.lp footer .lwrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+@media(max-width:720px){.lp nav a.hide-m{display:none}.lp .lhero{padding:44px 0 36px}.lp section{padding:44px 0}}

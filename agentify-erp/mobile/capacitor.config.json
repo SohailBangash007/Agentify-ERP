@@ -1,0 +1,26 @@
+{
+  "appId": "pk.expertmarketing.erp",
+  "appName": "Expert ERP",
+  "webDir": "www",
+  "server": {
+    "url": "https://YOUR-ERP-DOMAIN.example",
+    "cleartext": false,
+    "allowNavigation": [
+      "YOUR-ERP-DOMAIN.example"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "backgroundColor": "#f4f9f7",
+  "plugins": {
+    "SplashScreen": {
+      "backgroundColor": "#0e7c6b",
+      "launchAutoHide": true
+    },
+    "StatusBar": {
+      "backgroundColor": "#0e7c6b",
+      "style": "DARK"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+node_modules/
+client/dist/
+# live data: never commit tenant databases, uploads or secrets
+server/data/
+server/uploads/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+!.env.example
+.DS_Store

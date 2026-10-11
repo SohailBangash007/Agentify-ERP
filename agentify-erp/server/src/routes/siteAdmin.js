@@ -1,0 +1,221 @@
+import { Router } from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
+import { all, get, run, tx, getSetting, setSetting, uploadDir } from '../db.js';
+import { can, hasPerm, requireStaff } from '../rbac.js';
+import { audit } from '../audit.js';
+import { uploader } from './helpers.js';
+import { asyncH, bad, notFound, jparse, now } from '../util.js';
+import { siteConfig } from './site.js';
+import { validateSiteConfig, validateSections } from '../services/siteValidate.js';
+import { DEFAULT_CONFIG, defaultPages } from '../services/siteDefaults.js';
+import { buildKnowledge, reply } from '../services/bot.js';
+import { isHtml, sanitizeHtml, wordCount } from '../services/richText.js';
+
+/** Website editor backend (permission module: website). */
+const r = Router();
+r.use(requireStaff);
+
+const slugify = (s) => String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
+
+r.get('/config', can('website', 'view'), (req, res) => res.json(siteConfig()));
+r.put('/config', can('website', 'edit'), asyncH((req, res) => {
+  const c = req.body;
+  if (!c || typeof c !== 'object' || Array.isArray(c)) throw bad('Invalid configuration');
+  if (c.theme) for (const k of ['primary', 'accent', 'dark', 'bg', 'soft']) if (c.theme[k] && !/^#[0-9a-fA-F]{3,8}$/.test(c.theme[k])) throw bad(`Theme colour "${k}" must be a hex value like #0f766e`);
+  validateSiteConfig(c);
+  setSetting('site_config', JSON.stringify(c));
+  audit(req, 'Updated website settings', 'website', null, Object.keys(c).join(', '));
+  res.json({ ok: true });
+}));
+r.post('/config/reset', can('website', 'delete'), asyncH((req, res) => {
+  setSetting('site_config', JSON.stringify(DEFAULT_CONFIG));
+  audit(req, 'Reset website settings', 'website');
+  res.json({ ok: true });
+}));
+
+// ---- pages
+const parsePage = (p) => (p ? { ...p, sections: jparse(p.sections, []) } : p);
+r.get('/pages', can('website', 'view'), (req, res) => res.json(all('SELECT id,slug,title,published,show_in_menu,sort_order,seo_title,seo_desc,updated_at FROM site_pages ORDER BY sort_order,id')));
+r.get('/pages/:id(\\d+)', can('website', 'view'), asyncH((req, res) => {
+  const p = get('SELECT * FROM site_pages WHERE id=?', req.params.id);
+  if (!p) throw notFound();
+  res.json(parsePage(p));
+}));
+/** Version history: every save keeps a snapshot (the newest 40 per page) so any earlier layout can be restored. */
+function snapshot(pageId, title, sections, label, userId) {
+  const last = get('SELECT sections FROM site_page_versions WHERE page_id=? ORDER BY id DESC LIMIT 1', pageId);
+  if (last && last.sections === sections && !label) return;
+  run('INSERT INTO site_page_versions(page_id,title,sections,label,user_id,created_at) VALUES(?,?,?,?,?,?)', pageId, title, sections, String(label || '').slice(0, 80), userId, now());
+  run('DELETE FROM site_page_versions WHERE page_id=? AND id NOT IN (SELECT id FROM site_page_versions WHERE page_id=? ORDER BY id DESC LIMIT 40)', pageId, pageId);
+}
+r.get('/pages/:id(\\d+)/versions', can('website', 'view'), (req, res) => res.json(all(`SELECT v.id,v.label,v.title,v.created_at,u.name by_name, json_array_length(v.sections) sections FROM site_page_versions v LEFT JOIN users u ON u.id=v.user_id WHERE v.page_id=? ORDER BY v.id DESC`, req.params.id)));
+r.get('/pages/:id(\\d+)/versions/:vid(\\d+)', can('website', 'view'), asyncH((req, res) => {
+  const v = get('SELECT id,title,label,created_at,sections FROM site_page_versions WHERE id=? AND page_id=?', req.params.vid, req.params.id);
+  if (!v) throw notFound('Version not found');
+  res.json({ ...v, sections: jparse(v.sections, []) });
+}));
+r.post('/pages/:id(\\d+)/versions', can('website', 'edit'), asyncH((req, res) => {
+  const p = get('SELECT id,title,sections FROM site_pages WHERE id=?', req.params.id); if (!p) throw notFound();
+  snapshot(p.id, p.title, p.sections, String(req.body?.label || 'Saved version').trim() || 'Saved version', req.user.id);
+  res.status(201).json({ ok: true });
+}));
+r.post('/pages', can('website', 'create'), asyncH((req, res) => {
+  const title = String(req.body.title || '').trim();
+  if (!title) throw bad('Page title is required');
+  const slug = slugify(req.body.slug || title);
+  if (!slug) throw bad('Invalid page address');
+  if (get('SELECT 1 FROM site_pages WHERE slug=?', slug)) throw bad('A page with this address already exists');
+  if (Array.isArray(req.body.sections)) validateSections(req.body.sections);
+  const id = Number(run('INSERT INTO site_pages(slug,title,sections,published,sort_order,show_in_menu,updated_at) VALUES(?,?,?,?,?,?,?)', slug, title, JSON.stringify(req.body.sections || []), 1, (get('SELECT COALESCE(MAX(sort_order),0) m FROM site_pages').m) + 1, 0, now()).lastInsertRowid);
+  audit(req, 'Created website page', 'website', id, title);
+  res.status(201).json(parsePage(get('SELECT * FROM site_pages WHERE id=?', id)));
+}));
+r.put('/pages/:id(\\d+)', can('website', 'edit'), asyncH((req, res) => {
+  const p = get('SELECT * FROM site_pages WHERE id=?', req.params.id);
+  if (!p) throw notFound();
+  const b = req.body;
+  if (b.sections !== undefined && !Array.isArray(b.sections)) throw bad('Sections must be a list');
+  if (b.sections) validateSections(b.sections);
+  let slug = p.slug;
+  if (b.slug !== undefined && p.slug !== 'home') { slug = slugify(b.slug); if (!slug) throw bad('Invalid page address'); if (get('SELECT 1 FROM site_pages WHERE slug=? AND id<>?', slug, p.id)) throw bad('A page with this address already exists'); }
+  if (b.sections) {
+    const lastV = get('SELECT sections FROM site_page_versions WHERE page_id=? ORDER BY id DESC LIMIT 1', p.id);
+    if (!lastV && p.sections !== JSON.stringify(b.sections)) snapshot(p.id, p.title, p.sections, 'Before first editor save', req.user.id);
+  }
+  run(`UPDATE site_pages SET title=COALESCE(?,title), slug=?, sections=COALESCE(?,sections), published=COALESCE(?,published), seo_title=COALESCE(?,seo_title), seo_desc=COALESCE(?,seo_desc), show_in_menu=COALESCE(?,show_in_menu), updated_at=? WHERE id=?`,
+    b.title ?? null, slug, b.sections ? JSON.stringify(b.sections) : null, b.published === undefined ? null : b.published ? 1 : 0, b.seo_title ?? null, b.seo_desc ?? null, b.show_in_menu === undefined ? null : b.show_in_menu ? 1 : 0, now(), p.id);
+  if (b.sections) snapshot(p.id, b.title ?? p.title, JSON.stringify(b.sections), b.version_label || '', req.user.id);
+  audit(req, 'Edited website page', 'website', p.id, p.title);
+  res.json(parsePage(get('SELECT * FROM site_pages WHERE id=?', p.id)));
+}));
+r.post('/pages/:id(\\d+)/duplicate', can('website', 'create'), asyncH((req, res) => {
+  const p = get('SELECT * FROM site_pages WHERE id=?', req.params.id);
+  if (!p) throw notFound();
+  let slug = `${p.slug}-copy`, n = 2;
+  while (get('SELECT 1 FROM site_pages WHERE slug=?', slug)) slug = `${p.slug}-copy-${n++}`;
+  const id = Number(run('INSERT INTO site_pages(slug,title,sections,published,sort_order,show_in_menu,updated_at) VALUES(?,?,?,?,?,?,?)', slug, `${p.title} (copy)`, p.sections, 0, p.sort_order + 1, 0, now()).lastInsertRowid);
+  res.status(201).json({ id });
+}));
+r.delete('/pages/:id(\\d+)', can('website', 'delete'), asyncH((req, res) => {
+  const p = get('SELECT * FROM site_pages WHERE id=?', req.params.id);
+  if (!p) throw notFound();
+  if (p.slug === 'home') throw bad('The home page cannot be deleted');
+  run('DELETE FROM site_pages WHERE id=?', p.id);
+  audit(req, 'Deleted website page', 'website', p.id, p.title);
+  res.json({ ok: true });
+}));
+r.post('/pages/:id(\\d+)/reset', can('website', 'delete'), asyncH((req, res) => {
+  const p = get('SELECT * FROM site_pages WHERE id=?', req.params.id);
+  const d = defaultPages().find((x) => x.slug === p?.slug);
+  if (!p || !d) throw bad('Only the starter pages (home, about, contact) can be reset');
+  run('UPDATE site_pages SET sections=?, updated_at=? WHERE id=?', JSON.stringify(d.sections), now(), p.id);
+  res.json({ ok: true });
+}));
+
+// ---- blog posts
+/** SEO managers write and edit articles (and upload their images) without needing access to the rest of the website editor. */
+const blogCan = (action) => (req, res, next) => (req.user && action !== 'delete' && hasPerm(req.user, 'seo', 'edit') ? next() : can('website', action)(req, res, next));
+const parsePost = (p) => (p ? { ...p, tags: jparse(p.tags, []) } : p);
+r.get('/posts', blogCan('view'), (req, res) => res.json(all('SELECT id,slug,title,excerpt,body,cover,tags,published,published_at,created_at,seo_title,seo_desc,focus_keyword FROM site_posts ORDER BY id DESC').map((p) => { const { body, ...rest } = parsePost(p); return { ...rest, words: wordCount(body) }; })));
+r.get('/posts/:id(\\d+)', blogCan('view'), asyncH((req, res) => {
+  const p = get('SELECT * FROM site_posts WHERE id=?', req.params.id);
+  if (!p) throw notFound();
+  res.json(parsePost(p));
+}));
+function savePost(req, id) {
+  const b = req.body;
+  const title = String(b.title || '').trim();
+  if (!title) throw bad('Title is required');
+  const slug = slugify(b.slug || title);
+  if (get('SELECT 1 FROM site_posts WHERE slug=? AND id<>?', slug, id || 0)) throw bad('Another article already uses this address');
+  const tags = JSON.stringify((b.tags || []).map((t) => String(t).trim()).filter(Boolean));
+  const published = b.published ? 1 : 0;
+  const body = isHtml(b.body) ? sanitizeHtml(b.body) : String(b.body ?? '').slice(0, 100_000);
+  const seoTitle = String(b.seo_title ?? '').trim().slice(0, 90), seoDesc = String(b.seo_desc ?? '').trim().slice(0, 250), focus = String(b.focus_keyword ?? '').trim().slice(0, 80);
+  if (id) {
+    const old = get('SELECT * FROM site_posts WHERE id=?', id);
+    run('UPDATE site_posts SET slug=?,title=?,excerpt=?,body=?,cover=?,tags=?,seo_title=?,seo_desc=?,focus_keyword=?,published=?,published_at=?,updated_at=? WHERE id=?', slug, title, b.excerpt ?? '', body, b.cover ?? '', tags, seoTitle, seoDesc, focus, published, published ? (old.published_at || now()) : old.published_at, now(), id);
+    return id;
+  }
+  return Number(run('INSERT INTO site_posts(slug,title,excerpt,body,cover,tags,seo_title,seo_desc,focus_keyword,author_id,published,published_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)', slug, title, b.excerpt ?? '', body, b.cover ?? '', tags, seoTitle, seoDesc, focus, req.user.id, published, published ? now() : null, now()).lastInsertRowid);
+}
+r.post('/posts', blogCan('create'), asyncH((req, res) => { const id = savePost(req, null); audit(req, 'Created blog post', 'website', id, req.body.title); res.status(201).json({ id }); }));
+r.put('/posts/:id(\\d+)', blogCan('edit'), asyncH((req, res) => {
+  if (!get('SELECT 1 FROM site_posts WHERE id=?', req.params.id)) throw notFound();
+  savePost(req, Number(req.params.id)); audit(req, 'Edited blog post', 'website', req.params.id, req.body.title); res.json({ ok: true });
+}));
+r.delete('/posts/:id(\\d+)', can('website', 'delete'), asyncH((req, res) => { run('DELETE FROM site_posts WHERE id=?', req.params.id); audit(req, 'Deleted blog post', 'website', req.params.id); res.json({ ok: true }); }));
+
+// ---- media library (logos, hero images, blog covers)
+const up = uploader('media', 'image', 10);
+r.get('/media', blogCan('view'), (req, res) => res.json(all("SELECT id,path,caption,created_at FROM media WHERE entity_type='site' ORDER BY id DESC LIMIT 300")));
+r.post('/media', blogCan('edit'), up.array('files', 20), asyncH((req, res) => {
+  const out = tx(() => (req.files || []).map((f) => ({ id: Number(run("INSERT INTO media(entity_type,entity_id,kind,path,caption,sort_order,created_at) VALUES('site',0,'library',?,?,0,?)", `media/${f.filename}`, f.originalname.slice(0, 120), now()).lastInsertRowid), path: `media/${f.filename}` })));
+  audit(req, 'Uploaded website images', 'website', null, `${out.length} file(s)`);
+  res.status(201).json(out);
+}));
+r.delete('/media/:id(\\d+)', can('website', 'delete'), asyncH((req, res) => {
+  const m = get("SELECT * FROM media WHERE id=? AND entity_type='site'", req.params.id);
+  if (!m) throw notFound();
+  // an image that is still the logo, a hero background, a section image or a blog cover must not vanish from the live site
+  const usedIn = [];
+  if (String(getSetting('site_config') || '').includes(m.path)) usedIn.push('the site design (logo / social image)');
+  for (const pg of all('SELECT title,sections FROM site_pages')) if (String(pg.sections).includes(m.path)) usedIn.push(`the “${pg.title}” page`);
+  for (const po of all('SELECT title FROM site_posts WHERE cover=? OR body LIKE ?', m.path, `%${m.path}%`)) usedIn.push(`the article “${po.title}”`);
+  if (usedIn.length) throw bad(`This image is still used on ${usedIn.join(', ')}. Replace it there first, then delete it.`);
+  run('DELETE FROM media WHERE id=?', m.id);
+  fs.rm(path.join(uploadDir(), m.path), { force: true }, () => {});
+  res.json({ ok: true });
+}));
+
+// ---------------------------------------------------------------- chatbot knowledge bank
+const kbBody = (b) => {
+  const title = String(b.title || '').trim(), content = String(b.content || '').trim();
+  if (!title) throw bad('Give the entry a title (usually the question)');
+  if (content.length < 10) throw bad('Write the answer the assistant should give');
+  if (content.length > 2000) throw bad('Keep the answer under 2,000 characters');
+  const link = String(b.link || '').trim();
+  if (link && !/^(\/[^\s]*|https?:\/\/[^\s]+)$/.test(link)) throw bad('The link must start with / or https://');
+  return { title: title.slice(0, 160), category: String(b.category || 'General').trim().slice(0, 40) || 'General', content, keywords: String(b.keywords || '').trim().slice(0, 300), link, active: b.active === false || b.active === 0 ? 0 : 1 };
+};
+r.get('/bot/kb', can('website', 'view'), (req, res) => res.json(all('SELECT * FROM bot_kb ORDER BY category, title')));
+r.post('/bot/kb', can('website', 'create'), asyncH((req, res) => {
+  const k = kbBody(req.body || {});
+  const id = Number(run('INSERT INTO bot_kb(title,category,content,keywords,link,active,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)', k.title, k.category, k.content, k.keywords, k.link, k.active, req.user.id, now()).lastInsertRowid);
+  audit(req, 'Added chatbot knowledge', 'website', id, k.title);
+  res.status(201).json({ id });
+}));
+r.put('/bot/kb/:id(\\d+)', can('website', 'edit'), asyncH((req, res) => {
+  if (!get('SELECT 1 FROM bot_kb WHERE id=?', req.params.id)) throw notFound('Entry not found');
+  const k = kbBody(req.body || {});
+  run('UPDATE bot_kb SET title=?,category=?,content=?,keywords=?,link=?,active=?,updated_at=? WHERE id=?', k.title, k.category, k.content, k.keywords, k.link, k.active, now(), req.params.id);
+  audit(req, 'Updated chatbot knowledge', 'website', Number(req.params.id), k.title);
+  res.json({ ok: true });
+}));
+r.delete('/bot/kb/:id(\\d+)', can('website', 'delete'), asyncH((req, res) => {
+  const k = get('SELECT title FROM bot_kb WHERE id=?', req.params.id); if (!k) throw notFound('Entry not found');
+  run('DELETE FROM bot_kb WHERE id=?', req.params.id);
+  audit(req, 'Deleted chatbot knowledge', 'website', Number(req.params.id), k.title);
+  res.json({ ok: true });
+}));
+/** What the assistant learns on its own from the website (read-only), grouped by source. */
+r.get('/bot/knowledge', can('website', 'view'), (req, res) => {
+  const docs = buildKnowledge(siteConfig());
+  const by = {};
+  docs.forEach((d) => { (by[d.source] ||= []).push(d.title); });
+  res.json({ total: docs.length, sources: Object.entries(by).map(([source, titles]) => ({ source, count: titles.length, sample: titles.slice(0, 6) })) });
+});
+r.get('/bot/chats', can('website', 'view'), (req, res) => {
+  const only = req.query.unanswered === '1' ? 'WHERE matched=0' : '';
+  const rows = all(`SELECT c.*, ct.full_name contact_name FROM bot_chats c LEFT JOIN contacts ct ON ct.id=c.contact_id ${only} ORDER BY c.id DESC LIMIT 300`);
+  res.json({ rows, stats: { total: get('SELECT COUNT(*) n FROM bot_chats').n, unanswered: get('SELECT COUNT(*) n FROM bot_chats WHERE matched=0').n, sessions: get('SELECT COUNT(DISTINCT session) n FROM bot_chats').n, leads: get('SELECT COUNT(DISTINCT contact_id) n FROM bot_chats WHERE contact_id IS NOT NULL').n } });
+});
+r.delete('/bot/chats/:id(\\d+)', can('website', 'delete'), (req, res) => { run('DELETE FROM bot_chats WHERE id=?', req.params.id); res.json({ ok: true }); });
+r.post('/bot/test', can('website', 'view'), asyncH((req, res) => {
+  const m = String(req.body?.message || '').trim();
+  if (!m) throw bad('Type a question to test');
+  res.json(reply(m, siteConfig()));
+}));
+
+export default r;
