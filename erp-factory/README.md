@@ -48,3 +48,15 @@ node erp-factory/tools/check-token-drift.mjs                       # reference v
 node erp-factory/tools/check-token-drift.mjs --target <proj>/client/src/tokens.css   # a client build vs tokens
 ```
 Rules for editing this folder are in `standards/52-checklists.md` → *Governance*.
+
+## Install as a Claude skill (use it in every project)
+
+The skill lives at `.claude/skills/erp-factory/SKILL.md`, so it is already active **inside this repository**. To use it in *any* project on your machine, build the self-contained bundle (skill + knowledge base + reference source, ~5 MB) and install it into your user skills folder:
+
+```bash
+node erp-factory/tools/package-skill.mjs --install     # builds dist/erp-factory and copies it to ~/.claude/skills/erp-factory
+```
+
+Manual alternatives: copy `dist/erp-factory/` (or the downloaded `erp-factory-skill.zip`, unzipped) to `~/.claude/skills/erp-factory/` (Windows: `%USERPROFILE%\.claude\skills\erp-factory\`), or into a single project's `.claude/skills/erp-factory/`. Restart Claude Code; it appears as `/erp-factory` and loads automatically for ERP tasks.
+
+Re-run the packaging command after every knowledge-base change (bump `VERSION` first) and reinstall; `erp-factory/BUNDLE.txt` inside the installed copy records which version it holds. Use `--no-reference` for a docs-only bundle.
