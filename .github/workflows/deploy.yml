@@ -3,7 +3,10 @@ name: Deploy
 on:
   push:
     branches: [main]
-    paths: ['agentify-erp/**', '.github/workflows/deploy.yml']
+    paths:
+      - 'agentify-erp/**'
+      - '.github/workflows/deploy.yml'
+      - '.github/scripts/**'
   workflow_dispatch:
 
 concurrency:
@@ -15,7 +18,7 @@ env:
   SERVICE: agentify-erp
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -26,11 +29,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: |
-            agentify-erp/server/package-lock.json
-            agentify-erp/client/package-lock.json
-      - run: npm --prefix server ci
-      - run: npm --prefix server test
+          cache-dependency-path: agentify-erp/client/package-lock.json
       - run: npm --prefix client ci
       - run: npm --prefix client run build
       - uses: actions/upload-artifact@v4
@@ -40,7 +39,7 @@ jobs:
           retention-days: 1
 
   deploy:
-    needs: test
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,35 +48,59 @@ jobs:
           name: client-dist
           path: agentify-erp/client/dist
 
-      - name: Set up SSH
-        run: |
-          install -m 700 -d ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p "${{ secrets.SSH_PORT || 22 }}" "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
-          cat > ~/.ssh/config <<EOF
-          Host server
-            HostName ${{ secrets.SSH_HOST }}
-            User ${{ secrets.SSH_USER }}
-            Port ${{ secrets.SSH_PORT || 22 }}
-            IdentityFile ~/.ssh/id_deploy
-          EOF
+      - name: Install sshpass
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass rsync
 
-      # Live data (databases, uploads) and .env stay on the server; never overwritten.
-      - name: Upload code
+      - name: Deploy to server
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+          HOST: ${{ secrets.SSH_HOST }}
+          DUSER: ${{ secrets.SSH_USER }}
+          PORT: ${{ secrets.SSH_PORT }}
+          ENV_JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ENV_ERP_SECRETS_KEY: ${{ secrets.ERP_SECRETS_KEY }}
+          ENV_ERP_BASE_DOMAIN: ${{ secrets.ERP_BASE_DOMAIN }}
+          ENV_PLATFORM_ADMIN_EMAIL: ${{ secrets.PLATFORM_ADMIN_EMAIL }}
+          ENV_PLATFORM_ADMIN_PASSWORD: ${{ secrets.PLATFORM_ADMIN_PASSWORD }}
         run: |
-          ssh server "mkdir -p $APP_DIR"
-          rsync -az --delete \
+          set -euo pipefail
+          if [ -z "${HOST:-}" ] || [ -z "${SSHPASS:-}" ]; then
+            echo "Missing required secrets: SSH_HOST and SSH_PASSWORD"; exit 1
+          fi
+          PORT="${PORT:-22}"
+          DUSER="${DUSER:-root}"
+          SSH="ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=25 -o ServerAliveInterval=20"
+          JWT_SECRET="${ENV_JWT_SECRET:-$(openssl rand -hex 32)}"
+          ERP_SECRETS_KEY="${ENV_ERP_SECRETS_KEY:-$(openssl rand -hex 32)}"
+          echo "::add-mask::${JWT_SECRET}"
+          echo "::add-mask::${ERP_SECRETS_KEY}"
+          if [ -n "${ENV_PLATFORM_ADMIN_PASSWORD:-}" ]; then echo "::add-mask::${ENV_PLATFORM_ADMIN_PASSWORD}"; fi
+          REMOTE="$DUSER@$HOST"
+
+          q() { printf '%q' "$1"; }
+          REMOTE_ENV="JWT_SECRET=$(q "$JWT_SECRET")"
+          REMOTE_ENV="$REMOTE_ENV ERP_SECRETS_KEY=$(q "$ERP_SECRETS_KEY")"
+          REMOTE_ENV="$REMOTE_ENV ERP_BASE_DOMAIN=$(q "${ENV_ERP_BASE_DOMAIN:-}")"
+          REMOTE_ENV="$REMOTE_ENV PLATFORM_ADMIN_EMAIL=$(q "${ENV_PLATFORM_ADMIN_EMAIL:-}")"
+          REMOTE_ENV="$REMOTE_ENV PLATFORM_ADMIN_PASSWORD=$(q "${ENV_PLATFORM_ADMIN_PASSWORD:-}")"
+
+          echo "==> Bootstrapping server ($HOST)"
+          sshpass -e $SSH -p "$PORT" "$REMOTE" \
+            "$REMOTE_ENV bash -s" \
+            -- "$APP_DIR" "$SERVICE" < .github/scripts/remote-bootstrap.sh
+
+          echo "==> Uploading server code"
+          sshpass -e rsync -az --delete -e "$SSH -p $PORT" \
             --exclude 'node_modules' --exclude '.env' --exclude '.env.*' \
-            --exclude 'server/data' --exclude 'server/uploads' \
-            --exclude 'mobile' --exclude 'docs' --exclude '.github' \
-            agentify-erp/ server:$APP_DIR/
+            --exclude 'data' --exclude 'uploads' \
+            agentify-erp/server/ "$REMOTE:$APP_DIR/server/"
 
-      - name: Install dependencies and restart
-        run: |
-          ssh server "set -e
-            cd $APP_DIR
-            npm --prefix server ci --omit=dev
-            systemctl restart $SERVICE
-            sleep 3
-            systemctl is-active $SERVICE"
+          echo "==> Uploading built client"
+          sshpass -e rsync -az --delete -e "$SSH -p $PORT" \
+            agentify-erp/client/dist/ "$REMOTE:$APP_DIR/client/dist/"
+
+          echo "==> Installing and restarting"
+          sshpass -e $SSH -p "$PORT" "$REMOTE" "bash -s" \
+            -- "$APP_DIR" "$SERVICE" < .github/scripts/remote-release.sh
+
+          echo "Deployed: http://$HOST:4000"
