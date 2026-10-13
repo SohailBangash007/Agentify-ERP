@@ -108,6 +108,10 @@ jobs:
             --exclude 'data' --exclude 'uploads' \
             agentify-erp/server/ "$REMOTE:$APP_DIR/server/"
 
+          echo "==> Uploading shared"
+          sshpass -e rsync -az --delete -e "$SSH -p $PORT" \
+            agentify-erp/shared/ "$REMOTE:$APP_DIR/shared/"
+
           echo "==> Uploading built client"
           sshpass -e rsync -az --delete -e "$SSH -p $PORT" \
             agentify-erp/client/dist/ "$REMOTE:$APP_DIR/client/dist/"
