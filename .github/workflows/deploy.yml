@@ -53,8 +53,8 @@ jobs:
 
       - name: Deploy to server
         env:
-          SSHPASS: ${{ secrets.SSH_PASSWORD }}
-          HOST: ${{ secrets.SSH_HOST }}
+          SSHPASS: ${{ secrets.SSH_PASSWORD || secrets.SECRETKEY }}
+          HOST: ${{ secrets.SSH_HOST || secrets.ACCESSKEY }}
           DUSER: ${{ secrets.SSH_USER }}
           PORT: ${{ secrets.SSH_PORT }}
           ENV_JWT_SECRET: ${{ secrets.JWT_SECRET }}
