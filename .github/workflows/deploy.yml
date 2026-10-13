@@ -62,6 +62,7 @@ jobs:
           ENV_ERP_BASE_DOMAIN: ${{ secrets.ERP_BASE_DOMAIN }}
           ENV_PLATFORM_ADMIN_EMAIL: ${{ secrets.PLATFORM_ADMIN_EMAIL }}
           ENV_PLATFORM_ADMIN_PASSWORD: ${{ secrets.PLATFORM_ADMIN_PASSWORD }}
+          SERVER_DOMAIN: ${{ secrets.SERVER_DOMAIN }}
         run: |
           set -euo pipefail
           if [ -z "${HOST:-}" ] || [ -z "${SSHPASS:-}" ]; then
@@ -69,6 +70,7 @@ jobs:
           fi
           PORT="${PORT:-22}"
           DUSER="${DUSER:-root}"
+          DOMAIN="${SERVER_DOMAIN:-agentifyerp.biztrack.uk}"
           SSH="ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=25 -o ServerAliveInterval=20"
           JWT_SECRET="${ENV_JWT_SECRET:-$(openssl rand -hex 32)}"
           ERP_SECRETS_KEY="${ENV_ERP_SECRETS_KEY:-$(openssl rand -hex 32)}"
@@ -98,7 +100,7 @@ jobs:
           echo "==> Bootstrapping server ($HOST)"
           sshpass -e $SSH -p "$PORT" "$REMOTE" \
             "$REMOTE_ENV bash -s" \
-            -- "$APP_DIR" "$SERVICE" < .github/scripts/remote-bootstrap.sh
+            -- "$APP_DIR" "$SERVICE" "$DOMAIN" < .github/scripts/remote-bootstrap.sh
 
           echo "==> Uploading server code"
           sshpass -e rsync -az --delete -e "$SSH -p $PORT" \
@@ -114,4 +116,4 @@ jobs:
           sshpass -e $SSH -p "$PORT" "$REMOTE" "bash -s" \
             -- "$APP_DIR" "$SERVICE" < .github/scripts/remote-release.sh
 
-          echo "Deployed: http://$HOST:4000"
+          echo "Deployed: https://$DOMAIN (and http://$HOST:4000)"

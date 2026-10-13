@@ -3,24 +3,28 @@ set -euo pipefail
 
 APP_DIR="${1:-/opt/agentify-erp}"
 SERVICE="${2:-agentify-erp}"
+NODE=/opt/node22/bin/node
+NPM=/opt/node22/bin/npm
+
+if [ ! -x "$NODE" ]; then
+  echo "Node 22 not found at $NODE (bootstrap did not run?)"
+  exit 1
+fi
 
 cd "$APP_DIR/server"
-npm install --omit=dev --no-audit --no-fund
+"$NPM" install --omit=dev --no-audit --no-fund
 
 pm2 delete "$SERVICE" >/dev/null 2>&1 || true
-pm2 start src/index.js --name "$SERVICE" --time
+pm2 start src/index.js --name "$SERVICE" \
+  --interpreter "$NODE" --node-args "--disable-warning=ExperimentalWarning"
 pm2 save
 
-PM2_USER="$(id -un)"
-pm2 startup systemd -u "$PM2_USER" --hp "$HOME" >/dev/null 2>&1 || true
-
-sleep 4
-STATUS="$(pm2 jlist 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const a=JSON.parse(s);const p=a.find(x=>x.name===process.argv[1]);console.log(p?p.pm2_env.status:"missing")}catch(e){console.log("unknown")}})' "$SERVICE")"
-
-if [ "$STATUS" != "online" ]; then
-  echo "service '$SERVICE' is '$STATUS' (expected online)"
+sleep 5
+if ! curl -fsS http://127.0.0.1:4000/health; then
+  echo "health check failed"
   pm2 logs "$SERVICE" --lines 60 --nostream || true
   exit 1
 fi
 
-echo "release ok: $SERVICE is online"
+echo
+echo "release ok: $SERVICE healthy on port 4000"

@@ -3,6 +3,9 @@ set -euo pipefail
 
 APP_DIR="${1:-/opt/agentify-erp}"
 SERVICE="${2:-agentify-erp}"
+DOMAIN="${3:-agentifyerp.biztrack.uk}"
+NODE_DIR=/opt/node22
+NODE_VERSION=v22.23.3
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -13,23 +16,17 @@ if ! have curl || ! have rsync || ! have git; then
   apt-get install -y -qq curl rsync git ca-certificates
 fi
 
-install_node=0
-if ! have node; then
-  install_node=1
-else
-  NODE_MAJOR="$(node -v | sed 's/^v//' | cut -d. -f1)"
-  if [ "${NODE_MAJOR:-0}" -lt 22 ]; then
-    install_node=1
-  fi
+if [ ! -x "$NODE_DIR/bin/node" ]; then
+  echo "installing Node $NODE_VERSION to $NODE_DIR"
+  curl -fsSL "https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-x64.tar.xz" -o /tmp/node22.tar.xz
+  tar -xJf /tmp/node22.tar.xz -C /opt
+  mv "/opt/node-$NODE_VERSION-linux-x64" "$NODE_DIR"
+  rm -f /tmp/node22.tar.xz
 fi
-
-if [ "$install_node" = "1" ]; then
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-  apt-get install -y -qq nodejs
-fi
+echo "node: $("$NODE_DIR/bin/node" -v)"
 
 if ! have pm2; then
-  npm install -g pm2
+  "$NODE_DIR/bin/npm" install -g pm2
 fi
 
 mkdir -p "$APP_DIR/server" "$APP_DIR/client"
@@ -55,4 +52,41 @@ else
   echo "keeping existing $APP_DIR/server/.env"
 fi
 
-echo "bootstrap ok: node $(node -v), npm $(npm -v), pm2 $(pm2 -v)"
+if have nginx && [ ! -f /etc/nginx/sites-available/agentify-erp ]; then
+  cat > /etc/nginx/sites-available/agentify-erp <<'NGINXCONF'
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __DOMAIN__;
+
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 300s;
+    }
+}
+NGINXCONF
+  sed -i "s/__DOMAIN__/$DOMAIN/g" /etc/nginx/sites-available/agentify-erp
+  ln -sf /etc/nginx/sites-available/agentify-erp /etc/nginx/sites-enabled/agentify-erp
+  if nginx -t; then
+    systemctl reload nginx
+    echo "nginx configured for $DOMAIN"
+  else
+    rm -f /etc/nginx/sites-enabled/agentify-erp
+    echo "nginx config test failed; skipped (site still on port 4000)"
+  fi
+fi
+
+if have certbot && [ -f /etc/nginx/sites-available/agentify-erp ] && [ ! -d "/etc/letsencrypt/live/$DOMAIN" ]; then
+  certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email --redirect || echo "certbot failed (HTTP still works)"
+fi
+
+echo "bootstrap ok"
