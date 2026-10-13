@@ -84,6 +84,17 @@ jobs:
           REMOTE_ENV="$REMOTE_ENV PLATFORM_ADMIN_EMAIL=$(q "${ENV_PLATFORM_ADMIN_EMAIL:-}")"
           REMOTE_ENV="$REMOTE_ENV PLATFORM_ADMIN_PASSWORD=$(q "${ENV_PLATFORM_ADMIN_PASSWORD:-}")"
 
+          case "$HOST" in
+            *.*) : ;;
+            *) echo "ERROR: the SSH host secret does not look like an IP or domain (expected something like 81.17.101.93). Update ACCESSKEY (or add SSH_HOST)."; exit 1 ;;
+          esac
+
+          echo "==> Testing SSH login to $HOST:$PORT as $DUSER"
+          if ! sshpass -e $SSH -p "$PORT" "$REMOTE" "echo connected"; then
+            echo "ERROR: SSH login failed. Check the password secret (SECRETKEY / SSH_PASSWORD) and SSH_USER."
+            exit 1
+          fi
+
           echo "==> Bootstrapping server ($HOST)"
           sshpass -e $SSH -p "$PORT" "$REMOTE" \
             "$REMOTE_ENV bash -s" \
