@@ -138,6 +138,10 @@ export function platformDb() {
     ['invited_by', 'TEXT'], ['invite_token_hash', 'TEXT'], ['invite_expires_at', 'TEXT'], ['activated_at', 'TEXT']]) if (!adm.has(c)) pdb.exec(`ALTER TABLE platform_admins ADD COLUMN ${c} ${def}`);
   const aud = new Set(pdb.prepare('PRAGMA table_info(platform_audit)').all().map((c) => c.name));
   for (const c of ['actor_role', 'target', 'reason', 'outcome', 'ip', 'user_agent', 'request_id']) if (!aud.has(c)) pdb.exec(`ALTER TABLE platform_audit ADD COLUMN ${c} TEXT`);
+  // invoices: the one-time part (setup fee) is recognised at once, the rest over the invoice period
+  const inv = new Set(pdb.prepare('PRAGMA table_info(invoices)').all().map((c) => c.name));
+  if (!inv.has('one_time_amount')) pdb.exec('ALTER TABLE invoices ADD COLUMN one_time_amount INTEGER NOT NULL DEFAULT 0');
+  if (!inv.has('plan')) pdb.exec('ALTER TABLE invoices ADD COLUMN plan TEXT');
   pdb.exec(PLATFORM_SCHEMA_2);
   // the original install keeps every product it already used and gains the construction module
   pdb.exec("UPDATE tenants SET product='bundle' WHERE is_legacy=1 AND product='real_estate'");

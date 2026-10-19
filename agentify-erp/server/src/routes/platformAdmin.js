@@ -5,6 +5,7 @@ import { asyncH, bad, HttpError } from '../util.js';
 import { platformDb, BASE_DOMAIN, isMultiTenant, getTenant } from '../platform.js';
 import { listAddons, saveAddon, setTenantAddon, listCoupons, saveCoupon, recordRefund, quote } from '../services/commerce.js';
 import { runLifecycle } from '../services/lifecycle.js';
+import { finance } from '../services/finance.js';
 import { COOKIE, login, loginMfa, changePassword, requireOperator, onPlatformHost, twofaStatus, twofaSetup, twofaEnable, twofaDisable,
   loginMeta, endSession, listSessions, revokeSession, revokeAllFor, loginHistory, mfaRequired } from '../services/platformAuth.js';
 import { ROLES, PERMISSIONS, permsOf, can, need, auditContext, onDenied } from '../services/platformAccess.js';
@@ -272,7 +273,32 @@ r.get('/transactions', requireOperator, need('billing.view'), (req, res) => res.
 r.get('/setup', requireOperator, need('system.view'), (req, res) => res.json(setupChecklist(req.operator)));
 
 // ---- Dashboard, health, notifications, search
-r.get('/dashboard', requireOperator, need('dashboard.view'), asyncH((req, res) => res.json(dashboard(req.query, req))));
+r.get('/dashboard', requireOperator, need('dashboard.view'), asyncH((req, res) => {
+  const out = dashboard(req.query, req);
+  // roles without financial reporting see counts and activity, never money
+  if (!can(req.operator, 'finance.view')) {
+    for (const k of ['mrr', 'arr', 'payments_received']) if (out.kpis[k]) out.kpis[k] = { hidden: true };
+    out.charts.revenue = []; out.charts.top_workspaces = []; out.charts.recent_transactions = [];
+  }
+  if (!can(req.operator, 'workspaces.view')) { out.charts.top_workspaces = []; out.charts.recent_transactions = []; out.charts.recent_activity = []; }
+  res.json(out);
+}));
+/** Revenue & subscriptions: MRR/ARR, invoiced vs collected, refunds, net, recognised revenue, movement; filterable. */
+r.get('/finance', requireOperator, need('finance.view'), asyncH((req, res) => res.json(finance(req.query))));
+r.get('/finance/export', requireOperator, need('finance.view'), need('workspaces.export'), asyncH(async (req, res) => {
+  const f = finance(req.query);
+  const rows = [];
+  for (const [metric, byCur] of Object.entries(f.money)) for (const [currency, amount] of Object.entries(byCur)) rows.push({ section: 'Money', metric, currency, value: amount, definition: f.definitions[metric] || '' });
+  for (const [k, v] of Object.entries({ ...f.counts, failed_payments: f.failed_payments, ...f.movement })) rows.push({ section: 'Counts', metric: k, currency: '', value: v ?? '', definition: '' });
+  for (const p of f.by_plan) for (const [currency, amount] of Object.entries(p.mrr)) rows.push({ section: 'MRR by plan', metric: `${p.name} (${p.plan}), ${p.subscribers} subscribers`, currency, value: amount, definition: '' });
+  const rep = { id: 'revenue-summary', title: 'Revenue & subscriptions', range: f.range, rows, columns: [['section', 'Section'], ['metric', 'Metric'], ['currency', 'Currency'], ['value', 'Value'], ['definition', 'Definition']] };
+  const file = await exportReport(rep, String(req.query.format || 'csv'));
+  audit(req.operator.email, 'report-exported', { report: rep.id, format: req.query.format || 'csv', filters: f.filters, from: f.range.from, to: f.range.to });
+  res.setHeader('Content-Type', file.type);
+  res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(file.body);
+}));
 r.get('/health', requireOperator, need('system.view'), (_req, res) => res.json(health()));
 r.get('/notifications', requireOperator, need('dashboard.view'), asyncH((req, res) => { generateNotifications(req); res.json(listNotifications(req.operator.id, { all: req.query.all === '1' })); }));
 r.post('/notifications/read', requireOperator, need('dashboard.view'), asyncH((req, res) => res.json({ marked: markRead(req.operator.id, req.body?.ids) })));

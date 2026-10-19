@@ -99,8 +99,8 @@ export function applyBillingEvent(provider, ev) {
     }
     if (ev.invoice?.id) {
       const i = ev.invoice;
-      db.prepare('INSERT OR REPLACE INTO invoices(tenant_id,provider_invoice_id,amount,currency,status,hosted_url,period_start,period_end) VALUES(?,?,?,?,?,?,?,?)')
-        .run(tenant.id, String(i.id), Math.round(Number(i.amount) || 0), String(i.currency || 'USD').toUpperCase(), String(i.status || 'paid'), i.url || null, iso(i.period_start), iso(i.period_end));
+      db.prepare('INSERT OR REPLACE INTO invoices(tenant_id,provider_invoice_id,amount,currency,status,hosted_url,period_start,period_end,plan) VALUES(?,?,?,?,?,?,?,?,?)')
+        .run(tenant.id, String(i.id), Math.round(Number(i.amount) || 0), String(i.currency || 'USD').toUpperCase(), String(i.status || 'paid'), i.url || null, iso(i.period_start), iso(i.period_end), getTenant(tenant.id).plan || null);
     }
     recordSubscriptionChange(tenant, getTenant(tenant.id), { source: `webhook:${provider}`, reason: ev.type }, db);
     db.exec('COMMIT');
@@ -218,7 +218,7 @@ export async function approveSubmission(id, decisionNote, decidedBy = null) {
     const recurring = s.list_amount != null ? Math.max(0, s.list_amount - (s.discount_amount || 0)) : s.amount;
     db.prepare("UPDATE tenants SET plan=?, subscription_status='active', current_period_end=?, billing_interval=?, billing_provider=?, grace_until=NULL, price_amount=?, price_currency=?, canceled_at=NULL, updated_at=datetime('now') WHERE id=?")
       .run(s.plan, periodEnd, s.interval, s.method, recurring, s.currency, s.tenant_id);
-    db.prepare('INSERT OR IGNORE INTO invoices(tenant_id,provider_invoice_id,amount,currency,status,period_start,period_end) VALUES(?,?,?,?,?,?,?)').run(s.tenant_id, `local-${id}`, s.amount, s.currency, 'paid', current, periodEnd);
+    db.prepare('INSERT OR IGNORE INTO invoices(tenant_id,provider_invoice_id,amount,currency,status,period_start,period_end,one_time_amount,plan) VALUES(?,?,?,?,?,?,?,?,?)').run(s.tenant_id, `local-${id}`, s.amount, s.currency, 'paid', current, periodEnd, Math.min(s.amount, s.setup_fee || 0), s.plan);
     if (s.coupon_code) recordRedemption(s.coupon_code, s.tenant_id, id, s.discount_amount || 0, s.currency, db);
     for (const a of (() => { try { return JSON.parse(s.addons || '[]'); } catch { return []; } })()) setTenantAddon(s.tenant_id, { addon_id: a.id, quantity: a.quantity, active: true }, decidedBy, db);
     recordSubscriptionChange(tenant, getTenant(s.tenant_id), { source: 'payment', actor: decidedBy, reason: `Payment ${s.reference} (${s.method})` }, db);

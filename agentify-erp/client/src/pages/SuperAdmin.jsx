@@ -54,6 +54,7 @@ export function Workspaces({ onOpen }) {
   const toast = useToast();
   const [rows, setRows] = useState(null);
   const [q, setQ] = useState('');
+  const [prod, setProd] = useState('');
   const [params, setParams] = useSearchParams();
   const f = FILTERS.some(([k]) => k === params.get('status')) ? params.get('status') : 'all';
   const setF = (v) => { const p = new URLSearchParams(params); if (v === 'all') p.delete('status'); else p.set('status', v); setParams(p); setPage(0); };
@@ -61,15 +62,15 @@ export function Workspaces({ onOpen }) {
   const [sort, setSort] = useState({ key: 'created', dir: -1 });
   const [page, setPage] = useState(0);
   const PER = 25;
-  const blank = { slug: '', company_name: '', admin_name: '', admin_email: '', admin_password: '', trial_days: 14, demo: false };
+  const blank = { slug: '', company_name: '', admin_name: '', admin_email: '', admin_password: '', trial_days: 7, demo: false, product: 'real_estate' };
   useEffect(() => { if (params.get('new') === '1') { setCreate(blank); const p = new URLSearchParams(params); p.delete('new'); setParams(p, { replace: true }); } }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
   const load = useCallback(() => api.get(`${A}/workspaces`).then(setRows).catch((e) => toast(e.message, 'err')), [toast]);
   useEffect(() => { load(); }, [load]);
   const shown = useMemo(() => {
-    const list = (rows || []).filter((t) => matches(t, f) && (!q || `${t.name} ${t.slug} ${t.owner_email}`.toLowerCase().includes(q.toLowerCase())));
+    const list = (rows || []).filter((t) => matches(t, f) && (!prod || t.product === prod) && (!q || `${t.name} ${t.slug} ${t.owner_email}`.toLowerCase().includes(q.toLowerCase())));
     const val = (t) => ({ name: t.name.toLowerCase(), progress: t.progress?.percent ?? -1, users: t.stats?.seats ?? -1, active: t.stats?.last_activity || '', expiry: t.expiry.days_left ?? 99999, created: t.created_at }[sort.key]);
     return list.sort((a, b) => (val(a) < val(b) ? -1 : val(a) > val(b) ? 1 : 0) * sort.dir);
-  }, [rows, q, f, sort]);
+  }, [rows, q, f, sort, prod]);
   const pages = Math.max(1, Math.ceil(shown.length / PER));
   const pageRows = shown.slice(page * PER, page * PER + PER);
   const th = (key, label) => <th className="pa-sortable" onClick={() => setSort((x) => ({ key, dir: x.key === key ? -x.dir : 1 }))} aria-sort={sort.key === key ? (sort.dir > 0 ? 'ascending' : 'descending') : 'none'}>{label}{sort.key === key ? (sort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>;
@@ -86,6 +87,7 @@ export function Workspaces({ onOpen }) {
   return (
     <Card flush title={`${shown.length} workspace${shown.length === 1 ? '' : 's'}`} actions={<>
       <input className="input" style={{ width: 200 }} placeholder="Search name, address, owner" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} aria-label="Search workspaces" />
+      <select className="input" style={{ width: 170 }} value={prod} onChange={(e) => { setProd(e.target.value); setPage(0); }} aria-label="Product"><option value="">Both products</option><option value="real_estate">Real estate</option><option value="construction">Construction</option><option value="bundle">Bundle</option></select>
       <select className="input" style={{ width: 180 }} value={f} onChange={(e) => setF(e.target.value)} aria-label="Filter">{FILTERS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
       <button className="btn sm" onClick={exportCsv} disabled={!shown.length}>Export CSV</button>
       <button className="btn primary sm" onClick={() => setCreate(blank)}>New workspace</button>
@@ -98,7 +100,7 @@ export function Workspaces({ onOpen }) {
               <td style={{ minWidth: 140 }}>{t.progress ? <><ProgressBar value={t.progress.percent} tone="green" /><div className="muted">{t.progress.done} of {t.progress.total} steps</div></> : <span className="err">{t.error || '—'}</span>}</td>
               <td className="nowrap">{t.stats && <><div>{limit(t.stats.seats, t.expiry.limits?.seats)} users</div><div className="muted">{limit(t.stats.projects, t.expiry.limits?.projects)} projects · {num(t.stats.properties)} properties · {num(t.stats.sales)} sales</div></>}</td>
               <td className="nowrap">{ago(t.stats?.last_activity)}</td>
-              <td><div style={{ textTransform: 'capitalize' }}>{t.is_legacy ? 'Original (unmetered)' : t.plan}</div><ExpiryBadge e={t.expiry} /></td>
+              <td><div style={{ textTransform: 'capitalize' }}>{t.is_legacy ? 'Original (unmetered)' : t.plan}</div><div className="muted">{PRODUCT_SHORT[t.product] || ''}</div><ExpiryBadge e={t.expiry} /></td>
               <td><StatusBadge status={t.status} /></td>
             </tr>
           ))}
@@ -113,6 +115,7 @@ export function Workspaces({ onOpen }) {
           <Field label="Owner name"><TextInput value={create.admin_name} onChange={(v) => setCreate({ ...create, admin_name: v })} /></Field>
           <Field label="Owner email" required><TextInput type="email" value={create.admin_email} onChange={(v) => setCreate({ ...create, admin_email: v })} /></Field>
           <Field label="Owner password" required hint="At least 8 characters"><TextInput type="text" autoComplete="off" value={create.admin_password} onChange={(v) => setCreate({ ...create, admin_password: v })} /></Field>
+          <Field label="Product"><select className="input" value={create.product} onChange={(ev) => setCreate({ ...create, product: ev.target.value })}><option value="real_estate">Real Estate Brokerage</option><option value="construction">Construction Management</option><option value="bundle">Both products</option></select></Field>
           <Field label="Free trial days" hint="0 for no trial"><TextInput type="number" value={create.trial_days} onChange={(v) => setCreate({ ...create, trial_days: v })} /></Field>
           <Toggle value={create.demo} onChange={(v) => setCreate({ ...create, demo: v })} label="Fill with demo data" />
         </Modal>
@@ -132,6 +135,8 @@ const USER_ACTIONS = [
 ];
 
 const fmtBytes = (n) => (n == null ? '—' : n > 1e9 ? `${(n / 1e9).toFixed(2)} GB` : n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
+const PRODUCT_SHORT = { real_estate: 'Real estate', construction: 'Construction', bundle: 'Both products' };
+const TRIAL_ACTIONS = [['extend', 'Extend'], ['shorten', 'Shorten'], ['end', 'End now'], ['revoke', 'Revoke (abuse)'], ['grant', 'Start a new trial']];
 const TABS = [['overview', 'Overview'], ['profile', 'Company profile'], ['users', 'Users & access'], ['subscription', 'Subscription'], ['payments', 'Invoices & payments'], ['limits', 'Usage & limits'], ['activity', 'Activity'], ['notes', 'Notes & support']];
 
 export function WorkspaceDetail({ id, onClose, onChanged }) {
@@ -167,7 +172,7 @@ export function WorkspaceDetail({ id, onClose, onChanged }) {
         {d.url && <a className="btn sm" href={d.url} target="_blank" rel="noreferrer">Open workspace ↗</a>}
         {billed && can('billing.manage') && <button className="btn sm" onClick={() => setModal({ kind: 'plan', plan: d.plans.some((p) => p.id === d.plan) ? d.plan : d.plans[0]?.id, sub: 'active', interval: d.billing_interval || 'month', period_end: '', reason: '' })}>Change plan</button>}
         {billed && can('billing.manage') && <button className="btn sm" onClick={() => setModal({ kind: 'pay', plan: d.plans.some((p) => p.id === d.plan) ? d.plan : d.plans[0]?.id, interval: d.billing_interval || 'month', method: 'bank', currency: 'PKR', amount: '', reference: '', note: '' })}>Record payment</button>}
-        {billed && can('workspaces.edit') && e.kind === 'trial' && <button className="btn sm" onClick={() => setModal({ kind: 'trial', days: 7, until: '', reason: '' })}>Extend trial</button>}
+        {billed && can('trials.manage') && (d.subscription_status === 'trialing' || (['expired', 'pending'].includes(d.subscription_status) && !d.current_period_end)) && <button className="btn sm" onClick={() => setModal({ kind: 'trial', action: d.subscription_status === 'trialing' ? 'extend' : 'grant', days: 7, until: '', reason: '' })}>Trial controls</button>}
         {billed && can('billing.manage') && e.kind === 'grace' && <button className="btn sm" onClick={() => setModal({ kind: 'grace', until: '', reason: '' })}>Extend grace period</button>}
         {billed && can('workspaces.edit') && d.owner_email && <button className="btn sm" onClick={() => post(`${A}/workspaces/${id}/remind`, {}, 'Billing reminder sent to the owner')}>Send billing reminder</button>}
         <Menu trigger={<button className="btn sm">More ▾</button>}>
@@ -183,7 +188,7 @@ export function WorkspaceDetail({ id, onClose, onChanged }) {
       <div style={{ marginTop: 12 }} className="stack">
         {tab === 'overview' && <>
           <Card title="At a glance">
-            <KV items={[['Address', d.url ? <a href={d.url} target="_blank" rel="noreferrer">{d.url}</a> : d.slug], ['Owner', [d.owner_name, d.owner_email, d.owner_phone].filter(Boolean).join(' · ') || '—'], ['Status', <StatusBadge key="s" status={d.status} />],
+            <KV items={[['Address', d.url ? <a href={d.url} target="_blank" rel="noreferrer">{d.url}</a> : d.slug], ['Product', `${PRODUCT_SHORT[d.product] || d.product}${d.products ? ` (uses: ${d.products.map((x) => PRODUCT_SHORT[x]).join(', ')})` : ''}`], ...(d.trial_note ? [['Trial', d.trial_note]] : []), ['Owner', [d.owner_name, d.owner_email, d.owner_phone].filter(Boolean).join(' · ') || '—'], ['Status', <StatusBadge key="s" status={d.status} />],
               ['Plan', d.is_legacy ? 'Original install (unmetered)' : `${e.kind === 'trial' ? 'Free trial' : planNames[d.plan] || d.plan}${d.billing_interval && e.kind !== 'trial' ? ` · ${d.billing_interval}ly` : ''}`],
               ['Price', d.price ? `${d.price.currency} ${num(d.price.amount)} per ${d.price.interval}` : '—'], ['Access', <ExpiryBadge key="e" e={e} />],
               ['Account manager', d.account_manager], ['Created', d10(d.created_at)], ['Last sign-in', ago(s.last_login)], ['Last activity', ago(s.last_activity)]]} />
@@ -220,7 +225,7 @@ export function WorkspaceDetail({ id, onClose, onChanged }) {
         </>}
         {tab === 'subscription' && <>
           <Card title="Current subscription"><KV items={[['Plan', planNames[d.plan] || d.plan], ['Billing status', <StatusBadge key="b" status={d.subscription_status} />], ['Billing cycle', d.billing_interval ? `${d.billing_interval}ly` : '—'],
-            ['Price paid', d.price ? `${d.price.currency} ${num(d.price.amount)}` : '—'], ['Trial ends', d10(d.trial_ends_at)], ['Paid until / next renewal', d10(d.current_period_end)], ['Grace until', d10(d.grace_until)], ['Paid via', d.billing_provider || '—']]} /></Card>
+            ['Price paid', d.price ? `${d.price.currency} ${num(d.price.amount)}` : '—'], ['Trial', d.trial_started_at ? `${new Date(d.trial_started_at).toLocaleString()} → ${new Date(d.trial_ends_at).toLocaleString()}` : d10(d.trial_ends_at)], ['Cancelled on', d10(d.canceled_at)], ['Paid until / next renewal', d10(d.current_period_end)], ['Grace until', d10(d.grace_until)], ['Paid via', d.billing_provider || '—']]} /></Card>
           <Card title="History" flush>
             {!d.history.length ? <Empty title="No changes recorded yet" /> : <div className="table-wrap"><table className="t"><tbody>{d.history.map((h) => <tr key={h.id}><td className="nowrap muted">{h.created_at.slice(0, 16)}</td><td>{historyLine(h)}</td><td>{h.actor || h.source}</td><td className="muted">{h.reason || ''}</td></tr>)}</tbody></table></div>}
           </Card>
@@ -230,9 +235,11 @@ export function WorkspaceDetail({ id, onClose, onChanged }) {
             {!d.payments.length ? <Empty title="No bank or wallet payments" /> : <div className="table-wrap"><table className="t"><thead><tr><th>Date</th><th>For</th><th>Method</th><th>Amount</th><th>Reference</th><th>Status</th></tr></thead><tbody>{d.payments.map((p) => <tr key={p.id}><td className="nowrap">{d10(p.created_at)}</td><td>{planNames[p.plan] || p.plan} / {p.interval}</td><td>{p.method}</td><td className="mono nowrap">{p.currency} {num(p.amount)}</td><td className="mono">{p.reference}</td><td><StatusBadge status={p.status} />{p.decision_note && <div className="muted">{p.decision_note}</div>}</td></tr>)}</tbody></table></div>}
           </Card>
           <Card title="Invoices" flush>
-            {!d.invoices.length ? <Empty title="No invoices yet" /> : <div className="table-wrap"><table className="t"><thead><tr><th>Issued</th><th>Number</th><th>Amount</th><th>Covers</th><th>Status</th></tr></thead><tbody>{d.invoices.map((i) => <tr key={i.id}><td className="nowrap">{d10(i.created_at)}</td><td className="mono">{i.hosted_url ? <a href={i.hosted_url} target="_blank" rel="noreferrer">{i.provider_invoice_id}</a> : i.provider_invoice_id}</td><td className="mono nowrap">{i.currency} {num(i.amount)}</td><td>{d10(i.period_start)} → {d10(i.period_end)}</td><td><StatusBadge status={i.status} /></td></tr>)}</tbody></table></div>}
+            {!d.invoices.length ? <Empty title="No invoices yet" /> : <div className="table-wrap"><table className="t"><thead><tr><th>Issued</th><th>Number</th><th>Amount</th><th>Covers</th><th>Status</th></tr></thead><tbody>{d.invoices.map((i) => <tr key={i.id}><td className="nowrap">{d10(i.created_at)}</td><td className="mono">{i.hosted_url ? <a href={i.hosted_url} target="_blank" rel="noreferrer">{i.provider_invoice_id}</a> : i.provider_invoice_id}</td><td className="mono nowrap">{i.currency} {num(i.amount)}</td><td>{d10(i.period_start)} → {d10(i.period_end)}</td><td><StatusBadge status={i.status} />{can('billing.manage') && i.status === 'paid' && <button className="btn sm" style={{ marginLeft: 6 }} onClick={() => setModal({ kind: 'refund', invoice: i, amount: '', reason: '', reference: '' })}>Refund</button>}</td></tr>)}</tbody></table></div>}
           </Card>
+          {!!d.refunds?.length && <Card title="Refunds" flush><div className="table-wrap"><table className="t"><tbody>{d.refunds.map((r) => <tr key={r.id}><td className="nowrap">{d10(r.created_at)}</td><td className="mono">{r.provider_invoice_id}</td><td className="mono nowrap">{r.currency} {num(r.amount)}</td><td>{r.provider}{r.reference ? ` · ${r.reference}` : ''}</td><td className="muted">{r.reason}</td></tr>)}</tbody></table></div></Card>}
         </>}
+        {tab === 'limits' && billed && <AddonsBox d={d} canEdit={can('billing.manage')} onChange={(body) => post(`${A}/workspaces/${id}/addons`, body, 'Add-ons updated')} />}
         {tab === 'limits' && <LimitsForm d={d} onSave={(body) => post(`${A}/workspaces/${id}/entitlements`, body, 'Limits saved', 'put')} />}
         {tab === 'activity' && <>
           <Card title="Account history" flush>
@@ -266,7 +273,7 @@ export function WorkspaceDetail({ id, onClose, onChanged }) {
         <Modal title={`Change plan · ${d.name}`} onClose={() => setModal(null)} footer={<><button className="btn" onClick={() => setModal(null)}>Cancel</button><button className="btn primary" disabled={modal.reason.trim().length < 3} onClick={async () => { if (await post(`${A}/workspaces/${id}/subscription`, { plan: modal.plan, status: modal.sub, interval: modal.interval, period_end: modal.period_end || undefined, reason: modal.reason }, 'Subscription updated')) setModal(null); }}>Save</button></>}>
           <p className="muted">An override for exceptions (upgrades agreed by phone, corrections). To record money received, use Record payment instead: it also creates the invoice and receipt.</p>
           <Field label="Plan"><select className="input" value={modal.plan} onChange={(ev) => setModal({ ...modal, plan: ev.target.value })}>{d.plans.map((p) => <option key={p.id} value={p.id}>{p.name}{p.active ? '' : ' (retired)'}</option>)}</select></Field>
-          <Field label="Billing status"><select className="input" value={modal.sub} onChange={(ev) => setModal({ ...modal, sub: ev.target.value })}>{[['active', 'Active'], ['trialing', 'Trial'], ['past_due', 'Payment failed (grace period)'], ['canceled', 'Cancelled at period end']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
+          <Field label="Billing status"><select className="input" value={modal.sub} onChange={(ev) => setModal({ ...modal, sub: ev.target.value })}>{[['active', 'Active (authorised manual activation)'], ['trialing', 'Trial'], ['pending', 'Pending first payment'], ['past_due', 'Payment failed (grace period)'], ['canceled', 'Cancelled at period end'], ['expired', 'Expired (read-only)']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
           <Field label="Billing cycle"><select className="input" value={modal.interval} onChange={(ev) => setModal({ ...modal, interval: ev.target.value })}><option value="month">Monthly</option><option value="year">Yearly</option></select></Field>
           <Field label="Paid until"><input type="date" className="input" value={modal.period_end} onChange={(ev) => setModal({ ...modal, period_end: ev.target.value })} /></Field>
           <Field label="Reason" required hint="Saved in the subscription history and audit log."><TextInput value={modal.reason} onChange={(v) => setModal({ ...modal, reason: v })} /></Field>
@@ -287,11 +294,21 @@ export function WorkspaceDetail({ id, onClose, onChanged }) {
         </Modal>
       )}
       {modal?.kind === 'trial' && (
-        <Modal title={`Extend trial · ${d.name}`} onClose={() => setModal(null)} footer={<><button className="btn" onClick={() => setModal(null)}>Cancel</button><button className="btn primary" disabled={modal.reason.trim().length < 3} onClick={async () => { if (await post(`${A}/workspaces/${id}/trial`, { ...(modal.until ? { until: modal.until } : { days: Number(modal.days) }), reason: modal.reason }, 'Trial extended')) setModal(null); }}>Extend</button></>}>
-          <p>Trial currently ends <b>{d10(d.trial_ends_at)}</b>.</p>
-          <Field label="Add days" hint="Added to the current end date, or to today if it already ended"><TextInput type="number" value={modal.days} onChange={(v) => setModal({ ...modal, days: v, until: '' })} /></Field>
-          <Field label="Or set an exact end date"><input type="date" className="input" value={modal.until} onChange={(ev) => setModal({ ...modal, until: ev.target.value })} /></Field>
-          <Field label="Reason" required><TextInput value={modal.reason} onChange={(v) => setModal({ ...modal, reason: v })} placeholder="e.g. Waiting for their accountant to finish setup" /></Field>
+        <Modal title={`Trial controls · ${d.name}`} onClose={() => setModal(null)} footer={<><button className="btn" onClick={() => setModal(null)}>Cancel</button><button className={`btn ${['end', 'revoke'].includes(modal.action) ? 'danger' : 'primary'}`} disabled={modal.reason.trim().length < 3} onClick={async () => { if (await post(`${A}/workspaces/${id}/trial`, { action: modal.action, ...(modal.action === 'extend' && modal.until ? { until: modal.until } : { days: Number(modal.days) }), reason: modal.reason }, 'Trial updated')) setModal(null); }}>Apply</button></>}>
+          <p>Status <b>{d.subscription_status}</b>{d.trial_ends_at ? <> · trial ends <b>{new Date(d.trial_ends_at).toLocaleString()}</b> (stored in UTC)</> : ''}.</p>
+          <Field label="Action"><select className="input" value={modal.action} onChange={(ev) => setModal({ ...modal, action: ev.target.value })}>{TRIAL_ACTIONS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+          {['extend', 'shorten', 'grant'].includes(modal.action) && <Field label={modal.action === 'shorten' ? 'Remove days' : modal.action === 'grant' ? 'Trial length (days)' : 'Add days'} hint={modal.action === 'extend' ? 'Added to the current end, or from now if it already ended' : ''}><TextInput type="number" value={modal.days} onChange={(v) => setModal({ ...modal, days: v, until: '' })} /></Field>}
+          {modal.action === 'extend' && <Field label="Or end on this date (end of day, UTC)"><input type="date" className="input" value={modal.until} onChange={(ev) => setModal({ ...modal, until: ev.target.value })} /></Field>}
+          {['end', 'revoke'].includes(modal.action) && <p className="muted">The trial ends now and the workspace becomes read-only until it subscribes. Nothing is deleted.</p>}
+          <Field label="Reason" required hint="Kept in the subscription history and audit log."><TextInput value={modal.reason} onChange={(v) => setModal({ ...modal, reason: v })} placeholder="e.g. Waiting for their accountant to finish setup" /></Field>
+        </Modal>
+      )}
+      {modal?.kind === 'refund' && (
+        <Modal title={`Refund invoice ${modal.invoice.provider_invoice_id}`} onClose={() => setModal(null)} footer={<><button className="btn" onClick={() => setModal(null)}>Cancel</button><button className="btn danger" disabled={!modal.amount || modal.reason.trim().length < 3 || modal.reference.trim().length < 3} onClick={async () => { if (await post(`${A}/workspaces/${id}/refunds`, { invoice_id: modal.invoice.id, amount: Number(modal.amount), reason: modal.reason, reference: modal.reference }, 'Refund recorded')) setModal(null); }}>Record refund</button></>}>
+          <p className="muted">Record money you have already returned (bank transfer). Card refunds made in Stripe arrive automatically. The invoice stays as collected; reports show refunds and net separately.</p>
+          <Field label={`Amount (${modal.invoice.currency})`} required hint={`Invoice total ${num(modal.invoice.amount)}`}><TextInput type="number" value={modal.amount} onChange={(v) => setModal({ ...modal, amount: v })} /></Field>
+          <Field label="Transfer reference" required><TextInput value={modal.reference} onChange={(v) => setModal({ ...modal, reference: v })} /></Field>
+          <Field label="Reason" required><TextInput value={modal.reason} onChange={(v) => setModal({ ...modal, reason: v })} /></Field>
         </Modal>
       )}
       {modal?.kind === 'grace' && (
@@ -312,6 +329,22 @@ export function WorkspaceDetail({ id, onClose, onChanged }) {
         message={{ active: 'Its users can sign in and work again.', suspended: 'Nobody in this workspace can sign in or use it until you reactivate it. No data is deleted.', cancelled: 'The workspace is closed: nobody can sign in. All data is kept and it can be reactivated later.' }[ask.status]}
         onCancel={() => setAsk(null)} onConfirm={async (reason) => { await post(`${A}/workspaces/${id}/status`, { status: ask.status, reason }, { active: 'Workspace reactivated', suspended: 'Workspace suspended', cancelled: 'Workspace cancelled' }[ask.status]); setAsk(null); }} />}
     </Drawer>
+  );
+}
+
+function AddonsBox({ d, canEdit, onChange }) {
+  const [f, setF] = useState({ addon_id: d.available_addons?.[0]?.id || '', quantity: 1, reason: '' });
+  return (
+    <Card title="Add-ons">
+      {!d.addons?.length ? <p className="muted">No add-ons.</p> : <div className="table-wrap"><table className="t"><tbody>{d.addons.map((a) => <tr key={a.id}><td>{a.name}</td><td>x {a.quantity}</td><td><StatusBadge status={a.status === 'active' ? 'active' : 'inactive'} label={a.status} /></td><td className="muted">{d10(a.started_at)}{a.ended_at ? ` → ${d10(a.ended_at)}` : ''}</td>
+        <td className="right">{canEdit && a.status === 'active' && <button className="btn sm" onClick={() => { const reason = window.prompt('Reason for removing this add-on'); if (reason) onChange({ addon_id: a.addon_id, active: false, reason }); }}>Remove</button>}</td></tr>)}</tbody></table></div>}
+      {canEdit && !!d.available_addons?.length && <div className="row wrap" style={{ gap: 8, marginTop: 8 }}>
+        <select className="input" style={{ width: 200 }} value={f.addon_id} onChange={(e) => setF({ ...f, addon_id: e.target.value })} aria-label="Add-on">{d.available_addons.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+        <input className="input" type="number" min="1" style={{ width: 80 }} value={f.quantity} onChange={(e) => setF({ ...f, quantity: e.target.value })} aria-label="Quantity" />
+        <input className="input" style={{ width: 220 }} placeholder="Reason (required)" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} aria-label="Reason" />
+        <button className="btn sm primary" disabled={f.reason.trim().length < 3} onClick={() => onChange({ addon_id: f.addon_id, quantity: Number(f.quantity), active: true, reason: f.reason })}>Switch on</button>
+      </div>}
+    </Card>
   );
 }
 

@@ -16,61 +16,89 @@ export function downloadCsv(name, header, rows) {
 }
 
 // ---------------------------------------------------------------- plans
+const PRODUCT_LABEL = { real_estate: 'Real Estate Brokerage', construction: 'Construction Management', bundle: 'Both products (bundle)', any: 'Any product' };
+const moneyMap = (m) => (m && Object.keys(m).length ? Object.entries(m).map(([c, v]) => `${c} ${n0(v)}`).join(' · ') : '—');
+const days = (arr) => (Array.isArray(arr) ? arr.join(', ') : String(arr || ''));
+
 export function PlansPage() {
   const toast = useToast();
   const [d, setD] = useState(null);
   const [err, setErr] = useState('');
   const [edit, setEdit] = useState(null);
   const [settings, setSettings] = useState(null);
-  const load = useCallback(() => api.get(`${A}/plans`).then((x) => { setD(x); setSettings(x.settings); }).catch((e) => setErr(e.message)), []);
+  const [tab, setTab] = useState('real_estate');
+  const load = useCallback(() => api.get(`${A}/plans`).then((x) => { setD(x); setSettings({ ...x.settings, trial_reminder_days: days(x.settings.trial_reminder_days), renewal_reminder_days: days(x.settings.renewal_reminder_days) }); }).catch((e) => setErr(e.message)), []);
   useEffect(() => { load(); }, [load]);
-  const open = (p) => setEdit(p ? { ...p, isNew: false, allModules: p.modules == null, modules: p.modules || [], price: { PKR: { ...(p.price.PKR || {}) }, USD: { ...(p.price.USD || {}) } } }
-    : { isNew: true, id: '', name: '', description: '', seats: '', projects: '', grace_days: 7, allModules: true, modules: [], visible: true, active: true, price: { PKR: {}, USD: {} } });
+  const open = (p) => setEdit(p ? { ...p, isNew: false, allModules: p.modules == null, modules: p.modules || [], features: (p.features || []).join('\n'), setup_fee: { ...(p.setup_fee || {}) }, price: { PKR: { ...(p.price.PKR || {}) }, USD: { ...(p.price.USD || {}) } } }
+    : { isNew: true, id: '', name: '', product: tab, description: '', seats: '', projects: '', properties: '', storage_mb: '', api_access: true, grace_days: 7, allModules: true, modules: [], features: '', highlight: false, trial_eligible: true, setup_fee: {}, visible: true, active: true, price: { PKR: {}, USD: {} } });
+  const nul = (v) => (v === '' || v == null ? null : v);
   const save = async () => {
-    const body = { name: edit.name, description: edit.description, seats: edit.seats === '' ? null : edit.seats, projects: edit.projects === '' ? null : edit.projects, grace_days: edit.grace_days,
-      modules: edit.allModules ? null : edit.modules, visible: edit.visible, active: edit.active, price: edit.price };
+    const body = { name: edit.name, product: edit.product, description: edit.description, seats: nul(edit.seats), projects: nul(edit.projects), properties: nul(edit.properties), storage_mb: nul(edit.storage_mb), api_access: edit.api_access,
+      grace_days: edit.grace_days, modules: edit.allModules ? null : edit.modules, features: String(edit.features || '').split('\n').map((x) => x.trim()).filter(Boolean), highlight: edit.highlight, trial_eligible: edit.trial_eligible,
+      setup_fee: edit.setup_fee, visible: edit.visible, active: edit.active, price: edit.price };
     try { await api.put(`${A}/plans/${encodeURIComponent(edit.id.trim().toLowerCase())}`, body); toast('Plan saved'); setEdit(null); load(); } catch (e) { toast(e.message, 'err'); }
   };
-  const saveSettings = async () => { try { setSettings(await api.put(`${A}/plan-settings`, settings)); toast('Trial settings saved'); load(); } catch (e) { toast(e.message, 'err'); } };
+  const saveSettings = async () => {
+    try {
+      await api.put(`${A}/plan-settings`, { default_trial_days: settings.default_trial_days, trial_plan: settings.trial_plan, trial_plan_construction: settings.trial_plans?.construction,
+        trial_reminder_days: String(settings.trial_reminder_days).split(','), renewal_reminder_days: String(settings.renewal_reminder_days).split(','), one_trial_per_email: settings.one_trial_per_email });
+      toast('Trial settings saved'); load();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  const products = d ? [...Object.keys(d.products || {}), 'bundle'] : [];
+  const shown = d ? d.plans.filter((p) => p.product === tab) : [];
+  const modulesFor = (prod) => Object.entries(d.modules).filter(([, m]) => !m.product || prod === 'bundle' || m.product === prod);
   return (
     <>
-      <PageTitle title="Plans & pricing" sub="Changing a price affects new purchases and renewals only. Workspaces keep the price they are paying until they renew. Limit changes apply straight away to every workspace on the plan.">
+      <PageTitle title="Plans & pricing" sub="Each product family has its own tiers. Changing a price affects new purchases and renewals only; workspaces keep the price they pay until they renew. Limit changes apply straight away.">
         <button className="btn primary sm" onClick={() => open(null)}>New plan</button>
       </PageTitle>
       <ErrorBox error={err} />
       {!d ? (!err && <Loading />) : (
         <>
+          <div className="row" style={{ gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            {products.map((p) => <button key={p} className={`btn sm ${tab === p ? 'primary' : ''}`} onClick={() => setTab(p)}>{PRODUCT_LABEL[p]} ({d.plans.filter((x) => x.product === p).length})</button>)}
+          </div>
           <Card flush>
-            <div className="table-wrap"><table className="t"><thead><tr><th>Plan</th><th>Price (PKR)</th><th>Price (USD)</th><th>Users</th><th>Projects</th><th>Modules</th><th>Subscribers</th><th>Status</th><th /></tr></thead><tbody>
-              {d.plans.map((p) => (
+            {!shown.length ? <Empty title="No plans in this family yet" hint="Create one with New plan." /> : (
+            <div className="table-wrap"><table className="t"><thead><tr><th>Plan</th><th>Price (PKR)</th><th>Price (USD)</th><th>Setup fee</th><th>Users</th><th>Projects</th><th>Properties</th><th>Storage</th><th>API</th><th>Subscribers</th><th>Status</th><th /></tr></thead><tbody>
+              {shown.map((p) => (
                 <tr key={p.id}>
-                  <td><b>{p.name}</b><div className="muted mono">{p.id}</div>{p.description && <div className="muted">{p.description}</div>}</td>
-                  <td className="nowrap">{priceText(p.price, 'PKR')}</td><td className="nowrap">{priceText(p.price, 'USD')}</td>
-                  <td>{limitText(p.seats)}</td><td>{limitText(p.projects)}</td>
-                  <td>{p.modules == null ? 'All' : p.modules.length ? p.modules.map((m) => d.modules[m]?.label || m).join(', ') : 'Core only'}</td>
+                  <td><b>{p.name}</b>{p.highlight && <StatusBadge status="active" label="Recommended" />}<div className="muted mono">{p.id}</div>{p.description && <div className="muted">{p.description}</div>}</td>
+                  <td className="nowrap">{priceText(p.price, 'PKR')}</td><td className="nowrap">{priceText(p.price, 'USD')}</td><td className="nowrap">{moneyMap(p.setup_fee)}</td>
+                  <td>{limitText(p.seats)}</td><td>{limitText(p.projects)}</td><td>{limitText(p.properties)}</td><td>{p.storage_mb == null ? 'Unlimited' : `${n0(p.storage_mb)} MB`}</td><td>{p.api_access ? 'Yes' : 'No'}</td>
                   <td>{p.subscribers}</td>
-                  <td>{p.active ? <StatusBadge status="active" label={p.visible ? 'On sale' : 'On sale (hidden)'} /> : <StatusBadge status="inactive" label="Retired" />}</td>
+                  <td>{p.active ? <StatusBadge status="active" label={p.visible ? 'On sale' : 'On sale (hidden)'} /> : <StatusBadge status="inactive" label="Retired" />}{!p.trial_eligible && <div className="muted">No trial</div>}</td>
                   <td className="right"><button className="btn sm" onClick={() => open(p)}>Edit</button></td>
                 </tr>
               ))}
-            </tbody></table></div>
+            </tbody></table></div>)}
           </Card>
-          <Card title="Free trial">
-            <div className="pa-grid2" style={{ marginBottom: 0 }}>
-              <Field label="Trial length for new sign-ups (days)" hint="0 means no trial."><TextInput type="number" value={settings.default_trial_days} onChange={(v) => setSettings({ ...settings, default_trial_days: v })} /></Field>
-              <Field label="Trial gets the limits of" hint="Users, projects and modules during the trial."><select className="input" value={settings.trial_plan} onChange={(e) => setSettings({ ...settings, trial_plan: e.target.value })}>{d.plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+          <Card title="Free trial and reminders">
+            <div className="pa-grid3" style={{ marginBottom: 0 }}>
+              <Field label="Trial length for new sign-ups (days)" hint="Default 7. 0 means no trial: new workspaces wait for a first payment."><TextInput type="number" value={settings.default_trial_days} onChange={(v) => setSettings({ ...settings, default_trial_days: v })} /></Field>
+              <Field label="Real estate trials get the limits of"><select className="input" value={settings.trial_plan} onChange={(e) => setSettings({ ...settings, trial_plan: e.target.value })}>{d.plans.filter((p) => p.product !== 'construction').map((p) => <option key={p.id} value={p.id}>{p.name} ({p.id})</option>)}</select></Field>
+              <Field label="Construction trials get the limits of"><select className="input" value={settings.trial_plans?.construction || ''} onChange={(e) => setSettings({ ...settings, trial_plans: { ...settings.trial_plans, construction: e.target.value } })}>{d.plans.filter((p) => p.product !== 'real_estate').map((p) => <option key={p.id} value={p.id}>{p.name} ({p.id})</option>)}</select></Field>
+              <Field label="Trial reminders (days before the end)" hint="Comma separated, 0 = on the last day. Default 3, 1, 0."><TextInput value={settings.trial_reminder_days} onChange={(v) => setSettings({ ...settings, trial_reminder_days: v })} /></Field>
+              <Field label="Renewal reminders for bank/wallet payers" hint="Days before the paid period ends. Card renewals are automatic."><TextInput value={settings.renewal_reminder_days} onChange={(v) => setSettings({ ...settings, renewal_reminder_days: v })} /></Field>
+              <Field label="Trial abuse protection"><Toggle value={settings.one_trial_per_email} onChange={(v) => setSettings({ ...settings, one_trial_per_email: v })} label="One free trial per owner email" /></Field>
             </div>
+            <p className="muted">Trials start and end at exact times stored in UTC; customers see them in their own timezone. The hourly lifecycle job sends reminders once and makes expired trials read-only even if nobody signs in.</p>
             <button className="btn primary sm" onClick={saveSettings}>Save trial settings</button>
           </Card>
+          <AddonsCard />
+          <CouponsCard plans={d.plans} />
         </>
       )}
       {edit && (
         <Modal title={edit.isNew ? 'New plan' : `Edit plan · ${edit.name}`} size="lg" onClose={() => setEdit(null)} footer={<><button className="btn" onClick={() => setEdit(null)}>Cancel</button><button className="btn primary" onClick={save}>Save plan</button></>}>
-          <div className="pa-grid2" style={{ marginBottom: 0 }}>
-            <Field label="Plan ID" required hint={edit.isNew ? 'Lowercase, e.g. pro. Cannot be changed later.' : 'Fixed'}><TextInput value={edit.id} disabled={!edit.isNew} onChange={(v) => setEdit({ ...edit, id: v })} /></Field>
+          <div className="pa-grid3" style={{ marginBottom: 0 }}>
+            <Field label="Plan ID" required hint={edit.isNew ? 'Lowercase, e.g. con_pro. Cannot be changed later.' : 'Fixed'}><TextInput value={edit.id} disabled={!edit.isNew} onChange={(v) => setEdit({ ...edit, id: v })} /></Field>
             <Field label="Name" required><TextInput value={edit.name} onChange={(v) => setEdit({ ...edit, name: v })} /></Field>
+            <Field label="Product family" hint={edit.subscribers ? 'Locked while workspaces subscribe to it' : ''}><select className="input" value={edit.product} disabled={!edit.isNew && edit.subscribers > 0} onChange={(e) => setEdit({ ...edit, product: e.target.value })}>{products.map((p) => <option key={p} value={p}>{PRODUCT_LABEL[p]}</option>)}</select></Field>
           </div>
           <Field label="Description"><TextInput value={edit.description || ''} onChange={(v) => setEdit({ ...edit, description: v })} /></Field>
+          <Field label="Features shown on the pricing page" hint="One per line. Describe only what the plan really includes."><textarea className="input" rows={4} value={edit.features} onChange={(e) => setEdit({ ...edit, features: e.target.value })} /></Field>
           <h4 style={{ margin: '12px 0 6px' }}>Prices</h4>
           <div className="pa-grid2" style={{ marginBottom: 0 }}>
             {['PKR', 'USD'].flatMap((cur) => ['month', 'year'].map((int) => (
@@ -78,22 +106,29 @@ export function PlansPage() {
                 <TextInput type="number" value={edit.price[cur]?.[int] ?? ''} onChange={(v) => setEdit({ ...edit, price: { ...edit.price, [cur]: { ...edit.price[cur], [int]: v === '' ? undefined : Number(v) } } })} />
               </Field>
             )))}
+            {['PKR', 'USD'].map((cur) => <Field key={`fee${cur}`} label={`One-time setup fee (${cur})`} hint="Charged with the first payment only. Empty = none."><TextInput type="number" value={edit.setup_fee?.[cur] ?? ''} onChange={(v) => setEdit({ ...edit, setup_fee: { ...edit.setup_fee, [cur]: v === '' ? undefined : Number(v) } })} /></Field>)}
           </div>
+          <p className="muted" style={{ marginTop: 0 }}>Annual discount: set the yearly price lower than 12 x monthly.</p>
           <h4 style={{ margin: '12px 0 6px' }}>Limits</h4>
           <div className="pa-grid3" style={{ marginBottom: 0 }}>
             <Field label="Users" hint="Empty = unlimited"><TextInput type="number" value={edit.seats ?? ''} onChange={(v) => setEdit({ ...edit, seats: v })} /></Field>
             <Field label="Projects" hint="Empty = unlimited"><TextInput type="number" value={edit.projects ?? ''} onChange={(v) => setEdit({ ...edit, projects: v })} /></Field>
+            <Field label="Properties" hint="Real estate. Empty = unlimited"><TextInput type="number" value={edit.properties ?? ''} onChange={(v) => setEdit({ ...edit, properties: v })} /></Field>
+            <Field label="File storage (MB)" hint="Empty = unlimited"><TextInput type="number" value={edit.storage_mb ?? ''} onChange={(v) => setEdit({ ...edit, storage_mb: v })} /></Field>
             <Field label="Grace days after a failed payment"><TextInput type="number" value={edit.grace_days} onChange={(v) => setEdit({ ...edit, grace_days: v })} /></Field>
+            <Field label="Website / partner API"><Toggle value={edit.api_access} onChange={(v) => setEdit({ ...edit, api_access: v })} label="Included" /></Field>
           </div>
           <h4 style={{ margin: '12px 0 6px' }}>Modules</h4>
-          <Toggle value={edit.allModules} onChange={(v) => setEdit({ ...edit, allModules: v })} label="All modules included" />
-          {!edit.allModules && <div className="pa-grid2" style={{ marginTop: 8 }}>{Object.entries(d.modules).map(([k, m]) => (
+          <Toggle value={edit.allModules} onChange={(v) => setEdit({ ...edit, allModules: v })} label="All modules of this product included" />
+          {!edit.allModules && <div className="pa-grid2" style={{ marginTop: 8 }}>{modulesFor(edit.product).map(([k, m]) => (
             <label key={k} className="row" style={{ gap: 8 }}><input type="checkbox" checked={edit.modules.includes(k)} onChange={(e) => setEdit({ ...edit, modules: e.target.checked ? [...edit.modules, k] : edit.modules.filter((x) => x !== k) })} />{m.label}</label>
           ))}</div>}
-          <p className="muted">CRM, properties, projects, sales and receipts are always included.</p>
+          <p className="muted">CRM, contacts, projects, sales/contracts, receipts and settings are always included. Product modules are only available to workspaces of that product.</p>
           <h4 style={{ margin: '12px 0 6px' }}>Availability</h4>
           <Toggle value={edit.active} onChange={(v) => setEdit({ ...edit, active: v })} label="On sale (off = retired: current subscribers can still renew)" />
           <Toggle value={edit.visible} onChange={(v) => setEdit({ ...edit, visible: v })} label="Shown on the public price list" />
+          <Toggle value={edit.highlight} onChange={(v) => setEdit({ ...edit, highlight: v })} label="Mark as recommended on the pricing page" />
+          <Toggle value={edit.trial_eligible} onChange={(v) => setEdit({ ...edit, trial_eligible: v })} label="Free trial available" />
           {!edit.isNew && !!edit.price_history?.length && <>
             <h4 style={{ margin: '12px 0 6px' }}>Price history</h4>
             <div className="table-wrap"><table className="t"><tbody>{edit.price_history.map((h, i) => <tr key={i}><td className="muted nowrap">{h.effective_from.startsWith('2000') ? 'Original' : h.effective_from.slice(0, 16)}</td><td>{h.currency} per {h.interval}</td><td className="mono">{n0(h.amount)}</td><td className="muted">{h.created_by}</td></tr>)}</tbody></table></div>
@@ -101,6 +136,98 @@ export function PlansPage() {
         </Modal>
       )}
     </>
+  );
+}
+
+function AddonsCard() {
+  const toast = useToast();
+  const [rows, setRows] = useState(null);
+  const [edit, setEdit] = useState(null);
+  const load = useCallback(() => api.get(`${A}/addons`).then(setRows).catch((e) => toast(e.message, 'err')), [toast]);
+  useEffect(() => { load(); }, [load]);
+  const save = async () => {
+    const ent = {}; for (const k of ['seats', 'projects', 'properties', 'storage_mb']) if (edit.entitlements[k]) ent[k] = Number(edit.entitlements[k]); if (edit.entitlements.api_access) ent.api_access = true;
+    try { await api.put(`${A}/addons/${encodeURIComponent(edit.id.trim().toLowerCase())}`, { ...edit, entitlements: ent }); toast('Add-on saved'); setEdit(null); load(); } catch (e) { toast(e.message, 'err'); }
+  };
+  const setPrice = (cur, int, v) => setEdit({ ...edit, price: { ...edit.price, [cur]: { ...(edit.price[cur] || {}), [int]: v === '' ? undefined : Number(v) } } });
+  return (
+    <Card title="Add-ons" actions={<button className="btn sm" onClick={() => setEdit({ isNew: true, id: '', name: '', description: '', product: 'any', price: { PKR: {} }, entitlements: {}, active: true })}>New add-on</button>}>
+      <p className="muted">Extras sold on top of a plan. Their limits are added to the plan's. Customers buy them with bank or wallet payments; a Billing Manager can also switch one on for a workspace.</p>
+      {!rows ? <Loading /> : !rows.length ? <Empty title="No add-ons yet" /> : (
+        <div className="table-wrap"><table className="t"><thead><tr><th>Add-on</th><th>Product</th><th>Price</th><th>Adds</th><th>Status</th><th /></tr></thead><tbody>
+          {rows.map((a) => <tr key={a.id}><td><b>{a.name}</b><div className="muted mono">{a.id}</div></td><td>{PRODUCT_LABEL[a.product]}</td><td className="nowrap">{priceText(a.price, 'PKR')}</td>
+            <td>{Object.entries(a.entitlements).map(([k, v]) => (k === 'api_access' ? 'API access' : `+${n0(v)} ${k.replace('_mb', ' MB')}`)).join(', ') || '—'}</td>
+            <td><StatusBadge status={a.active ? 'active' : 'inactive'} label={a.active ? 'On sale' : 'Off'} /></td><td className="right"><button className="btn sm" onClick={() => setEdit({ ...a, isNew: false })}>Edit</button></td></tr>)}
+        </tbody></table></div>
+      )}
+      {edit && (
+        <Modal title={edit.isNew ? 'New add-on' : `Edit add-on · ${edit.name}`} onClose={() => setEdit(null)} footer={<><button className="btn" onClick={() => setEdit(null)}>Cancel</button><button className="btn primary" onClick={save}>Save</button></>}>
+          <div className="pa-grid2" style={{ marginBottom: 0 }}>
+            <Field label="ID" required><TextInput value={edit.id} disabled={!edit.isNew} onChange={(v) => setEdit({ ...edit, id: v })} /></Field>
+            <Field label="Name" required><TextInput value={edit.name} onChange={(v) => setEdit({ ...edit, name: v })} /></Field>
+          </div>
+          <Field label="Description"><TextInput value={edit.description || ''} onChange={(v) => setEdit({ ...edit, description: v })} /></Field>
+          <Field label="Available with"><select className="input" value={edit.product} onChange={(e) => setEdit({ ...edit, product: e.target.value })}>{['any', 'real_estate', 'construction'].map((p) => <option key={p} value={p}>{PRODUCT_LABEL[p]}</option>)}</select></Field>
+          <div className="pa-grid2" style={{ marginBottom: 0 }}>
+            {['PKR', 'USD'].flatMap((cur) => ['month', 'year'].map((int) => <Field key={cur + int} label={`${cur} per ${int}`}><TextInput type="number" value={edit.price?.[cur]?.[int] ?? ''} onChange={(v) => setPrice(cur, int, v)} /></Field>))}
+          </div>
+          <div className="pa-grid2" style={{ marginBottom: 0 }}>
+            {[['seats', 'Extra users'], ['projects', 'Extra projects'], ['properties', 'Extra properties'], ['storage_mb', 'Extra storage (MB)']].map(([k, l]) => <Field key={k} label={l}><TextInput type="number" value={edit.entitlements?.[k] ?? ''} onChange={(v) => setEdit({ ...edit, entitlements: { ...edit.entitlements, [k]: v } })} /></Field>)}
+          </div>
+          <Toggle value={!!edit.entitlements?.api_access} onChange={(v) => setEdit({ ...edit, entitlements: { ...edit.entitlements, api_access: v } })} label="Adds website / partner API access" />
+          <Toggle value={edit.active} onChange={(v) => setEdit({ ...edit, active: v })} label="On sale" />
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
+function CouponsCard({ plans }) {
+  const toast = useToast();
+  const [rows, setRows] = useState(null);
+  const [edit, setEdit] = useState(null);
+  const load = useCallback(() => api.get(`${A}/coupons`).then(setRows).catch((e) => toast(e.message, 'err')), [toast]);
+  useEffect(() => { load(); }, [load]);
+  const save = async () => {
+    const body = { description: edit.description, percent_off: edit.kind === 'percent' ? edit.percent_off : null, amount_off: edit.kind === 'amount' ? edit.amount_off : {}, products: edit.products?.length ? edit.products : null,
+      plans: edit.plans?.length ? edit.plans : null, intervals: edit.intervals?.length ? edit.intervals : null, first_payment_only: edit.first_payment_only, max_redemptions: edit.max_redemptions || null,
+      valid_from: edit.valid_from || null, valid_until: edit.valid_until || null, active: edit.active };
+    try { await api.put(`${A}/coupons/${encodeURIComponent(edit.code.trim().toUpperCase())}`, body); toast('Coupon saved'); setEdit(null); load(); } catch (e) { toast(e.message, 'err'); }
+  };
+  const toggleIn = (k, v) => setEdit({ ...edit, [k]: (edit[k] || []).includes(v) ? edit[k].filter((x) => x !== v) : [...(edit[k] || []), v] });
+  return (
+    <Card title="Coupons & promotions" actions={<button className="btn sm" onClick={() => setEdit({ isNew: true, code: '', description: '', kind: 'percent', percent_off: 10, amount_off: {}, products: [], plans: [], intervals: [], first_payment_only: true, max_redemptions: '', valid_from: '', valid_until: '', active: true })}>New coupon</button>}>
+      <p className="muted">Codes customers enter when paying by bank or wallet; the discount is applied by the server. For card payments create matching promotion codes in Stripe (checkout accepts them).</p>
+      {!rows ? <Loading /> : !rows.length ? <Empty title="No coupons yet" /> : (
+        <div className="table-wrap"><table className="t"><thead><tr><th>Code</th><th>Discount</th><th>Applies to</th><th>Valid</th><th>Used</th><th>Status</th><th /></tr></thead><tbody>
+          {rows.map((c) => <tr key={c.code}><td className="mono"><b>{c.code}</b><div className="muted">{c.description}</div></td>
+            <td>{c.percent_off ? `${c.percent_off}%` : moneyMap(c.amount_off)}{c.first_payment_only ? <div className="muted">first payment</div> : null}</td>
+            <td>{[c.products?.map((p) => PRODUCT_LABEL[p]).join(', '), c.plans?.join(', '), c.intervals?.join(', ')].filter(Boolean).join(' · ') || 'Everything'}</td>
+            <td className="nowrap">{c.valid_from || '…'} – {c.valid_until || '…'}</td><td>{c.redeemed}{c.max_redemptions ? ` / ${c.max_redemptions}` : ''}</td>
+            <td><StatusBadge status={c.active ? 'active' : 'inactive'} label={c.active ? 'Active' : 'Off'} /></td>
+            <td className="right"><button className="btn sm" onClick={() => setEdit({ ...c, isNew: false, kind: c.percent_off ? 'percent' : 'amount', products: c.products || [], plans: c.plans || [], intervals: c.intervals || [], max_redemptions: c.max_redemptions || '', valid_from: c.valid_from || '', valid_until: c.valid_until || '' })}>Edit</button></td></tr>)}
+        </tbody></table></div>
+      )}
+      {edit && (
+        <Modal title={edit.isNew ? 'New coupon' : `Edit coupon · ${edit.code}`} onClose={() => setEdit(null)} footer={<><button className="btn" onClick={() => setEdit(null)}>Cancel</button><button className="btn primary" onClick={save}>Save</button></>}>
+          <div className="pa-grid2" style={{ marginBottom: 0 }}>
+            <Field label="Code" required><TextInput value={edit.code} disabled={!edit.isNew} onChange={(v) => setEdit({ ...edit, code: v.toUpperCase() })} /></Field>
+            <Field label="Description"><TextInput value={edit.description || ''} onChange={(v) => setEdit({ ...edit, description: v })} /></Field>
+            <Field label="Discount type"><select className="input" value={edit.kind} onChange={(e) => setEdit({ ...edit, kind: e.target.value })}><option value="percent">Percent off</option><option value="amount">Fixed amount off</option></select></Field>
+            {edit.kind === 'percent' ? <Field label="Percent off"><TextInput type="number" value={edit.percent_off ?? ''} onChange={(v) => setEdit({ ...edit, percent_off: v })} /></Field>
+              : <Field label="Amount off (PKR)"><TextInput type="number" value={edit.amount_off?.PKR ?? ''} onChange={(v) => setEdit({ ...edit, amount_off: { ...edit.amount_off, PKR: v === '' ? undefined : Number(v) } })} /></Field>}
+            <Field label="Valid from"><TextInput type="date" value={edit.valid_from} onChange={(v) => setEdit({ ...edit, valid_from: v })} /></Field>
+            <Field label="Valid until"><TextInput type="date" value={edit.valid_until} onChange={(v) => setEdit({ ...edit, valid_until: v })} /></Field>
+            <Field label="Maximum uses" hint="Empty = unlimited"><TextInput type="number" value={edit.max_redemptions} onChange={(v) => setEdit({ ...edit, max_redemptions: v })} /></Field>
+          </div>
+          <Field label="Products (none ticked = all)"><div className="row" style={{ gap: 12 }}>{['real_estate', 'construction'].map((p) => <label key={p} className="row" style={{ gap: 6 }}><input type="checkbox" checked={edit.products.includes(p)} onChange={() => toggleIn('products', p)} />{PRODUCT_LABEL[p]}</label>)}</div></Field>
+          <Field label="Plans (none ticked = all)"><div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>{plans.map((p) => <label key={p.id} className="row" style={{ gap: 6 }}><input type="checkbox" checked={edit.plans.includes(p.id)} onChange={() => toggleIn('plans', p.id)} />{p.name} <span className="muted mono">{p.id}</span></label>)}</div></Field>
+          <Field label="Billing (none ticked = both)"><div className="row" style={{ gap: 12 }}>{['month', 'year'].map((i) => <label key={i} className="row" style={{ gap: 6 }}><input type="checkbox" checked={edit.intervals.includes(i)} onChange={() => toggleIn('intervals', i)} />{i === 'month' ? 'Monthly' : 'Yearly'}</label>)}</div></Field>
+          <Toggle value={edit.first_payment_only} onChange={(v) => setEdit({ ...edit, first_payment_only: v })} label="First payment only" />
+          <Toggle value={edit.active} onChange={(v) => setEdit({ ...edit, active: v })} label="Active" />
+        </Modal>
+      )}
+    </Card>
   );
 }
 
