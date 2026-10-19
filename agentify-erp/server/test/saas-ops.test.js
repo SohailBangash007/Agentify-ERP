@@ -77,3 +77,26 @@ test('integrations: honest states, validated settings, no internal URLs, audited
   const v = (await adm('GET', '/version')).data;
   assert.ok(v.version && v.server_started_at); assert.ok(['local git checkout', 'deployment record', 'unknown'].includes(v.source));
 });
+
+test('retention: closure request, no early deletion, owner-requested deletion removes files but keeps billing records', async () => {
+  const { getTenantBySlug, platformDb } = await import('../src/platform.js');
+  const gone = await ws('goneco', 'construction');
+  const t = getTenantBySlug('goneco');
+  assert.equal((await gone('POST', '/api/billing/close-request', { confirm: 'wrong' })).status, 400);
+  assert.equal((await gone('POST', '/api/billing/close-request', { confirm: 'goneco', reason: 'Moving to another system' })).status, 200);
+  assert.ok(platformDb().prepare("SELECT 1 FROM platform_notifications WHERE kind='account' AND tenant_id=?").get(t.id), 'operators are alerted');
+  platformDb().prepare("INSERT INTO invoices(tenant_id,provider_invoice_id,amount,currency,status) VALUES(?,?,?,?,?)").run(t.id, 'keep-me', 1000, 'PKR', 'paid');
+  assert.equal((await adm('POST', `/workspaces/${t.id}/delete-data`, { confirm_slug: 'goneco', reason: 'Customer request', owner_request: true })).status, 400, 'must be cancelled first');
+  assert.equal((await adm('POST', `/workspaces/${t.id}/status`, { status: 'cancelled', reason: 'Customer asked to close' })).status, 200);
+  assert.equal((await adm('POST', `/workspaces/${t.id}/delete-data`, { confirm_slug: 'goneco', reason: 'Retention not over' })).status, 400, 'not before the retention period');
+  assert.equal((await adm('POST', `/workspaces/${t.id}/delete-data`, { confirm_slug: 'nope', reason: 'Customer request', owner_request: true })).status, 400, 'slug must be typed');
+  assert.ok(fs.existsSync(t.db_path));
+  const del = await adm('POST', `/workspaces/${t.id}/delete-data`, { confirm_slug: 'goneco', reason: 'Customer request by email', owner_request: true, keep_archive: true });
+  assert.equal(del.status, 200, JSON.stringify(del.data));
+  assert.ok(!fs.existsSync(t.db_path), 'database file removed');
+  assert.ok(platformDb().prepare("SELECT 1 FROM invoices WHERE provider_invoice_id='keep-me'").get(), 'billing records kept');
+  assert.equal((await adm('POST', `/workspaces/${t.id}/status`, { status: 'active' })).status, 400, 'cannot be reactivated');
+  assert.ok(platformDb().prepare("SELECT 1 FROM platform_audit WHERE action='workspace-data-deleted'").get());
+  assert.equal((await adm('PUT', '/retention', { retention_days: 5 })).status, 400);
+  assert.equal((await adm('PUT', '/retention', { retention_days: 120 })).data.retention_days, 120);
+});

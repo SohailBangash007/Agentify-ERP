@@ -181,9 +181,13 @@ export function WorkspaceDetail({ id, onClose, onChanged }) {
           {billed && can('workspaces.suspend') && d.status !== 'active' && <button onClick={() => setAsk({ status: 'active' })}>Reactivate workspace</button>}
           {billed && can('workspaces.suspend') && d.status === 'active' && <button className="danger" onClick={() => setAsk({ status: 'suspended' })}>Suspend workspace</button>}
           {billed && can('workspaces.suspend') && d.status !== 'cancelled' && <button className="danger" onClick={() => setAsk({ status: 'cancelled' })}>Cancel workspace</button>}
+          {billed && can('workspaces.suspend') && d.status === 'cancelled' && !d.data_deleted_at && <button className="danger" onClick={() => setModal({ kind: 'delete', confirm_slug: '', reason: '', owner_request: !!d.close_requested_at, keep_archive: false })}>Delete workspace data…</button>}
         </Menu>
       </div>
       {d.error && <div className="alert err">Could not read this workspace's database: {d.error}</div>}
+      {d.close_requested_at && !d.data_deleted_at && <div className="alert warn">The owner asked to close this account and delete its data on {d10(d.close_requested_at)}. Confirm with them, cancel the workspace, then delete its data.</div>}
+      {d.data_deleted_at && <div className="alert info">This workspace's data was deleted on {d10(d.data_deleted_at)}. Billing records are kept.</div>}
+      {d.retention?.applies && !d.data_deleted_at && <div className="alert info">Cancelled on {d.retention.cancelled_on}. Data is kept until {d.retention.keep_until} ({d.retention.retention_days}-day retention){d.retention.eligible ? ': it can now be reviewed for deletion.' : '.'}</div>}
       <Tabs tabs={TABS.map(([key, label]) => ({ key, label: key === 'users' ? `${label} (${d.users.length})` : key === 'notes' && d.notes.length ? `${label} (${d.notes.length})` : label }))} value={tab} onChange={setTab} />
       <div style={{ marginTop: 12 }} className="stack">
         {tab === 'overview' && <>
@@ -309,6 +313,16 @@ export function WorkspaceDetail({ id, onClose, onChanged }) {
           <Field label={`Amount (${modal.invoice.currency})`} required hint={`Invoice total ${num(modal.invoice.amount)}`}><TextInput type="number" value={modal.amount} onChange={(v) => setModal({ ...modal, amount: v })} /></Field>
           <Field label="Transfer reference" required><TextInput value={modal.reference} onChange={(v) => setModal({ ...modal, reference: v })} /></Field>
           <Field label="Reason" required><TextInput value={modal.reason} onChange={(v) => setModal({ ...modal, reason: v })} /></Field>
+        </Modal>
+      )}
+      {modal?.kind === 'delete' && (
+        <Modal title={`Delete data · ${d.name}`} onClose={() => setModal(null)} footer={<><button className="btn" onClick={() => setModal(null)}>Cancel</button><button className="btn danger" disabled={modal.confirm_slug !== d.slug || modal.reason.trim().length < 5} onClick={async () => { if (await post(`${A}/workspaces/${id}/delete-data`, modal, 'Workspace data deleted')) setModal(null); }}>Delete permanently</button></>}>
+          <div className="alert err">This permanently deletes the workspace's database and uploaded files. It cannot be undone. Invoices, payments and subscription history are kept.</div>
+          {!d.retention?.eligible && <p>The retention period runs until <b>{d.retention?.keep_until}</b>. Delete earlier only if the customer asked for it.</p>}
+          <Toggle value={modal.owner_request} onChange={(v) => setModal({ ...modal, owner_request: v })} label="The customer asked for their data to be deleted" />
+          <Toggle value={modal.keep_archive} onChange={(v) => setModal({ ...modal, keep_archive: v })} label="Keep one final archive copy in the backup folder" />
+          <Field label="Reason" required><TextInput value={modal.reason} onChange={(v) => setModal({ ...modal, reason: v })} /></Field>
+          <Field label={`Type ${d.slug} to confirm`} required><TextInput value={modal.confirm_slug} onChange={(v) => setModal({ ...modal, confirm_slug: v.trim().toLowerCase() })} /></Field>
         </Modal>
       )}
       {modal?.kind === 'grace' && (

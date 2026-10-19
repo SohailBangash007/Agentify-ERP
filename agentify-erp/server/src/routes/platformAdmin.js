@@ -6,6 +6,7 @@ import { platformDb, BASE_DOMAIN, isMultiTenant, getTenant } from '../platform.j
 import { listAddons, saveAddon, setTenantAddon, listCoupons, saveCoupon, recordRefund, quote } from '../services/commerce.js';
 import { runLifecycle } from '../services/lifecycle.js';
 import { finance } from '../services/finance.js';
+import { retentionDays, setRetentionDays, eligibleForDeletion, retentionState, deleteWorkspaceData } from '../services/retention.js';
 import { listAnnouncements, saveAnnouncement, setAnnouncementStatus } from '../services/announcements.js';
 import { versionInfo } from '../services/version.js';
 import { registry as integrationRegistry, configure as configureIntegration, test as testIntegration, disconnect as disconnectIntegration } from '../services/integrations.js';
@@ -14,7 +15,7 @@ import { analyticsReport } from '../services/analytics.js';
 import { resolveRange, utcStart, addDays, buckets, keyExpr } from '../services/platformMetrics.js';
 import { COOKIE, login, loginMfa, changePassword, requireOperator, onPlatformHost, twofaStatus, twofaSetup, twofaEnable, twofaDisable,
   loginMeta, endSession, listSessions, revokeSession, revokeAllFor, loginHistory, mfaRequired } from '../services/platformAuth.js';
-import { ROLES, PERMISSIONS, permsOf, can, need, auditContext, onDenied } from '../services/platformAccess.js';
+import { ROLES, PERMISSIONS, TOP_ROLES, permsOf, can, need, auditContext, onDenied } from '../services/platformAccess.js';
 import { getMaintenance, setMaintenance, recentErrors } from '../services/maintenance.js';
 import { reportList, runReport, exportReport, savedViews, saveView, deleteView, reconcile } from '../services/platformReports.js';
 import { stripeView, saveStripe, stripeConfig, STRIPE_MODES, audit, getSetting, setSetting } from '../services/platformConfig.js';
@@ -329,6 +330,19 @@ r.post('/integrations/:id/test', requireOperator, need('integrations.manage'), l
 r.delete('/integrations/:id', requireOperator, need('integrations.manage'), asyncH(async (req, res) => {
   const out = await disconnectIntegration(req.params.id, req.operator.email);
   audit(req.operator.email, 'integration-disconnected', { integration: req.params.id });
+  res.json(out);
+}));
+// ---- Data retention and deletion (never automatic)
+r.get('/retention', requireOperator, need('workspaces.view'), (_req, res) => res.json({ retention_days: retentionDays(), eligible: eligibleForDeletion().map((t) => ({ id: t.id, slug: t.slug, name: t.name, ...retentionState(t) })) }));
+r.put('/retention', requireOperator, need('system.manage'), asyncH((req, res) => {
+  const days = setRetentionDays(req.body?.retention_days, req.operator.email);
+  audit(req.operator.email, 'retention-policy', { retention_days: days });
+  res.json({ retention_days: days });
+}));
+r.post('/workspaces/:id/delete-data', requireOperator, need('workspaces.suspend'), limiter, asyncH((req, res) => {
+  if (!TOP_ROLES.includes(req.operator.role) && req.operator.via !== 'token') throw new HttpError(403, 'Only a Platform Owner or Super Admin can delete workspace data');
+  const out = deleteWorkspaceData(req.params.id, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'workspace-data-deleted', { slug: out.slug, reason: req.body?.reason, owner_request: !!req.body?.owner_request, archive: out.archive });
   res.json(out);
 }));
 r.post('/lifecycle/run', requireOperator, need('system.manage'), limiter, asyncH(async (req, res) => {

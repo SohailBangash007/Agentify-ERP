@@ -7,6 +7,7 @@ import { startCardCheckout, openCardPortal, availableMethods, submitLocalPayment
 import { quote, listAddons, tenantAddons, refundsFor } from '../services/commerce.js';
 import { audit } from '../audit.js';
 import { recordServerEvent } from '../services/analytics.js';
+import { platformDb, logTenantEvent } from '../platform.js';
 
 const r = Router();
 r.use(requireStaff);
@@ -16,7 +17,7 @@ const catalogFor = (t) => planCatalog(t.plan, t.product && t.product !== 'bundle
 const summary = (req) => {
   const st = billingState(req.tenant);
   return { ...st, message: st.locked ? lockMessage(st.reason) : null, usage: usage(), plans: catalogFor(req.tenant), provider: providerName(), methods: availableMethods(req.tenant), currency: req.tenant.currency, interval: req.tenant.billing_interval || null,
-    product: req.tenant.product || 'real_estate', product_labels: PRODUCTS, modules: MODULES, trial_note: req.tenant.trial_note || null };
+    product: req.tenant.product || 'real_estate', product_labels: PRODUCTS, modules: MODULES, trial_note: req.tenant.trial_note || null, slug: req.tenant.slug };
 };
 
 /** Any signed-in staff member: enough to show the trial / read-only banner and to hide what the subscription does not include. */
@@ -52,6 +53,24 @@ r.post('/manual-payment', can('settings', 'edit'), asyncH(async (req, res) => {
   const out = await submitLocalPayment(req.tenant, req.user, req.body || {});
   audit(req, 'Submitted payment for confirmation', 'billing', out.id, `${req.body.method} ${req.body.plan}`);
   res.status(201).json(out);
+}));
+
+/**
+ * The workspace owner asks to close the account and delete its data. Nothing is deleted here: the platform team is
+ * alerted, confirms with the owner, cancels the workspace and deletes the data (billing records are kept by law).
+ * Export your data first (Settings > reports and My Space > Security > download database).
+ */
+r.post('/close-request', can('settings', 'edit'), asyncH((req, res) => {
+  if (req.tenant.is_legacy) throw bad('This workspace is not billed');
+  if (req.user.role !== 'Super Admin') throw bad('Only the workspace Super Admin can ask to close the account');
+  const reason = String(req.body?.reason || '').trim().slice(0, 500);
+  if (req.body?.confirm !== req.tenant.slug) throw bad(`Type your workspace address (${req.tenant.slug}) to confirm`);
+  platformDb().prepare("UPDATE tenants SET close_requested_at=datetime('now') WHERE id=?").run(req.tenant.id);
+  logTenantEvent(req.tenant.id, 'close-requested', { by: req.user.email, reason: reason || null });
+  platformDb().prepare("INSERT INTO platform_notifications(kind,severity,title,body,link,tenant_id,dedupe) VALUES('account','warning',?,?,?,?,?) ON CONFLICT(dedupe) DO NOTHING")
+    .run(`${req.tenant.name} asked to close the account and delete its data`, `${req.user.email}${reason ? `: ${reason}` : ''}`, `/platform/workspaces/${req.tenant.id}`, req.tenant.id, `close:${req.tenant.id}:${new Date().toISOString().slice(0, 10)}`);
+  audit(req, 'Requested account closure', 'billing', null, reason);
+  res.json({ ok: true, message: 'Your request was sent. We will confirm by email before anything is deleted.' });
 }));
 
 /** Stripe customer portal: update the card, change plan, cancel, download invoices. */

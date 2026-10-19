@@ -34,6 +34,13 @@ export function openDb(file, tenant = null) {
   return h;
 }
 
+/** Close one database file (before a workspace's data is deleted). */
+export function closeDb(file) {
+  const abs = path.resolve(file);
+  const h = handles.get(abs);
+  if (h) { try { h.close(); } catch { /* already closed */ } handles.delete(abs); }
+}
+
 export function closeDbs() {
   for (const h of handles.values()) { try { h.close(); } catch { /* already closed */ } }
   handles.clear();

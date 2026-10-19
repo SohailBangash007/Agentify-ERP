@@ -105,6 +105,23 @@ function PayModal({ data, plan, interval, onClose, onDone }) {
   );
 }
 
+function CloseAccount({ slug }) {
+  const toast = useToast();
+  const [f, setF] = useState(null);
+  if (!slug) return null;
+  const send = async () => { try { const r = await api.post('/api/billing/close-request', f); toast(r.message, 'ok'); setF(null); } catch (e) { toast(e.message, 'err'); } };
+  return (
+    <Card title="Close your account" style={{ marginTop: 16 }}>
+      <p className="muted">Export anything you need first (every list and report has Excel/PDF export, and the Super Admin can download the whole database under My Space › Security). We confirm by email before deleting anything; billing records are kept as the law requires.</p>
+      {f ? <div className="stack">
+        <Field label="Why are you leaving? (optional)"><input className="input" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} /></Field>
+        <Field label={`Type ${slug} to confirm`}><input className="input" value={f.confirm} onChange={(e) => setF({ ...f, confirm: e.target.value.trim().toLowerCase() })} /></Field>
+        <div className="row" style={{ gap: 8 }}><button className="btn danger" disabled={f.confirm !== slug} onClick={send}>Ask to close the account</button><button className="btn" onClick={() => setF(null)}>Cancel</button></div>
+      </div> : <button className="btn" onClick={() => setF({ reason: '', confirm: '' })}>Ask to close the account and delete our data</button>}
+    </Card>
+  );
+}
+
 export default function Billing() {
   const { can } = useAuth();
   const toast = useToast();
@@ -197,6 +214,7 @@ export default function Billing() {
         </Card>
       )}
       {!data.invoices?.length && data.plan !== 'legacy' && <Empty title="No invoices yet" />}
+      {data.plan !== 'legacy' && can('settings', 'edit') && <CloseAccount slug={data.slug} />}
       {paying && <PayModal data={data} plan={paying} interval={interval} onClose={() => setPaying(null)} onDone={() => { setPaying(null); reload(); }} />}
       {manual && <Modal title="Activate your plan" size="sm" onClose={() => setManual(null)} footer={<button className="btn primary" onClick={() => setManual(null)}>Close</button>}><p>{manual.text}</p></Modal>}
     </div>

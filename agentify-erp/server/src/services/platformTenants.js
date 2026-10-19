@@ -7,6 +7,7 @@ import { platformDb, listTenants, getTenant, withTenant, logTenantEvent, BASE_DO
 import { all, get, run, val } from '../db.js';
 import { billingState, usage, PLANS, PLAN_SETTINGS, MODULES, PRODUCTS, tenantProducts } from './plans.js';
 import { refundsFor, tenantAddons, listAddons } from './commerce.js';
+import { retentionState } from './retention.js';
 import { cleanModules } from './plansStore.js';
 import { recordSubscriptionChange, subscriptionHistory } from './subscriptions.js';
 import { approveSubmission, LOCAL_METHODS } from './billing.js';
@@ -135,7 +136,7 @@ export function tenantDetail(id, req) {
     notes: pdb.prepare('SELECT id, admin, body, pinned, created_at FROM tenant_notes WHERE tenant_id=? ORDER BY pinned DESC, id DESC').all(t.id),
     history: subscriptionHistory({ tenantId: t.id, limit: 50 }).rows,
     storage: storageOf(t), modules: MODULES, plans: Object.entries(PLANS).map(([id, p]) => ({ id, name: p.name, product: p.product, active: p.active, price: p.price })),
-    refunds: refundsFor(t.id), addons: tenantAddons(t.id), available_addons: listAddons({ activeOnly: true }),
+    refunds: refundsFor(t.id), addons: tenantAddons(t.id), available_addons: listAddons({ activeOnly: true }), retention: retentionState(t), close_requested_at: t.close_requested_at || null, data_deleted_at: t.data_deleted_at || null,
   };
 }
 
@@ -439,6 +440,7 @@ export function changeStatus(id, { status, reason }, actor) {
   if (t.is_legacy && status !== 'active') throw bad('The original workspace cannot be suspended or cancelled');
   if (status !== 'active') needReason(reason, status === 'cancelled' ? 'cancelling a workspace' : 'suspending a workspace');
   if (t.status === status) throw bad(`The workspace is already ${status}`);
+  if (t.data_deleted_at) throw bad('The data of this workspace was deleted; it cannot be reactivated');
   setTenantStatus(t.id, status);
   logTenantEvent(t.id, 'status-reason', { status, reason: reason || null, by: actor });
   return getTenant(t.id);

@@ -16,6 +16,7 @@ import { recordSubscriptionChange } from './subscriptions.js';
 import { sendMail, layout } from './mailer.js';
 import { all } from '../db.js';
 import { notify } from '../audit.js';
+import { flagEligible } from './retention.js';
 
 const pdb = () => platformDb();
 const day = (v) => String(v || '').slice(0, 10);
@@ -121,5 +122,6 @@ export async function runLifecycle({ now = Date.now() } = {}) {
       }
     } catch (e) { out.errors.push({ tenant: t.slug, error: e.message }); console.error(`[lifecycle ${t.slug}]`, e); }
   }
+  try { out.retention_flagged = flagEligible(); } catch (e) { out.errors.push({ tenant: '*', error: e.message }); }
   return out;
 }
