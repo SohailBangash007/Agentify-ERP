@@ -8,7 +8,7 @@ import CommandPalette from './CommandPalette.jsx';
 import OfflineBar from './OfflineBar.jsx';
 import { NotificationBell } from './Notifications.jsx';
 import { api } from '../api.js';
-import { useAuth, useMeta } from '../context.jsx';
+import { useAuth, useFetch, useMeta } from '../context.jsx';
 import { useBrand } from '../brand.js';
 import { BillingBanner, VerifyBanner } from '../pages/Billing.jsx';
 import Announcements from './Announcements.jsx';
@@ -21,7 +21,9 @@ const NAV = [
   { label: 'CRM', icon: 'users', module: 'crm', children: [
     ['Contacts', '/contacts'], ['Leads', '/leads'], ['Smart Lists', '/smart-lists'], ['Sales Pipeline', '/pipeline'], ['Tasks', '/tasks'], ['Notes', '/notes'],
     ['Goals & Rewards', '/goals'], ['Sales Agents', '/agents'], ['Commissions', '/commissions', 'commissions'] ] },
-  { label: 'Properties', icon: 'building', module: 'properties', children: [
+  { label: 'Construction', icon: 'hardhat', module: 'construction', product: 'construction', children: [
+    ['Overview & projects', '/construction'], ['Estimates', '/construction/estimates'], ['Purchase orders', '/construction/purchase-orders'], ['Materials & stock', '/construction/materials'], ['Subcontracts', '/construction/subcontracts'] ] },
+  { label: 'Properties', icon: 'building', module: 'properties', product: 'real_estate', children: [
     ['Inventory', '/properties'], ['Listing Approvals', '/listings/approvals', 'listings'], ['Add Property', '/properties/new', 'properties:create'], ['Featured Properties', '/properties/featured'], ['Draft Properties', '/properties/draft', 'properties:edit'],
     ['Sold Properties', '/properties/sold'], ['Reserved Properties', '/properties/reserved'], ['Property Types', '/properties/types', 'settings'] ] },
   { label: 'Projects', icon: 'hardhat', module: 'projects', children: [
@@ -49,6 +51,9 @@ const NAV = [
     ['Payment Methods', '/settings/payment-methods'], ['Lead Stages', '/settings/lead-stages'], ['Categories & Lists', '/settings/categories'], ['Commission Rules', '/settings/commission-rules'], ['Receipts & Branding', '/settings/branding'], ['Notifications', '/settings/notifications'], ['System Settings', '/settings/system'], ['Audit Log', '/settings/audit'] ] },
 ];
 
+/** Pages that belong to the Real Estate product only (the server refuses them for other workspaces too). */
+const PRODUCT_PATHS = { '/listings/approvals': 'real_estate', '/projects/map': 'real_estate', '/properties/new': 'real_estate', '/properties/featured': 'real_estate' };
+
 function useAllowed() {
   const { can } = useAuth();
   const ok = (spec, fallbackModule) => {
@@ -66,6 +71,9 @@ function Sidebar({ collapsed, setCollapsed, mobileOpen, closeMobile }) {
   const loc = useLocation();
   const [open, setOpen] = useState(() => { try { return JSON.parse(localStorage.getItem('nav-open')) || {}; } catch { return {}; } });
   const { meta } = useMeta();
+  const ent = useFetch('/api/billing/status').data;
+  const products = ent?.products || null; // null while loading: show everything rather than flicker
+  const hasProduct = (pr) => !pr || !products || products.includes(pr);
   useEffect(() => {
     const g = NAV.find((n) => n.children?.some((c) => loc.pathname === c[1] || loc.pathname.startsWith(c[1] + '/')));
     if (g && !open[g.label]) setOpen((o) => ({ ...o, [g.label]: true }));
@@ -75,10 +83,14 @@ function Sidebar({ collapsed, setCollapsed, mobileOpen, closeMobile }) {
 
   const groups = NAV.map((g) => {
     if (!g.always && !ok(null, g.module)) return null;
+    if (!hasProduct(g.product)) return null;
     if (!g.children) return g;
-    const kids = g.always ? g.children : g.children.filter((c) => ok(c[2], g.module));
+    const kids = (g.always ? g.children : g.children.filter((c) => ok(c[2], g.module))).filter((c) => hasProduct(PRODUCT_PATHS[c[1]]));
     return kids.length ? { ...g, children: kids } : null;
   }).filter(Boolean);
+  // upgrade path: the product a workspace does not have yet, for people who manage billing
+  const missing = products && ok('settings') ? ['construction', 'real_estate'].filter((pr) => !products.includes(pr)) : [];
+  if (missing.length && !ent?.legacy) groups.push({ label: missing[0] === 'construction' ? 'Add Construction' : 'Add Real Estate', icon: 'plus', to: '/settings/billing' });
   // longest-prefix match so /properties/new does not also light up /properties
   const allPaths = groups.flatMap((g) => g.children?.map((c) => c[1]) || []);
   const activePath = allPaths.filter((p) => loc.pathname === p || loc.pathname.startsWith(p + '/')).sort((a, b) => b.length - a.length)[0];
