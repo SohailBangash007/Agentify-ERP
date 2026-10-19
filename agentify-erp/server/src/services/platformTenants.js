@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import bcrypt from 'bcryptjs';
 import { platformDb, listTenants, getTenant, withTenant, logTenantEvent, BASE_DOMAIN, isMultiTenant, createTenant, setTenantStatus } from '../platform.js';
 import { all, get, run, val } from '../db.js';
-import { billingState, usage, PLANS, PLAN_SETTINGS, MODULES } from './plans.js';
+import { billingState, usage, PLANS, PLAN_SETTINGS, MODULES, PRODUCTS, tenantProducts } from './plans.js';
+import { refundsFor, tenantAddons, listAddons } from './commerce.js';
 import { cleanModules } from './plansStore.js';
 import { recordSubscriptionChange, subscriptionHistory } from './subscriptions.js';
 import { approveSubmission, LOCAL_METHODS } from './billing.js';
@@ -94,7 +95,8 @@ export function expiryOf(t) {
 }
 
 const tenantRow = (t, req) => ({
-  id: t.id, slug: t.slug, name: t.name, owner_email: t.owner_email, is_legacy: !!t.is_legacy, status: t.status, plan: t.plan,
+  id: t.id, slug: t.slug, name: t.name, owner_email: t.owner_email, is_legacy: !!t.is_legacy, status: t.status, plan: t.plan, product: t.product || 'real_estate', products: tenantProducts(t),
+  trial_started_at: t.trial_started_at || null, trial_note: t.trial_note || null, canceled_at: t.canceled_at || null,
   subscription_status: t.subscription_status, billing_interval: t.billing_interval, billing_provider: t.billing_provider,
   trial_ends_at: t.trial_ends_at, current_period_end: t.current_period_end, grace_until: t.grace_until, custom_domain: t.custom_domain,
   timezone: t.timezone, currency: t.currency, created_at: t.created_at, url: workspaceUrl(t, req), expiry: expiryOf(t),
@@ -132,7 +134,8 @@ export function tenantDetail(id, req) {
     payments: pdb.prepare('SELECT id, plan, interval, method, amount, currency, reference, status, decision_note, submitted_by, created_at, decided_at FROM payment_submissions WHERE tenant_id=? ORDER BY id DESC LIMIT 20').all(t.id),
     notes: pdb.prepare('SELECT id, admin, body, pinned, created_at FROM tenant_notes WHERE tenant_id=? ORDER BY pinned DESC, id DESC').all(t.id),
     history: subscriptionHistory({ tenantId: t.id, limit: 50 }).rows,
-    storage: storageOf(t), modules: MODULES, plans: Object.entries(PLANS).map(([id, p]) => ({ id, name: p.name, active: p.active, price: p.price })),
+    storage: storageOf(t), modules: MODULES, plans: Object.entries(PLANS).map(([id, p]) => ({ id, name: p.name, product: p.product, active: p.active, price: p.price })),
+    refunds: refundsFor(t.id), addons: tenantAddons(t.id), available_addons: listAddons({ activeOnly: true }),
   };
 }
 
@@ -144,25 +147,66 @@ function mustTenant(id) {
 const mustBilled = (t) => { if (t.is_legacy) throw bad('The original workspace has no trial or subscription'); };
 
 // ---------------------------------------------------------------- expiry actions
-/** Set a new trial end date (or add days to the current one). Only for workspaces that are still on trial. */
-export function extendTrial(id, { days, until, reason }, actor = null) {
+/** A trial end as an instant (ms). Date-only values (older rows) last until the end of that UTC day. */
+const trialEndMs = (v) => {
+  if (!v) return null;
+  const s = String(v);
+  return s.length > 10 ? Date.parse(s.includes('T') ? s : `${s.replace(' ', 'T')}Z`) : Date.parse(`${s}T23:59:59.999Z`);
+};
+/** On trial now, or a trial that ran out without the workspace ever paying (so it can be extended again). */
+const trialish = (t) => (t.subscription_status || 'trialing') === 'trialing' || (['expired', 'pending'].includes(t.subscription_status) && !t.current_period_end);
+export const TRIAL_ACTIONS = ['extend', 'shorten', 'end', 'revoke', 'grant'];
+
+/**
+ * Change a workspace's free trial (super admin, `trials.manage`, reason required, written to subscription history):
+ *   extend  { days } adds days to the current end (or from now if it already ended) | { until: YYYY-MM-DD } ends that day (UTC)
+ *   shorten { days } moves the end earlier; if that is in the past the trial ends now
+ *   end     the trial ends now; the workspace becomes read-only until it subscribes
+ *   revoke  like end, for abuse; noted on the workspace
+ *   grant   start a new trial of { days } for a workspace that is pending or whose trial ran out
+ * The lifecycle job reads the dates on every run, so reminders and expiry follow the new dates automatically.
+ */
+export function trialAction(id, { action = 'extend', days, until, reason }, actor = null) {
   const t = mustTenant(id); mustBilled(t);
-  needReason(reason, 'extending a trial');
-  if ((t.subscription_status || 'trialing') !== 'trialing') throw bad('This workspace is not on a trial. Use Set plan to change its subscription.');
-  let end;
-  if (until) { if (!DATE_RE.test(String(until))) throw bad('Date must be YYYY-MM-DD'); end = String(until); }
-  else {
-    const n = Math.trunc(Number(days));
-    if (!(n >= 1 && n <= 365)) throw bad('Days must be between 1 and 365');
-    const from = t.trial_ends_at && t.trial_ends_at > today() ? t.trial_ends_at : today();
-    end = addDays(from, n);
+  if (!TRIAL_ACTIONS.includes(action)) throw bad(`Action must be one of: ${TRIAL_ACTIONS.join(', ')}`);
+  needReason(reason, `changing a trial (${action})`);
+  if (!trialish(t)) throw bad('This workspace has a paid subscription, not a trial. Use Set plan to change it.');
+  const now = Date.now();
+  const n = () => { const v = Math.trunc(Number(days)); if (!(v >= 1 && v <= 365)) throw bad('Days must be between 1 and 365'); return v; };
+  const curEnd = trialEndMs(t.trial_ends_at);
+  const set = { };
+  if (action === 'extend') {
+    if (until) {
+      if (!DATE_RE.test(String(until))) throw bad('Date must be YYYY-MM-DD');
+      if (String(until) < today()) throw bad('The new trial end date is in the past');
+      set.trial_ends_at = `${until}T23:59:59.000Z`;
+    } else set.trial_ends_at = new Date(Math.max(now, curEnd || now) + n() * 864e5).toISOString();
+    set.subscription_status = 'trialing';
+  } else if (action === 'grant') {
+    if (t.subscription_status === 'trialing' && curEnd && curEnd > now) throw bad('This workspace is already on a trial. Use extend.');
+    set.trial_started_at = new Date(now).toISOString();
+    set.trial_ends_at = new Date(now + n() * 864e5).toISOString();
+    set.subscription_status = 'trialing';
+    set.trial_note = null;
+  } else if (action === 'shorten') {
+    if (t.subscription_status !== 'trialing' || !curEnd) throw bad('Only a running trial with an end date can be shortened');
+    const next = curEnd - n() * 864e5;
+    if (next <= now) { set.trial_ends_at = new Date(now).toISOString(); set.subscription_status = 'expired'; }
+    else set.trial_ends_at = new Date(next).toISOString();
+  } else {
+    if (t.subscription_status !== 'trialing') throw bad('This workspace is not on a running trial');
+    set.trial_ends_at = new Date(now).toISOString();
+    set.subscription_status = 'expired';
+    if (action === 'revoke') set.trial_note = `Trial revoked: ${String(reason).trim().slice(0, 200)}`;
   }
-  if (end < today()) throw bad('The new trial end date is in the past');
-  platformDb().prepare("UPDATE tenants SET trial_ends_at=?, updated_at=datetime('now') WHERE id=?").run(end, t.id);
-  recordSubscriptionChange(t, getTenant(t.id), { source: 'admin', actor, reason });
-  logTenantEvent(t.id, 'trial-extended', { until: end, reason });
+  const keys = Object.keys(set);
+  platformDb().prepare(`UPDATE tenants SET ${keys.map((k) => `${k}=?`).join(',')}, updated_at=datetime('now') WHERE id=?`).run(...keys.map((k) => set[k]), t.id);
+  recordSubscriptionChange(t, getTenant(t.id), { source: 'admin', actor, reason: `Trial ${action}: ${reason}` });
+  logTenantEvent(t.id, `trial-${action}`, { until: set.trial_ends_at || null, reason });
   return getTenant(t.id);
 }
+/** Kept for existing callers: extend a trial. */
+export const extendTrial = (id, body, actor = null) => trialAction(id, { ...body, action: 'extend' }, actor);
 
 /** Give a workspace whose payment failed more time before it becomes read-only. */
 export function extendGrace(id, { until, reason }, actor = null) {
@@ -261,7 +305,7 @@ export function createWorkspace(b, req) {
   const trialDays = b.trial_days === undefined || b.trial_days === '' ? PLAN_SETTINGS.default_trial_days : Math.trunc(Number(b.trial_days));
   if (!(trialDays >= 0 && trialDays <= 365)) throw bad('Trial days must be between 0 and 365');
   const t = createTenant({ slug: b.slug, name: b.company_name, adminName: String(b.admin_name || '').trim() || 'Admin', adminEmail: b.admin_email, adminPassword: b.admin_password,
-    timezone: b.timezone || 'Asia/Karachi', currency: b.currency || 'PKR', demo: !!b.demo, trialDays: trialDays || null });
+    timezone: b.timezone || 'Asia/Karachi', currency: b.currency || 'PKR', demo: !!b.demo, trialDays: trialDays || null, product: b.product || 'real_estate' });
   return tenantRow(t, req);
 }
 
@@ -435,12 +479,18 @@ export function setEntitlements(id, b, actor) {
   let next = null;
   if (!b.clear) {
     next = {};
-    for (const k of ['seats', 'projects']) {
+    const label = { seats: 'User', projects: 'Project', properties: 'Property', storage_mb: 'Storage (MB)' };
+    for (const k of Object.keys(label)) {
       if (b[k] === undefined || b[k] === 'plan') continue;
       if (b[k] === null || b[k] === '') next[k] = null;
-      else { const n = Math.trunc(Number(b[k])); if (!(n >= 1 && n <= 100000)) throw bad(`${k === 'seats' ? 'User' : 'Project'} limit must be a whole number from 1, or empty for unlimited`); next[k] = n; }
+      else { const n = Math.trunc(Number(b[k])); if (!(n >= 1 && n <= 10_000_000)) throw bad(`${label[k]} limit must be a whole number from 1, or empty for unlimited`); next[k] = n; }
     }
+    if (b.api_access !== undefined && b.api_access !== 'plan') next.api_access = !!b.api_access;
     if (b.modules !== undefined && b.modules !== 'plan') next.modules = cleanModules(b.modules);
+    if (b.products !== undefined && b.products !== 'plan') {
+      if (!Array.isArray(b.products) || !b.products.length || b.products.some((p) => !PRODUCTS[p])) throw bad(`Products must be a list of: ${Object.keys(PRODUCTS).join(', ')}`);
+      next.products = [...new Set(b.products)];
+    }
     if (!Object.keys(next).length) next = null;
   }
   platformDb().prepare("UPDATE tenants SET entitlements=?, updated_at=datetime('now') WHERE id=?").run(next ? JSON.stringify(next) : null, t.id);

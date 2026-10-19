@@ -9,7 +9,8 @@ import { bootstrap, upgradePermissions, seedDemo, ensureBootstrapped } from './s
 import { ensureSite } from './services/siteDefaults.js';
 import { HttpError, bad } from './util.js';
 import { initPlans } from './services/plansStore.js';
-import { PLAN_SETTINGS } from './services/plans.js';
+import { PLAN_SETTINGS, PLANS, PRODUCT_CHOICES } from './services/plans.js';
+import crypto from 'node:crypto';
 
 export const PLATFORM_DB_FILE = process.env.ERP_PLATFORM_DB || path.join(DATA_DIR, 'platform.db');
 /** Set ERP_BASE_DOMAIN (e.g. agentifyerp.com, or localhost in development) to serve many tenants by subdomain. */
@@ -22,7 +23,9 @@ export const LEGACY_SLUG = (process.env.ERP_DEFAULT_TENANT || 'default').toLower
 const TENANT_COLUMNS = [['subscription_status', "TEXT NOT NULL DEFAULT 'trialing'"], ['current_period_end', 'TEXT'], ['grace_until', 'TEXT'], ['billing_interval', 'TEXT'],
   ['billing_provider', 'TEXT'], ['provider_customer_id', 'TEXT'], ['provider_subscription_id', 'TEXT'],
   // per-workspace limit overrides (JSON {seats, projects, modules}), the price this workspace pays, and profile fields
-  ['entitlements', 'TEXT'], ['price_amount', 'INTEGER'], ['price_currency', 'TEXT'], ['owner_name', 'TEXT'], ['owner_phone', 'TEXT'], ['account_manager', 'TEXT']];
+  ['entitlements', 'TEXT'], ['price_amount', 'INTEGER'], ['price_currency', 'TEXT'], ['owner_name', 'TEXT'], ['owner_phone', 'TEXT'], ['account_manager', 'TEXT'],
+  // SaaS release: product chosen at signup, trial start (UTC), when a subscription was cancelled, why a trial was not granted
+  ['product', "TEXT NOT NULL DEFAULT 'real_estate'"], ['trial_started_at', 'TEXT'], ['canceled_at', 'TEXT'], ['trial_note', 'TEXT']];
 
 const PLATFORM_SCHEMA = `
 CREATE TABLE IF NOT EXISTS tenants(
@@ -96,6 +99,19 @@ CREATE TRIGGER IF NOT EXISTS platform_audit_no_delete BEFORE DELETE ON platform_
 CREATE TABLE IF NOT EXISTS platform_logins(id INTEGER PRIMARY KEY, admin_id INTEGER, email TEXT, outcome TEXT NOT NULL, ip TEXT, user_agent TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));
 CREATE INDEX IF NOT EXISTS idx_platform_logins ON platform_logins(created_at);
 CREATE INDEX IF NOT EXISTS idx_platform_logins_email ON platform_logins(email, created_at);
+-- money returned to customers; invoices stay as collected so gross, refunds and net are reported separately
+CREATE TABLE IF NOT EXISTS refunds(id INTEGER PRIMARY KEY, tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE, invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+  amount INTEGER NOT NULL CHECK(amount > 0), currency TEXT NOT NULL, reason TEXT, reference TEXT, provider TEXT NOT NULL DEFAULT 'manual', provider_refund_id TEXT, created_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(provider, provider_refund_id));
+CREATE INDEX IF NOT EXISTS idx_refunds_created ON refunds(created_at);
+-- one row per reminder / lifecycle email actually sent, so the hourly job never sends the same notice twice
+CREATE TABLE IF NOT EXISTS lifecycle_notices(id INTEGER PRIMARY KEY, tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE, kind TEXT NOT NULL, ref TEXT NOT NULL,
+  sent_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(tenant_id, kind, ref));
+-- one free trial per owner email (hash only); a second workspace for the same email starts without a trial
+CREATE TABLE IF NOT EXISTS trial_claims(email_hash TEXT PRIMARY KEY, tenant_id INTEGER, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE INDEX IF NOT EXISTS idx_tenants_sub ON tenants(subscription_status, trial_ends_at);
+CREATE INDEX IF NOT EXISTS idx_tenants_period ON tenants(current_period_end);
+CREATE INDEX IF NOT EXISTS idx_tenants_product ON tenants(product, plan);
 CREATE TABLE IF NOT EXISTS platform_sessions(id TEXT PRIMARY KEY, admin_id INTEGER NOT NULL REFERENCES platform_admins(id) ON DELETE CASCADE, ip TEXT, user_agent TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')), last_seen TEXT NOT NULL DEFAULT (datetime('now')), expires_at TEXT NOT NULL, revoked_at TEXT, revoked_by TEXT);
 CREATE INDEX IF NOT EXISTS idx_platform_sessions_admin ON platform_sessions(admin_id, revoked_at);
@@ -123,6 +139,8 @@ export function platformDb() {
   const aud = new Set(pdb.prepare('PRAGMA table_info(platform_audit)').all().map((c) => c.name));
   for (const c of ['actor_role', 'target', 'reason', 'outcome', 'ip', 'user_agent', 'request_id']) if (!aud.has(c)) pdb.exec(`ALTER TABLE platform_audit ADD COLUMN ${c} TEXT`);
   pdb.exec(PLATFORM_SCHEMA_2);
+  // the original install keeps every product it already used and gains the construction module
+  pdb.exec("UPDATE tenants SET product='bundle' WHERE is_legacy=1 AND product='real_estate'");
   ensureLegacyTenant();
   seedFromEnv();
   initPlans(pdb);
@@ -150,7 +168,7 @@ const prun = (sql, ...p) => platformDb().prepare(sql).run(...p);
 function ensureLegacyTenant() {
   if (pdb.prepare('SELECT 1 FROM tenants WHERE is_legacy=1').get()) return;
   const name = process.env.ERP_DEFAULT_TENANT_NAME || 'Expert Marketing & Developers';
-  pdb.prepare("INSERT INTO tenants(slug,name,plan,db_file,upload_dir,is_legacy) VALUES(?,?,'legacy','(legacy)','(legacy)',1)").run(LEGACY_SLUG, name);
+  pdb.prepare("INSERT INTO tenants(slug,name,plan,db_file,upload_dir,is_legacy,product) VALUES(?,?,'legacy','(legacy)','(legacy)',1,'bundle')").run(LEGACY_SLUG, name);
 }
 
 /** Absolute paths for a tenant row; the legacy tenant follows ERP_DB / ERP_UPLOAD_DIR so existing setups keep working. */
@@ -221,15 +239,38 @@ export function validateSlug(slug) {
  * Provision a new tenant: register it, create its database with the base configuration and its first Super Admin.
  * Nothing is shared with other tenants. If anything fails the half-made tenant is removed again.
  */
-export function createTenant({ slug, name, adminName, adminEmail, adminPassword, timezone = 'Asia/Karachi', currency = 'PKR', demo = false, plan = 'trial', trialDays = PLAN_SETTINGS.default_trial_days }) {
+const emailHash = (e) => crypto.createHash('sha256').update(`trial:${String(e).trim().toLowerCase()}`).digest('hex');
+/** Has this owner email already had a free trial on the platform? (only a hash of the address is kept) */
+export const trialUsed = (email) => !!pget('SELECT 1 FROM trial_claims WHERE email_hash=?', emailHash(email));
+
+/**
+ * Provision a new tenant: register it, create its database with the base configuration and its first Super Admin.
+ * Nothing is shared with other tenants. If anything fails the half-made tenant is removed again.
+ * Self-serve sign-ups (`trialPolicy: true`) get the default trial for their product unless the owner email already had
+ * one, or trials are switched off; then the workspace starts as `pending` (read-only until the first payment).
+ * Trial start and end are stored as UTC timestamps.
+ */
+export function createTenant({ slug, name, adminName, adminEmail, adminPassword, timezone = 'Asia/Karachi', currency = 'PKR', demo = false, plan = 'trial',
+  trialDays = PLAN_SETTINGS.default_trial_days, product = 'real_estate', trialPolicy = false }) {
   const s = validateSlug(slug);
   if (!String(name || '').trim()) throw bad('Company name is required');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(adminEmail || ''))) throw bad('A valid admin email is required');
   if (String(adminPassword || '').length < 8) throw bad('Admin password must be at least 8 characters');
+  if (!PRODUCT_CHOICES.includes(product)) throw bad('Choose Real Estate Brokerage or Construction Management');
   try { new Intl.DateTimeFormat('en', { timeZone: timezone }); } catch { throw bad(`Unknown timezone: ${timezone}`); }
-  const trialEnds = trialDays ? new Date(Date.now() + trialDays * 864e5).toISOString().slice(0, 10) : null;
-  const id = Number(prun('INSERT INTO tenants(slug,name,plan,trial_ends_at,db_file,upload_dir,timezone,currency,owner_email) VALUES(?,?,?,?,?,?,?,?,?)',
-    s, String(name).trim(), plan, trialEnds, path.join('tenants', s, 'erp.db'), path.join('tenants', s), timezone, String(currency).toUpperCase(), String(adminEmail).toLowerCase()).lastInsertRowid);
+  const email = String(adminEmail).toLowerCase();
+  let days = trialDays, status = 'trialing', note = null;
+  if (trialPolicy) {
+    const trialPlan = PLANS[PLAN_SETTINGS.trial_plans?.[product === 'bundle' ? 'real_estate' : product]];
+    if (!days || trialPlan?.trial_eligible === false) { days = null; status = 'pending'; note = 'Free trials are not offered for this product'; }
+    else if (PLAN_SETTINGS.one_trial_per_email && trialUsed(email)) { days = null; status = 'pending'; note = 'A free trial was already used with this owner email'; }
+  }
+  const start = new Date();
+  const trialStart = days ? start.toISOString() : null;
+  const trialEnds = days ? new Date(start.getTime() + days * 864e5).toISOString() : null;
+  const id = Number(prun('INSERT INTO tenants(slug,name,plan,trial_ends_at,trial_started_at,subscription_status,trial_note,product,db_file,upload_dir,timezone,currency,owner_email) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    s, String(name).trim(), plan, trialEnds, trialStart, status, note, product, path.join('tenants', s, 'erp.db'), path.join('tenants', s), timezone, String(currency).toUpperCase(), email).lastInsertRowid);
+  if (days) prun('INSERT OR IGNORE INTO trial_claims(email_hash,tenant_id) VALUES(?,?)', emailHash(email), id);
   const tenant = getTenant(id);
   try {
     withTenant(tenant, () => {
@@ -243,7 +284,7 @@ export function createTenant({ slug, name, adminName, adminEmail, adminPassword,
     fs.rmSync(path.dirname(tenant.db_path), { recursive: true, force: true });
     throw e;
   }
-  logTenantEvent(id, 'created', { plan, demo: !!demo });
+  logTenantEvent(id, 'created', { plan, product, demo: !!demo, trial_days: days || null, status });
   return tenant;
 }
 

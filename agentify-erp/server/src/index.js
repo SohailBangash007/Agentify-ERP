@@ -11,9 +11,10 @@ import { tenantContext, bootstrapTenants, forEachTenant } from './platform.js';
 import { ensureFirstAdmin } from './services/platformAuth.js';
 import { markJob, snapshot, generateNotifications } from './services/platformMetrics.js';
 import { maintenanceGate, recordError } from './services/maintenance.js';
+import { runLifecycle } from './services/lifecycle.js';
 import platformRoutes from './routes/platform.js';
 import billing from './routes/billing.js';
-import { billingGuard } from './services/plans.js';
+import { billingGuard, apiAccessGuard } from './services/plans.js';
 import { authenticate, csrfGuard, requireStaff } from './rbac.js';
 import { HttpError } from './util.js';
 import { runReminders } from './services/reminders.js';
@@ -79,7 +80,7 @@ export function createApp() {
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
-  }, pub);
+  }, apiAccessGuard, pub);
 
   app.use('/api', rateLimit({ windowMs: 60_000, limit: 900, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many requests' } }));
   app.use('/api', authenticate, csrfGuard);
@@ -156,7 +157,9 @@ if (isMain) {
   scheduleBackups();
   setInterval(tick, 30 * 60 * 1000).unref(); // goal nudges are once-per-day via dedupe keys
   // platform-wide: daily metric snapshot (for period comparisons) and super-admin alerts
-  const platformTick = () => { try { snapshot(); generateNotifications(null, true); markJob('platform-jobs'); } catch (e) { console.error('[platform jobs]', e); markJob('platform-jobs', e); } };
+  const platformTick = () => { try { snapshot(); generateNotifications(null, true); markJob('platform-jobs'); } catch (e) { console.error('[platform jobs]', e); markJob('platform-jobs', e); }
+    // trial expiry, reminders and renewals (idempotent; safe to run as often as you like)
+    runLifecycle().then((r) => markJob('lifecycle', r.errors.length ? new Error(`${r.errors.length} workspace(s) failed`) : null)).catch((e) => { console.error('[lifecycle]', e); markJob('lifecycle', e); }); };
   setTimeout(platformTick, 5000).unref();
   setInterval(platformTick, 60 * 60 * 1000).unref();
 }

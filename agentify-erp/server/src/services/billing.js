@@ -14,7 +14,10 @@ import { bad, HttpError } from '../util.js';
 import { platformDb, getTenant, getTenantBySlug, logTenantEvent } from '../platform.js';
 import * as stripe from './stripe.js';
 import { sendMail, layout } from './mailer.js';
+import { quote, recordRedemption, setTenantAddon, recordRefund } from './commerce.js';
 
+/** Explicit subscription states (see services/plans.js billingState). */
+export const SUB_STATUSES = ['trialing', 'pending', 'active', 'past_due', 'canceled', 'expired'];
 export const providerName = () => (process.env.BILLING_PROVIDER || 'manual').toLowerCase();
 
 /** Where to send the customer to pay for `plan`. Returns { mode:'redirect', url } or { mode:'manual', instructions }. */
@@ -77,14 +80,20 @@ export function applyBillingEvent(provider, ev) {
         break;
       }
       case 'subscription.canceled':
-        set({ ...ids, subscription_status: 'canceled', current_period_end: iso(ev.period_end) || iso(tenant.current_period_end) });
+        set({ ...ids, subscription_status: 'canceled', current_period_end: iso(ev.period_end) || iso(tenant.current_period_end), canceled_at: tenant.canceled_at || new Date().toISOString() });
+        break;
+      case 'payment.refunded':
+        // a refund made in the provider's dashboard: recorded once against the invoice; access is not changed by itself
+        if (!ev.refund?.id || !ev.refund?.invoice) throw bad('Refund events need refund.id and refund.invoice');
+        recordRefund(tenant.id, { provider_invoice_id: ev.refund.invoice, amount: ev.refund.amount, reason: ev.refund.reason || 'Refunded at the payment provider', provider, provider_refund_id: String(ev.refund.id) }, `webhook:${provider}`, db);
         break;
       case 'payment.failed':
         // keep access for a grace period; do not extend it if a retry fails again
         set({ ...ids, subscription_status: 'past_due', grace_until: tenant.subscription_status === 'past_due' && tenant.grace_until ? tenant.grace_until : addDays(graceDays(tenant.plan)) });
         break;
       case 'invoice.paid':
-        if (tenant.subscription_status === 'past_due') set({ subscription_status: 'active', grace_until: null });
+        // a late payment (past due, or already expired after the grace period) restores access
+        if (['past_due', 'expired'].includes(tenant.subscription_status) && PLANS[tenant.plan]) set({ subscription_status: 'active', grace_until: null, ...(ev.invoice?.period_end ? { current_period_end: iso(ev.invoice.period_end) } : {}) });
         break;
       default: throw bad(`Unsupported event type: ${ev.type}`);
     }
@@ -106,15 +115,15 @@ export function setSubscription(tenantId, { plan, status = 'active', period_end,
   if (!tenant) throw new HttpError(404, 'Tenant not found');
   if (tenant.is_legacy) throw bad('The original workspace is not billed');
   if (!PLANS[plan]) throw bad('Unknown plan');
-  if (!['active', 'past_due', 'canceled', 'trialing'].includes(status)) throw bad('Unknown subscription status');
+  if (!SUB_STATUSES.includes(status)) throw bad('Unknown subscription status');
   const int = interval === 'year' ? 'year' : 'month';
   const cur = PLANS[plan].price[tenant.currency] ? tenant.currency : 'PKR';
   const amount = PLANS[plan].price[cur]?.[int] ?? null;
   const db = platformDb();
   db.exec('BEGIN IMMEDIATE');
   try {
-    db.prepare("UPDATE tenants SET plan=?, subscription_status=?, current_period_end=?, billing_interval=?, billing_provider='manual', grace_until=NULL, price_amount=?, price_currency=?, updated_at=datetime('now') WHERE id=?")
-      .run(plan, status, iso(period_end), int, amount, amount == null ? null : cur, tenantId);
+    db.prepare("UPDATE tenants SET plan=?, subscription_status=?, current_period_end=?, billing_interval=?, billing_provider='manual', grace_until=NULL, price_amount=?, price_currency=?, canceled_at=CASE WHEN ?='canceled' THEN COALESCE(canceled_at, ?) ELSE NULL END, updated_at=datetime('now') WHERE id=?")
+      .run(plan, status, iso(period_end), int, amount, amount == null ? null : cur, status, new Date().toISOString(), tenantId);
     recordSubscriptionChange(tenant, getTenant(tenantId), { source: 'admin', actor, reason }, db);
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
@@ -149,7 +158,7 @@ const origin = (req) => `${req.protocol}://${req.get('host')}`;
 export async function startCardCheckout(req, { plan, interval = 'month' }) {
   assertSellable(plan, req.tenant);
   if (!['month', 'year'].includes(interval)) throw bad('Interval must be month or year');
-  if (stripe.stripeConfigured()) return stripe.createCheckout(req.tenant, { plan, interval, email: req.user.email, origin: origin(req) });
+  if (stripe.stripeConfigured()) return stripe.createCheckout(req.tenant, { plan, interval, email: req.user.email, origin: origin(req), firstPayment: !platformDb().prepare("SELECT 1 FROM invoices WHERE tenant_id=? AND status='paid'").get(req.tenant.id) });
   return startCheckout(req.tenant, { plan, interval, email: req.user.email });
 }
 export const openCardPortal = (req) => stripe.createPortal(req.tenant, { origin: origin(req) });
@@ -162,19 +171,21 @@ const addMonths = (dateStr, n) => {
 };
 
 /** A customer says "I paid PKR X by <method>, reference <ref>". Nothing activates until an operator confirms it arrived. */
-export async function submitLocalPayment(tenant, user, { plan, interval = 'month', method, reference, note }) {
+export async function submitLocalPayment(tenant, user, { plan, interval = 'month', method, reference, note, coupon = null, addons = [] }) {
   assertSellable(plan, tenant);
   if (!['month', 'year'].includes(interval)) throw bad('Interval must be month or year');
   if (!localAccounts().some((a) => a.method === method)) throw bad('This payment method is not available');
   const ref = String(reference || '').trim();
   if (ref.length < 6) throw bad('Enter the transaction ID or reference from your payment receipt');
-  const amount = PLANS[plan].price.PKR[interval];
+  // the amount is computed here (plan + setup fee + add-ons - coupon), never taken from the browser
+  const q = quote(tenant, { plan, interval, currency: 'PKR', coupon, addons });
+  const amount = q.total;
   const db = platformDb();
   if (db.prepare("SELECT 1 FROM payment_submissions WHERE tenant_id=? AND status='pending'").get(tenant.id)) throw bad('You already have a payment waiting for confirmation');
   let id;
   try {
-    id = Number(db.prepare('INSERT INTO payment_submissions(tenant_id,plan,interval,method,amount,currency,reference,note,submitted_by) VALUES(?,?,?,?,?,?,?,?,?)')
-      .run(tenant.id, plan, interval, method, amount, 'PKR', ref, String(note || '').slice(0, 500) || null, user.email).lastInsertRowid);
+    id = Number(db.prepare('INSERT INTO payment_submissions(tenant_id,plan,interval,method,amount,currency,reference,note,submitted_by,coupon_code,discount_amount,setup_fee,addons,list_amount) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(tenant.id, plan, interval, method, amount, 'PKR', ref, String(note || '').slice(0, 500) || null, user.email, q.coupon, q.discount, q.setup_fee, q.addons.length ? JSON.stringify(q.addons) : null, q.list_amount).lastInsertRowid);
   } catch (e) {
     if (/UNIQUE/.test(e.message)) throw new HttpError(409, 'This transaction reference has already been submitted');
     throw e;
@@ -184,7 +195,7 @@ export async function submitLocalPayment(tenant, user, { plan, interval = 'month
     const mail = layout({ heading: 'Payment to confirm', lines: [`${tenant.name} (${tenant.slug}) says they paid PKR ${amount.toLocaleString('en-PK')} by ${LOCAL_METHODS[method]} for ${PLANS[plan].name} (${interval}).`, `Reference: ${ref}`] });
     await sendMail({ to: process.env.BILLING_OPERATOR_EMAIL, subject: `Payment to confirm: ${tenant.name}`, ...mail });
   }
-  return { id, amount, currency: 'PKR', status: 'pending' };
+  return { id, amount, currency: 'PKR', status: 'pending', quote: q };
 }
 
 export const submissionsFor = (tenantId) => platformDb().prepare('SELECT id,plan,interval,method,amount,currency,reference,status,decision_note,created_at,decided_at FROM payment_submissions WHERE tenant_id=? ORDER BY id DESC LIMIT 20').all(tenantId);
@@ -203,9 +214,13 @@ export async function approveSubmission(id, decisionNote, decidedBy = null) {
   db.exec('BEGIN IMMEDIATE');
   try {
     db.prepare("UPDATE payment_submissions SET status='approved', decision_note=?, decided_at=datetime('now') WHERE id=?").run(decisionNote || null, id);
-    db.prepare("UPDATE tenants SET plan=?, subscription_status='active', current_period_end=?, billing_interval=?, billing_provider=?, grace_until=NULL, price_amount=?, price_currency=?, updated_at=datetime('now') WHERE id=?")
-      .run(s.plan, periodEnd, s.interval, s.method, s.amount, s.currency, s.tenant_id);
+    // the recurring price excludes the one-time setup fee; with a coupon it is what the workspace actually pays per period
+    const recurring = s.list_amount != null ? Math.max(0, s.list_amount - (s.discount_amount || 0)) : s.amount;
+    db.prepare("UPDATE tenants SET plan=?, subscription_status='active', current_period_end=?, billing_interval=?, billing_provider=?, grace_until=NULL, price_amount=?, price_currency=?, canceled_at=NULL, updated_at=datetime('now') WHERE id=?")
+      .run(s.plan, periodEnd, s.interval, s.method, recurring, s.currency, s.tenant_id);
     db.prepare('INSERT OR IGNORE INTO invoices(tenant_id,provider_invoice_id,amount,currency,status,period_start,period_end) VALUES(?,?,?,?,?,?,?)').run(s.tenant_id, `local-${id}`, s.amount, s.currency, 'paid', current, periodEnd);
+    if (s.coupon_code) recordRedemption(s.coupon_code, s.tenant_id, id, s.discount_amount || 0, s.currency, db);
+    for (const a of (() => { try { return JSON.parse(s.addons || '[]'); } catch { return []; } })()) setTenantAddon(s.tenant_id, { addon_id: a.id, quantity: a.quantity, active: true }, decidedBy, db);
     recordSubscriptionChange(tenant, getTenant(s.tenant_id), { source: 'payment', actor: decidedBy, reason: `Payment ${s.reference} (${s.method})` }, db);
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }

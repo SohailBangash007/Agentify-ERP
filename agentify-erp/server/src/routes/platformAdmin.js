@@ -2,7 +2,9 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { asyncH, bad, HttpError } from '../util.js';
-import { platformDb, BASE_DOMAIN, isMultiTenant } from '../platform.js';
+import { platformDb, BASE_DOMAIN, isMultiTenant, getTenant } from '../platform.js';
+import { listAddons, saveAddon, setTenantAddon, listCoupons, saveCoupon, recordRefund, quote } from '../services/commerce.js';
+import { runLifecycle } from '../services/lifecycle.js';
 import { COOKIE, login, loginMfa, changePassword, requireOperator, onPlatformHost, twofaStatus, twofaSetup, twofaEnable, twofaDisable,
   loginMeta, endSession, listSessions, revokeSession, revokeAllFor, loginHistory, mfaRequired } from '../services/platformAuth.js';
 import { ROLES, PERMISSIONS, permsOf, can, need, auditContext, onDenied } from '../services/platformAccess.js';
@@ -13,10 +15,10 @@ import { testConnection } from '../services/stripe.js';
 import { LOCAL_METHODS } from '../services/billing.js';
 import { runBackup, listBackups, backupDir } from '../services/backup.js';
 import { dashboard, health, listNotifications, markRead, search, generateNotifications } from '../services/platformMetrics.js';
-import { overview, tenantSummaries, tenantDetail, createWorkspace, extendTrial, extendGrace, remindOwner, setOwner, userAction, setupChecklist, listAdmins, addAdmin, removeAdmin,
+import { overview, tenantSummaries, tenantDetail, createWorkspace, extendTrial, trialAction, extendGrace, remindOwner, setOwner, userAction, setupChecklist, listAdmins, addAdmin, removeAdmin,
   updateAdmin, changeStatus, updateProfile, setEntitlements, listNotes, addNote, recordManualPayment, resendOnboarding, transactions } from '../services/platformTenants.js';
 import { listPlans, savePlan, savePlanSettings } from '../services/plansStore.js';
-import { PLAN_SETTINGS, MODULES } from '../services/plans.js';
+import { PLAN_SETTINGS, MODULES, PRODUCTS } from '../services/plans.js';
 import { setSubscription } from '../services/billing.js';
 import { subscriptionHistory } from '../services/subscriptions.js';
 import { setupNeeded, completeSetup, inviteAdmin, inviteInfo, acceptInvite } from '../services/platformStaff.js';
@@ -148,8 +150,9 @@ r.post('/workspaces', requireOperator, need('workspaces.create'), asyncH((req, r
 }));
 r.get('/workspaces/:id', requireOperator, need('workspaces.view'), asyncH((req, res) => res.json(tenantDetail(req.params.id, req))));
 r.post('/workspaces/:id/trial', requireOperator, need('trials.manage'), asyncH((req, res) => {
-  const t = extendTrial(req.params.id, req.body || {}, req.operator.email);
-  audit(req.operator.email, 'trial-extended', { slug: t.slug, until: t.trial_ends_at, reason: req.body?.reason });
+  const action = req.body?.action || 'extend';
+  const t = trialAction(req.params.id, { ...(req.body || {}), action }, req.operator.email);
+  audit(req.operator.email, action === 'extend' ? 'trial-extended' : `trial-${action}`, { slug: t.slug, until: t.trial_ends_at, status: t.subscription_status, reason: req.body?.reason });
   res.json(tenantDetail(t.id, req));
 }));
 r.post('/workspaces/:id/grace', requireOperator, need('billing.manage'), asyncH((req, res) => {
@@ -215,7 +218,7 @@ r.post('/workspaces/:id/onboarding-email', requireOperator, need('workspaces.sup
 }));
 
 // ---- Plans, subscriptions and money
-r.get('/plans', requireOperator, need('billing.view'), (_req, res) => res.json({ plans: listPlans(), settings: { ...PLAN_SETTINGS }, modules: MODULES }));
+r.get('/plans', requireOperator, need('billing.view'), (_req, res) => res.json({ plans: listPlans(), settings: { ...PLAN_SETTINGS }, modules: MODULES, products: PRODUCTS }));
 r.put('/plans/:id', requireOperator, need('billing.configure'), asyncH((req, res) => {
   const out = savePlan(req.params.id, req.body || {}, req.operator.email);
   audit(req.operator.email, out.changes.created ? 'plan-created' : 'plan-edited', { plan: out.plan.id, ...out.changes });
@@ -224,6 +227,43 @@ r.put('/plans/:id', requireOperator, need('billing.configure'), asyncH((req, res
 r.put('/plan-settings', requireOperator, need('billing.configure'), asyncH((req, res) => {
   const out = savePlanSettings(req.body || {}, req.operator.email);
   audit(req.operator.email, 'plan-settings', out);
+  res.json(out);
+}));
+// ---- Add-ons, coupons, refunds and the lifecycle job
+r.get('/addons', requireOperator, need('billing.view'), (_req, res) => res.json(listAddons()));
+r.put('/addons/:id', requireOperator, need('billing.configure'), asyncH((req, res) => {
+  const out = saveAddon(req.params.id, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'addon-saved', { id: out.id, price: out.price, entitlements: out.entitlements, active: out.active });
+  res.json(out);
+}));
+r.post('/workspaces/:id/addons', requireOperator, need('billing.manage'), asyncH((req, res) => {
+  const reason = String(req.body?.reason || '').trim();
+  if (reason.length < 3) throw bad('A reason is required for changing add-ons by hand');
+  const t = tenantDetail(req.params.id, req);
+  if (t.is_legacy) throw bad('The original workspace is not billed');
+  const out = setTenantAddon(t.id, { ...(req.body || {}), reason }, req.operator.email);
+  audit(req.operator.email, 'addon-changed', { slug: t.slug, addon: req.body?.addon_id, active: req.body?.active !== false, quantity: req.body?.quantity, reason });
+  res.json(out);
+}));
+r.get('/coupons', requireOperator, need('billing.view'), (_req, res) => res.json(listCoupons()));
+r.put('/coupons/:code', requireOperator, need('billing.configure'), asyncH((req, res) => {
+  const out = saveCoupon(req.params.code, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'coupon-saved', { code: out.code, percent_off: out.percent_off, amount_off: out.amount_off, active: out.active });
+  res.json(out);
+}));
+r.post('/workspaces/:id/refunds', requireOperator, need('billing.manage'), limiter, asyncH((req, res) => {
+  const out = recordRefund(req.params.id, { invoice_id: req.body?.invoice_id, amount: req.body?.amount, reason: req.body?.reason, reference: req.body?.reference, provider: 'manual' }, req.operator.email);
+  audit(req.operator.email, 'refund-recorded', { tenant: Number(req.params.id), invoice: out.invoice_id, amount: out.amount, currency: out.currency, reason: req.body?.reason });
+  res.status(201).json(out);
+}));
+r.post('/quote', requireOperator, need('billing.view'), asyncH((req, res) => {
+  const b = req.body || {};
+  const t = b.tenant_id ? tenantDetail(b.tenant_id, req) : null;
+  res.json(quote(t && !t.is_legacy ? getTenant(t.id) : null, { plan: b.plan, interval: b.interval, currency: b.currency, coupon: b.coupon, addons: b.addons }));
+}));
+r.post('/lifecycle/run', requireOperator, need('system.manage'), limiter, asyncH(async (req, res) => {
+  const out = await runLifecycle();
+  audit(req.operator.email, 'lifecycle-run', out);
   res.json(out);
 }));
 r.get('/subscriptions/history', requireOperator, need('billing.view'), (req, res) => res.json(subscriptionHistory({ tenantId: req.query.tenant, limit: Number(req.query.per) || 100, offset: (Number(req.query.page) || 0) * (Number(req.query.per) || 100) })));

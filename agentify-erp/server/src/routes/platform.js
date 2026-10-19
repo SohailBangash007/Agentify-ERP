@@ -6,7 +6,8 @@ import { sendMail, layout } from '../services/mailer.js';
 import { requireOperator, onPlatformHost } from '../services/platformAuth.js';
 import { need, auditContext } from '../services/platformAccess.js';
 import { audit } from '../services/platformConfig.js';
-import { planCatalog, PLAN_SETTINGS } from '../services/plans.js';
+import { planCatalog, PLAN_SETTINGS, PRODUCTS } from '../services/plans.js';
+import { listAddons } from '../services/commerce.js';
 import { issueVerification } from '../services/accessLinks.js';
 import { get, run } from '../db.js';
 import adminRoutes from './platformAdmin.js';
@@ -19,7 +20,7 @@ const r = Router();
 r.use('/admin', adminRoutes);
 r.use(auditContext);
 
-const publicView = (t) => ({ id: t.id, slug: t.slug, name: t.name, owner_email: t.owner_email, is_legacy: !!t.is_legacy, billing_provider: t.billing_provider, billing_interval: t.billing_interval, status: t.status, plan: t.plan, subscription_status: t.subscription_status, current_period_end: t.current_period_end, trial_ends_at: t.trial_ends_at, timezone: t.timezone, currency: t.currency, custom_domain: t.custom_domain, created_at: t.created_at });
+const publicView = (t) => ({ id: t.id, slug: t.slug, name: t.name, product: t.product, trial_started_at: t.trial_started_at, trial_note: t.trial_note || null, owner_email: t.owner_email, is_legacy: !!t.is_legacy, billing_provider: t.billing_provider, billing_interval: t.billing_interval, status: t.status, plan: t.plan, subscription_status: t.subscription_status, current_period_end: t.current_period_end, trial_ends_at: t.trial_ends_at, timezone: t.timezone, currency: t.currency, custom_domain: t.custom_domain, created_at: t.created_at });
 /** Workspace address. On localhost (development) keep the scheme and port the request came in on, e.g. http://acme.localhost:4000. */
 const urlFor = (slug, req) => (!isMultiTenant() ? null : BASE_DOMAIN === 'localhost' && req ? `${req.protocol}://${slug}.${req.get('host')}` : `https://${slug}.${BASE_DOMAIN}`);
 
@@ -30,7 +31,7 @@ r.get('/site', (req, res) => {
   const landing = isMultiTenant() && onPlatformHost(req);
   if (!landing) return res.json({ landing: false, multi_tenant: isMultiTenant() });
   const methods = [...new Set(platformDb().prepare('SELECT method FROM payment_accounts WHERE active=1 ORDER BY sort_order, id').all().map((a) => a.method))];
-  res.json({ landing: true, base_domain: BASE_DOMAIN, trial_days: PLAN_SETTINGS.default_trial_days, plans: planCatalog().map(({ id, name, description, seats, projects, price }) => ({ id, name, description, seats, projects, price })), local_methods: methods, cards: stripe.stripeConfigured() });
+  res.json({ landing: true, base_domain: BASE_DOMAIN, trial_days: PLAN_SETTINGS.default_trial_days, plans: planCatalog(), products: PRODUCTS, addons: listAddons({ activeOnly: true }).map(({ id, name, description, product, price, entitlements }) => ({ id, name, description, product, price, entitlements })), local_methods: methods, cards: stripe.stripeConfigured() });
 });
 
 /** Is this workspace address free? (never reveals which tenants exist beyond availability) */
@@ -45,7 +46,7 @@ r.post('/signup', signupLimiter, asyncH(async (req, res) => {
   const b = req.body || {};
   const tenant = createTenant({
     slug: b.slug, name: b.company_name, adminName: String(b.admin_name || '').trim() || 'Admin', adminEmail: b.admin_email, adminPassword: b.admin_password,
-    timezone: b.timezone || 'Asia/Karachi', currency: b.currency || 'PKR', demo: false,
+    timezone: b.timezone || 'Asia/Karachi', currency: b.currency || 'PKR', demo: false, product: b.product || 'real_estate', trialPolicy: true,
   });
   const url = urlFor(tenant.slug, req);
   const origin = url || `${req.protocol}://${req.get('host')}`;
@@ -55,7 +56,7 @@ r.post('/signup', signupLimiter, asyncH(async (req, res) => {
     run('UPDATE users SET email_verified=0 WHERE id=?', owner.id);
     return issueVerification(owner.id);
   });
-  const mail = layout({ heading: `Your ${tenant.name} workspace is ready`, lines: [`Confirm ${tenant.owner_email} with the button below, then sign in to start setting up your company.`, tenant.trial_ends_at ? `Your free trial runs until ${tenant.trial_ends_at}.` : ''].filter(Boolean), button: { label: 'Confirm email and open workspace', url: `${origin}/verify-email/${token}` } });
+  const mail = layout({ heading: `Your ${tenant.name} workspace is ready`, lines: [`Confirm ${tenant.owner_email} with the button below, then sign in to start setting up your company.`, tenant.trial_ends_at ? `Your ${PLAN_SETTINGS.default_trial_days}-day free trial runs until ${tenant.trial_ends_at.slice(0, 10)} (UTC).` : tenant.trial_note ? `${tenant.trial_note}. Choose a plan in Settings > Plan & Billing to start.` : ''].filter(Boolean), button: { label: 'Confirm email and open workspace', url: `${origin}/verify-email/${token}` } });
   await sendMail({ to: tenant.owner_email, subject: `Welcome: ${tenant.name} is ready`, ...mail });
   res.status(201).json({ tenant: publicView(tenant), login_url: url });
 }));

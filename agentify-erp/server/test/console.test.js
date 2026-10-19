@@ -145,7 +145,8 @@ test('admin password change signs out the old session; the bearer token and cons
 test('landing info: shown on the main domain only, with plans and live payment methods', async () => {
   const main = await call(P, 'GET', '/api/platform/site');
   assert.equal(main.data.landing, true);
-  assert.deepEqual(main.data.plans.map((p) => p.id), ['starter', 'growth', 'enterprise']);
+  assert.deepEqual(main.data.plans.filter((p) => p.product === 'real_estate').map((p) => p.id), ['starter', 'growth', 'enterprise']);
+  assert.deepEqual(main.data.plans.filter((p) => p.product === 'construction').map((p) => p.id), ['con_starter', 'con_professional', 'con_enterprise']);
   assert.equal(main.data.base_domain, 'erp.test');
   assert.equal((await call('acme.erp.test', 'GET', '/api/platform/site')).data.landing, false);
 });

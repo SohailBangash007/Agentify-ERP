@@ -44,12 +44,12 @@ async function workspace(slug) {
   return { host, id: r.data.tenant.id, get: (u) => call(host, 'GET', u, null, { cookie: c }), post: (u, b) => call(host, 'POST', u, b || {}, { cookie: c }), put: (u, b) => call(host, 'PUT', u, b || {}, { cookie: c }) };
 }
 
-test('a new workspace starts on a 14-day trial with trial limits', async () => {
+test('a new workspace starts on a 7-day trial (the default) with trial limits', async () => {
   const w = await workspace('trialco');
   const b = await w.get('/api/billing');
   assert.equal(b.status, 200);
   assert.equal(b.data.status, 'trialing'); assert.equal(b.data.locked, false);
-  assert.ok(b.data.days_left >= 13 && b.data.days_left <= 14, `days_left ${b.data.days_left}`);
+  assert.ok(b.data.days_left >= 6 && b.data.days_left <= 7, `days_left ${b.data.days_left}`);
   assert.equal(b.data.usage.seats, 1);
   assert.equal(b.data.plans.length, 3);
 });
