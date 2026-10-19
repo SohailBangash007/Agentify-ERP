@@ -40,7 +40,7 @@ async function login(host, identifier, password) {
   return { c, get: (u) => call(host, 'GET', u, null, { cookie: c }), post: (u, b) => call(host, 'POST', u, b || {}, { cookie: c }), me: l.data };
 }
 
-const signup = (slug, email, extra = {}) => call('erp.test', 'POST', '/api/platform/signup', { slug, company_name: `${slug} Realty`, admin_name: 'Owner', admin_email: email, admin_password: 'Tenant@12345', ...extra });
+const signup = (slug, email, extra = {}) => call('erp.test', 'POST', '/api/platform/signup', { accept_terms: true, slug, company_name: `${slug} Realty`, admin_name: 'Owner', admin_email: email, admin_password: 'Tenant@12345', ...extra });
 
 test('signup creates an isolated workspace with its own admin and base configuration', async () => {
   const r = await signup('acme', 'owner@acme.test', { currency: 'AED', timezone: 'Asia/Dubai' });

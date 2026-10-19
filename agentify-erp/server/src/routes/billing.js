@@ -6,6 +6,7 @@ import { billingState, planCatalog, usage, lockMessage, PRODUCTS, MODULES } from
 import { startCardCheckout, openCardPortal, availableMethods, submitLocalPayment, submissionsFor, invoicesFor, providerName } from '../services/billing.js';
 import { quote, listAddons, tenantAddons, refundsFor } from '../services/commerce.js';
 import { audit } from '../audit.js';
+import { recordServerEvent } from '../services/analytics.js';
 
 const r = Router();
 r.use(requireStaff);
@@ -40,6 +41,7 @@ r.post('/quote', can('settings', 'view'), asyncH((req, res) => {
 r.post('/checkout', can('settings', 'edit'), asyncH(async (req, res) => {
   if (req.tenant.is_legacy) throw bad('This workspace is not billed');
   const out = await startCardCheckout(req, { plan: req.body?.plan, interval: req.body?.interval });
+  recordServerEvent('checkout_started', { product: req.tenant.product, plan: req.body?.plan, tenant_id: req.tenant.id });
   audit(req, 'Started checkout', 'billing', null, `${req.body?.plan} / ${req.body?.interval || 'month'}`);
   res.json(out);
 }));

@@ -25,7 +25,8 @@ const TENANT_COLUMNS = [['subscription_status', "TEXT NOT NULL DEFAULT 'trialing
   // per-workspace limit overrides (JSON {seats, projects, modules}), the price this workspace pays, and profile fields
   ['entitlements', 'TEXT'], ['price_amount', 'INTEGER'], ['price_currency', 'TEXT'], ['owner_name', 'TEXT'], ['owner_phone', 'TEXT'], ['account_manager', 'TEXT'],
   // SaaS release: product chosen at signup, trial start (UTC), when a subscription was cancelled, why a trial was not granted
-  ['product', "TEXT NOT NULL DEFAULT 'real_estate'"], ['trial_started_at', 'TEXT'], ['canceled_at', 'TEXT'], ['trial_note', 'TEXT']];
+  ['product', "TEXT NOT NULL DEFAULT 'real_estate'"], ['trial_started_at', 'TEXT'], ['canceled_at', 'TEXT'], ['trial_note', 'TEXT'],
+  ['terms_version', 'INTEGER'], ['terms_accepted_at', 'TEXT']];
 
 const PLATFORM_SCHEMA = `
 CREATE TABLE IF NOT EXISTS tenants(

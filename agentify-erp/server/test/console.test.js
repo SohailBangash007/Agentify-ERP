@@ -84,7 +84,7 @@ test('Test connection reports a working key, a rejected key, and a key saved in 
 });
 
 test('billing uses the keys saved in the console: checkout and signed webhooks, test mode and live mode kept apart', async () => {
-  const r = await call(P, 'POST', '/api/platform/signup', { slug: 'conso', company_name: 'Conso Co', admin_name: 'O', admin_email: 'o@conso.test', admin_password: 'Tenant@12345' });
+  const r = await call(P, 'POST', '/api/platform/signup', { accept_terms: true, slug: 'conso', company_name: 'Conso Co', admin_name: 'O', admin_email: 'o@conso.test', admin_password: 'Tenant@12345' });
   const id = r.data.tenant.id; const host = 'conso.erp.test';
   const l = await call(host, 'POST', '/api/auth/login', { identifier: 'o@conso.test', password: 'Tenant@12345' });
   const seen = [];

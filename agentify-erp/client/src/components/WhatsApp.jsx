@@ -51,7 +51,7 @@ export function WhatsAppButton({ phone, text, label, className = 'qa wa', size =
 
 export function useCompanyName() {
   const { meta } = useMeta();
-  return meta?.settings?.company_name || meta?.settings?.print_company || 'Expert Marketing & Developers';
+  return meta?.settings?.company_name || meta?.settings?.print_company || 'Agentify ERP';
 }
 
 /**

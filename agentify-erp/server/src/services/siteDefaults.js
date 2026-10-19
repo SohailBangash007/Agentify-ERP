@@ -1,5 +1,6 @@
-import { get, run, getSetting, setSetting } from '../db.js';
+import { all, get, run, getSetting, setSetting } from '../db.js';
 import { now } from '../util.js';
+import { currentTenant } from '../context.js';
 import { DEFAULT_TOOLS } from '../../../shared/constructionTools.js';
 
 let uid = 0;
@@ -27,7 +28,8 @@ const COMPANY_SERVICES = [
 const agriSec = () => sec('imagetext', { title: 'Agricultural land deals — 5, 10 & 20 Kanal', text: 'We provide professional solutions for agricultural land buying and selling, helping clients find suitable land for farming, investment and long-term development. Our services cover agricultural properties including 5 Kanal, 10 Kanal, 20 Kanal and larger land parcels in selected locations.\n\nWe assist clients throughout the process — from identifying suitable land and evaluating location to negotiating deals and completing transactions.', image: '/site/villa-sold.jpg', image_side: 'right', button_label: 'Ask about land', button_href: '/site/p/contact' });
 const housesSec = () => sec('imagetext', { title: 'Residential plots & houses for sale', text: 'We offer a wide range of houses for sale and residential plots in prime and developing locations across Islamabad and Rawalpindi. Our portfolio includes quality residential houses and strategically located plots suitable for families, home construction, investment and long-term growth.\n\nWe help clients find the right property according to their budget, location and investment goals, with professional guidance throughout the buying and selling process.', image: '/site/residential-house.jpg', image_side: 'left', button_label: 'Browse properties', button_href: '/site/properties?purpose=Sell' });
 
-export const DEFAULT_CONFIG = {
+/** The original company's website (the legacy install). New workspaces use genericConfig() below. */
+export const LEGACY_CONFIG = {
   brand: { name: 'Expert Marketing & Developers', tagline: 'Plots · Homes · Construction', logo: '' },
   theme: { primary: '#0f766e', accent: '#f59e0b', dark: '#0a3d3a', bg: '#ffffff', soft: '#f4f7f6', font_heading: 'Poppins', font_body: 'Inter', radius: 12 },
   header: {
@@ -62,7 +64,7 @@ export const DEFAULT_CONFIG = {
   seo: { keywords: 'real estate Islamabad, plots for sale Rawalpindi, houses for sale Islamabad, agricultural land Pakistan, house construction, property investment', base_url: '', noindex: false, org_type: 'RealEstateAgent', image: '', title: 'Expert Marketing & Developers — Plots, Homes & Construction', description: 'Browse plots, houses and commercial properties, view our projects and plan your purchase with installment and construction calculators.' },
 };
 
-export function defaultPages() {
+function legacyPages() {
   return [
     { slug: 'home', title: 'Home', show_in_menu: 0, sort_order: 0, seo_title: 'Plots, Houses & Land for Sale in Islamabad & Rawalpindi', seo_desc: 'Browse verified plots, houses, commercial properties and agricultural land in Islamabad and Rawalpindi with flexible installment plans and live project updates.', sections: [
       sec('hero', { headline: 'Find your place with Expert Marketing & Developers', subheadline: 'Plots, homes and commercial spaces in planned communities — with flexible installment plans and live progress updates.', image: '', overlay: 55, show_search: true, height: 'tall', cta_label: 'Explore projects', cta_href: '/site/projects' }),
@@ -112,6 +114,7 @@ export function demoPosts() {
  */
 export function upgradeSite() {
   if (getSetting('site_upgrade_v1')) return;
+  if (isGeneric()) { setSetting('site_upgrade_v1', '1'); return; }
   const add = (slug, build, after) => {
     const row = get('SELECT id, sections FROM site_pages WHERE slug=?', slug);
     if (!row) return;
@@ -152,21 +155,115 @@ export const STARTER_KB = [
 
 /** Installs the starter website once (idempotent). */
 export function ensureSite({ withPosts = false } = {}) {
-  if (!getSetting('site_config')) setSetting('site_config', JSON.stringify(DEFAULT_CONFIG));
+  if (!getSetting('site_config')) setSetting('site_config', JSON.stringify(defaultConfig()));
   if (!get('SELECT 1 FROM site_pages LIMIT 1')) {
     for (const p of defaultPages()) {
       run('INSERT INTO site_pages(slug,title,sections,published,seo_title,seo_desc,sort_order,show_in_menu,updated_at) VALUES(?,?,?,?,?,?,?,?,?)', p.slug, p.title, JSON.stringify(p.sections), 1, p.seo_title, p.seo_desc, p.sort_order, p.show_in_menu, now());
     }
   }
   upgradeSite();
+  scrubInheritedSite();
   upgradeSiteTheme();
   if (!getSetting('bot_kb_seeded')) {
-    if (!get('SELECT 1 FROM bot_kb LIMIT 1')) for (const k of STARTER_KB) run('INSERT INTO bot_kb(title,category,content,keywords,link,active,created_at) VALUES(?,?,?,?,?,1,?)', k.title, k.category, k.content, k.keywords, k.link, now());
+    if (!isGeneric() && !get('SELECT 1 FROM bot_kb LIMIT 1')) for (const k of STARTER_KB) run('INSERT INTO bot_kb(title,category,content,keywords,link,active,created_at) VALUES(?,?,?,?,?,1,?)', k.title, k.category, k.content, k.keywords, k.link, now());
     setSetting('bot_kb_seeded', '1');
   }
-  if (withPosts && !get('SELECT 1 FROM site_posts LIMIT 1')) {
+  if (withPosts && !isGeneric() && !get('SELECT 1 FROM site_posts LIMIT 1')) {
     for (const p of demoPosts()) {
       run('INSERT INTO site_posts(slug,title,excerpt,body,cover,tags,published,published_at,created_at) VALUES(?,?,?,?,?,?,1,?,?)', p.slug, p.title, p.excerpt, p.body, '', JSON.stringify(p.tags), now(), now());
     }
   }
+}
+
+// ---------------------------------------------------------------- neutral defaults for SaaS workspaces
+// The starter website above describes the original company (its people, phone numbers, address, results and customer
+// quotes). A new customer workspace must never inherit any of that, so every workspace other than the original install
+// starts from these neutral defaults built from its own company name and product. Nothing here makes claims about the
+// customer's business: sections that need real facts (team, figures, testimonials) are left for the customer to add.
+const isGeneric = () => { const t = currentTenant(); return !!t && !t.is_legacy; };
+const companyName = () => getSetting('company_name') || currentTenant()?.name || 'Our company';
+const productOf = () => currentTenant()?.product || 'real_estate';
+
+export function genericConfig(name = companyName(), product = productOf()) {
+  const construction = product === 'construction';
+  const c = JSON.parse(JSON.stringify(LEGACY_CONFIG));
+  c.brand = { name, tagline: '', logo: '' };
+  c.header.links = construction
+    ? [{ label: 'Projects', href: '/site/projects' }, { label: 'Calculators', href: '/site/calculators' }, { label: 'About', href: '/site/p/about' }, { label: 'Contact', href: '/site/p/contact' }]
+    : [{ label: 'Buy', href: '/site/properties?purpose=Sell' }, { label: 'Rent', href: '/site/properties?purpose=Rent' }, { label: 'Projects', href: '/site/projects' }, { label: 'Agents', href: '/site/agents' }, { label: 'Contact', href: '/site/p/contact' }];
+  c.footer.about = `${name}.`;
+  c.footer.columns = [
+    { title: 'Explore', links: construction ? [{ label: 'Projects', href: '/site/projects' }, { label: 'Construction calculator', href: '/site/calculators?tab=cost' }] : [{ label: 'Properties for sale', href: '/site/properties?purpose=Sell' }, { label: 'Properties for rent', href: '/site/properties?purpose=Rent' }, { label: 'Projects', href: '/site/projects' }] },
+    { title: 'Company', links: [{ label: 'About us', href: '/site/p/about' }, { label: 'Contact', href: '/site/p/contact' }, { label: construction ? 'Client portal' : 'Customer portal', href: '/portal/login' }] },
+  ];
+  c.footer.cta_title = 'Have a question?'; c.footer.cta_text = 'Send us a message and our team will get back to you.';
+  c.footer.copyright = `© {year} ${name}. All rights reserved.`;
+  c.social = [];
+  c.contact = { phone: '', landline: '', email: '', whatsapp: '', address: '', hours: '', map_embed: '' };
+  c.bot = { ...c.bot, name: 'Assistant', greeting: `Hello! Ask me about ${name}.`, quick_replies: construction ? ['Our projects', 'Construction cost', 'Contact details'] : ['Show featured properties', 'Our projects', 'Contact details'] };
+  c.seo = { ...c.seo, keywords: '', title: name, description: '', image: '', org_type: construction ? 'GeneralContractor' : 'RealEstateAgent' };
+  return c;
+}
+
+export function genericPages(name = companyName(), product = productOf()) {
+  const construction = product === 'construction';
+  return [
+    { slug: 'home', title: 'Home', show_in_menu: 0, sort_order: 0, seo_title: name, seo_desc: '', sections: [
+      sec('hero', { headline: `Welcome to ${name}`, subheadline: construction ? 'Tell visitors what you build and where you work.' : 'Tell visitors what you sell and where you work.', image: '', overlay: 55, show_search: !construction, height: 'tall', cta_label: 'Contact us', cta_href: '/site/p/contact' }),
+      ...(construction ? [] : [sec('listings', { title: 'Featured properties', subtitle: '', source: 'featured', limit: 8, layout: 'carousel', view_all_href: '/site/properties' })]),
+      sec('projects', { title: 'Our projects', subtitle: '', limit: 3 }),
+      sec('calculators', { title: construction ? 'Estimate your build' : 'Plan your purchase', subtitle: '' }),
+      sec('cta', { headline: 'Get in touch', text: 'Send us a message and our team will get back to you.', button_label: 'Contact us', button_href: '/site/p/contact', image: '', tone: 'dark' }),
+    ] },
+    { slug: 'about', title: 'About us', show_in_menu: 0, sort_order: 1, seo_title: `About ${name}`, seo_desc: '', sections: [
+      sec('banner', { text: `About ${name}`, href: '', tone: 'primary' }),
+      sec('imagetext', { title: name, text: 'Describe your company, your experience and your team here.', image: '', image_side: 'right' }),
+    ] },
+    { slug: 'contact', title: 'Contact', show_in_menu: 0, sort_order: 2, seo_title: `Contact ${name}`, seo_desc: '', sections: [
+      sec('banner', { text: 'Contact us', href: '', tone: 'primary' }),
+      sec('contact', { title: 'Send us a message', text: 'Tell us what you are looking for and we will get back to you.', show_form: true, show_details: true }),
+    ] },
+  ];
+}
+
+/** The defaults for the current workspace: the original company's site for the original install, neutral otherwise. */
+export const defaultConfig = () => (isGeneric() ? genericConfig() : LEGACY_CONFIG);
+export const defaultPages = () => (isGeneric() ? genericPages() : legacyPages());
+
+/** @deprecated use defaultConfig(): kept for older imports. */
+export const DEFAULT_CONFIG = LEGACY_CONFIG;
+
+/**
+ * One-time clean-up for customer workspaces created before the neutral defaults existed: they were seeded with the
+ * original company's name, contact details, people, figures, quotes and assistant answers. Only values that are still
+ * exactly the inherited defaults are replaced or removed; anything the customer changed is kept.
+ */
+const LEGACY_NAME = 'Expert Marketing & Developers';
+const LEGACY_MARKERS = ['Raja Usman', '200+', 'Muhammad Ali', 'Sara Khan', 'expertdevelopers', '0300-5551350'];
+export function scrubInheritedSite() {
+  if (!isGeneric() || getSetting('site_scrub_v1')) return;
+  const L = LEGACY_CONFIG, G = genericConfig();
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  let saved = null;
+  try { saved = JSON.parse(getSetting('site_config') || 'null'); } catch { saved = null; }
+  if (saved) {
+    if (saved.brand?.name === L.brand.name) saved.brand = { ...saved.brand, name: G.brand.name, tagline: saved.brand.tagline === L.brand.tagline ? '' : saved.brand.tagline };
+    if (same(saved.contact, L.contact)) saved.contact = G.contact;
+    if (same(saved.social, L.social)) saved.social = G.social;
+    if (saved.footer) for (const k of ['about', 'copyright']) if (saved.footer[k] === L.footer[k]) saved.footer[k] = G.footer[k];
+    if (saved.seo?.title === L.seo.title) saved.seo = { ...saved.seo, title: G.seo.title, description: G.seo.description, keywords: G.seo.keywords };
+    if (saved.bot?.name === L.bot.name) saved.bot = { ...saved.bot, name: G.bot.name, greeting: G.bot.greeting };
+    setSetting('site_config', JSON.stringify(saved));
+  }
+  const name = companyName();
+  for (const pg of all('SELECT id, sections, seo_title, seo_desc FROM site_pages')) {
+    let secs = [];
+    try { secs = JSON.parse(pg.sections || '[]'); } catch { continue; }
+    const kept = secs.filter((x) => !(['leadership', 'projectinfo', 'stats', 'testimonials'].includes(x.type) && LEGACY_MARKERS.some((m) => JSON.stringify(x.props || {}).includes(m))))
+      .map((x) => JSON.parse(JSON.stringify(x).split(LEGACY_NAME).join(name)));
+    const fix = (t) => (t && (t.includes(LEGACY_NAME) || LEGACY_MARKERS.some((m) => t.includes(m))) ? name : t);
+    run('UPDATE site_pages SET sections=?, seo_title=?, seo_desc=? WHERE id=?', JSON.stringify(kept), fix(pg.seo_title), pg.seo_desc && (pg.seo_desc.includes(LEGACY_NAME) || LEGACY_MARKERS.some((m) => pg.seo_desc.includes(m))) ? '' : pg.seo_desc, pg.id);
+  }
+  for (const k of STARTER_KB) run('DELETE FROM bot_kb WHERE title=? AND content=?', k.title, k.content);
+  setSetting('site_scrub_v1', '1');
 }

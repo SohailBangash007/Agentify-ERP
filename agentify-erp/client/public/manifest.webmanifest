@@ -1,7 +1,7 @@
 {
-  "name": "Expert Marketing & Developers ERP",
-  "short_name": "Expert ERP",
-  "description": "CRM, sales goals, properties, projects and accounts for Expert Marketing & Developers.",
+  "name": "Agentify ERP",
+  "short_name": "Agentify ERP",
+  "description": "Real estate brokerage and construction management: CRM, projects, sales, billing and accounts.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",

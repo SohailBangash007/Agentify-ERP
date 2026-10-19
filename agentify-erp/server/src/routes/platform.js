@@ -6,14 +6,16 @@ import { sendMail, layout } from '../services/mailer.js';
 import { requireOperator, onPlatformHost } from '../services/platformAuth.js';
 import { need, auditContext } from '../services/platformAccess.js';
 import { audit } from '../services/platformConfig.js';
-import { planCatalog, PLAN_SETTINGS, PRODUCTS } from '../services/plans.js';
+import { planCatalog, PLAN_SETTINGS, PRODUCTS, PLANS } from '../services/plans.js';
+import { publicContent, publicLegal, createDemoRequest, marketingContent, termsVersion } from '../services/marketing.js';
+import { recordServerEvent, collect } from '../services/analytics.js';
 import { listAddons } from '../services/commerce.js';
 import { issueVerification } from '../services/accessLinks.js';
 import { get, run } from '../db.js';
 import adminRoutes from './platformAdmin.js';
 import { verifySignature, applyBillingEvent, setSubscription, listSubmissions, approveSubmission, rejectSubmission, tenantByProviderIds } from '../services/billing.js';
 import * as stripe from '../services/stripe.js';
-import { stripeConfig } from '../services/platformConfig.js';
+import { stripeConfig, getSetting } from '../services/platformConfig.js';
 import { BASE_DOMAIN, platformDb, withTenant, isMultiTenant, createTenant, validateSlug, listTenants, getTenant, setTenantStatus, RESERVED_SLUGS } from '../platform.js';
 
 const r = Router();
@@ -44,10 +46,13 @@ r.get('/slug-available/:slug', asyncH((req, res) => {
 r.post('/signup', signupLimiter, asyncH(async (req, res) => {
   if (!isMultiTenant()) throw new HttpError(404, 'Workspace signup is switched off: this server is running in single-company mode. Start it with ERP_BASE_DOMAIN=localhost (run-agentify-erp.bat does this).');
   const b = req.body || {};
+  if (b.accept_terms !== true) throw bad('Please accept the Terms of Service and Privacy Policy to create a workspace');
   const tenant = createTenant({
     slug: b.slug, name: b.company_name, adminName: String(b.admin_name || '').trim() || 'Admin', adminEmail: b.admin_email, adminPassword: b.admin_password,
     timezone: b.timezone || 'Asia/Karachi', currency: b.currency || 'PKR', demo: false, product: b.product || 'real_estate', trialPolicy: true,
   });
+  // which version of the Terms the owner accepted (0 = the unpublished template) and when
+  platformDb().prepare('UPDATE tenants SET terms_version=?, terms_accepted_at=? WHERE id=?').run(termsVersion(), new Date().toISOString(), tenant.id);
   const url = urlFor(tenant.slug, req);
   const origin = url || `${req.protocol}://${req.get('host')}`;
   // the owner confirms the address with the link in the welcome email; until then they cannot invite others (stops the form being used to mail strangers)
@@ -58,6 +63,7 @@ r.post('/signup', signupLimiter, asyncH(async (req, res) => {
   });
   const mail = layout({ heading: `Your ${tenant.name} workspace is ready`, lines: [`Confirm ${tenant.owner_email} with the button below, then sign in to start setting up your company.`, tenant.trial_ends_at ? `Your ${PLAN_SETTINGS.default_trial_days}-day free trial runs until ${tenant.trial_ends_at.slice(0, 10)} (UTC).` : tenant.trial_note ? `${tenant.trial_note}. Choose a plan in Settings > Plan & Billing to start.` : ''].filter(Boolean), button: { label: 'Confirm email and open workspace', url: `${origin}/verify-email/${token}` } });
   await sendMail({ to: tenant.owner_email, subject: `Welcome: ${tenant.name} is ready`, ...mail });
+  recordServerEvent('signup_completed', { ...(b.analytics || {}), product: tenant.product, tenant_id: tenant.id });
   res.status(201).json({ tenant: publicView(tenant), login_url: url });
 }));
 
@@ -106,6 +112,45 @@ r.post('/payments/:id/reject', requireOperator, need('billing.manage'), asyncH(a
   res.json({ ok: true });
 }));
 r.get('/reserved', (_req, res) => res.json([...RESERVED_SLUGS]));
+
+// ---- Public marketing website (main domain only)
+const publicLimiter = rateLimit({ windowMs: 60 * 60_000, limit: Number(process.env.PUBLIC_FORM_LIMIT) || 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many requests from this address. Try again later.' } });
+const mainOnly = (req) => { if (!isMultiTenant() || !onPlatformHost(req)) throw new HttpError(404, 'Not found'); };
+/** Everything the marketing pages show: editable content, plans by product, add-ons, trial terms and payment options. */
+r.get('/marketing', asyncH((req, res) => {
+  mainOnly(req);
+  const methods = [...new Set(platformDb().prepare('SELECT method FROM payment_accounts WHERE active=1 ORDER BY sort_order, id').all().map((a) => a.method))];
+  res.json({ content: publicContent(), base_domain: BASE_DOMAIN, trial_days: PLAN_SETTINGS.default_trial_days, one_trial_per_email: PLAN_SETTINGS.one_trial_per_email, products: PRODUCTS,
+    plans: planCatalog().filter((p) => PLANS[p.id]?.visible), addons: listAddons({ activeOnly: true }).map(({ id, name, description, product, price, entitlements }) => ({ id, name, description, product, price, entitlements })),
+    local_methods: methods, cards: stripe.stripeConfigured(), terms_version: termsVersion(), ga4_id: getSetting('ga4_measurement_id') || null });
+}));
+r.get('/legal/:slug', asyncH((req, res) => { mainOnly(req); res.json(publicLegal(req.params.slug)); }));
+/** Contact / demo request form. A hidden "website" field catches bots; nothing is sent to the visitor. */
+r.post('/demo-request', publicLimiter, asyncH(async (req, res) => {
+  mainOnly(req);
+  const b = req.body || {};
+  if (b.website) return res.status(201).json({ ok: true }); // honeypot: pretend success
+  const out = createDemoRequest(b);
+  const to = process.env.SALES_EMAIL || process.env.BILLING_OPERATOR_EMAIL || marketingContent().contact_email;
+  if (to) await sendMail({ to, subject: `Demo request: ${out.name}`, ...layout({ heading: 'New demo request', lines: [`${out.name} <${out.email}>`, `Company: ${b.company || '—'} · Product: ${out.product || 'not chosen'} · Team: ${b.team_size || '—'}`, String(b.message || '').slice(0, 1000)] }) });
+  recordServerEvent('demo_requested', { product: out.product, source: b.source, landing_page: b.landing_page, visitor_id: b.visitor_id, session_id: b.session_id, consent: b.consent });
+  res.status(201).json({ ok: true });
+}));
+/** First-party website analytics (consent required; Do Not Track / GPC honoured). */
+const analyticsLimiter = rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many events' } });
+r.post('/analytics/collect', analyticsLimiter, asyncH((req, res) => {
+  mainOnly(req);
+  res.json(collect(req, req.body || {}, BASE_DOMAIN));
+}));
+/** "Which workspaces are mine?": emails the owner the addresses; the answer is the same whether or not any exist. */
+r.post('/find-workspace', publicLimiter, asyncH(async (req, res) => {
+  mainOnly(req);
+  const e = String(req.body?.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) throw bad('Please enter a valid email address');
+  const list = listTenants().filter((t) => !t.is_legacy && t.owner_email === e && t.status !== 'cancelled');
+  if (list.length) await sendMail({ to: e, subject: 'Your Agentify ERP workspaces', ...layout({ heading: 'Your workspaces', lines: list.map((t) => `${t.name}: ${urlFor(t.slug, req)}/login`) }) });
+  res.json({ ok: true, message: 'If that email owns a workspace, we have emailed its address.' });
+}));
 r.use((_req, _res, next) => next(new HttpError(404, 'Endpoint not found')));
 
 export default r;

@@ -34,7 +34,7 @@ const daysFromNow = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(
 const webhook = (ev, secret = 'whsec_test') => { const raw = JSON.stringify(ev); return call('erp.test', 'POST', '/api/platform/billing/webhook/generic', null, { 'X-Signature': `sha256=${crypto.createHmac('sha256', secret).update(raw).digest('hex')}` }, raw); };
 
 async function workspace(slug) {
-  const r = await call('erp.test', 'POST', '/api/platform/signup', { slug, company_name: `${slug} Co`, admin_name: 'Owner', admin_email: `owner@${slug}.test`, admin_password: PW });
+  const r = await call('erp.test', 'POST', '/api/platform/signup', { accept_terms: true, slug, company_name: `${slug} Co`, admin_name: 'Owner', admin_email: `owner@${slug}.test`, admin_password: PW });
   assert.equal(r.status, 201, JSON.stringify(r.data));
   const host = `${slug}.erp.test`;
   const tok = outbox.filter((m) => m.to === `owner@${slug}.test`).pop().text.match(/verify-email\/(\S+)/)[1];

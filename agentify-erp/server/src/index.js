@@ -7,7 +7,8 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { uploadDir, get } from './db.js';
 import { scheduleBackups } from './services/backup.js';
-import { tenantContext, bootstrapTenants, forEachTenant } from './platform.js';
+import { tenantContext, bootstrapTenants, forEachTenant, isMultiTenant, resolveTenant } from './platform.js';
+import { injectMeta, platformSitemap, platformRobots, MARKETING_ROUTES } from './services/marketing.js';
 import { ensureFirstAdmin } from './services/platformAuth.js';
 import { markJob, snapshot, generateNotifications } from './services/platformMetrics.js';
 import { maintenanceGate, recordError } from './services/maintenance.js';
@@ -57,7 +58,8 @@ export function createApp() {
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
   app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], imgSrc: ["'self'", 'data:', 'blob:', 'https:'], mediaSrc: ["'self'", 'blob:', 'https:'], styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-    fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'], scriptSrc: ["'self'"], frameSrc: ["'self'", 'https://www.youtube.com', 'https://www.google.com', 'https://www.openstreetmap.org'], connectSrc: ["'self'"], workerSrc: ["'self'"], manifestSrc: ["'self'"],
+    fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'], // Google Analytics 4 is loaded only after a visitor consents and only when the platform owner configured it
+    scriptSrc: ["'self'", 'https://www.googletagmanager.com'], frameSrc: ["'self'", 'https://www.youtube.com', 'https://www.google.com', 'https://www.openstreetmap.org'], connectSrc: ["'self'", 'https://www.google-analytics.com', 'https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://www.googletagmanager.com'], workerSrc: ["'self'"], manifestSrc: ["'self'"],
     // Only force https in production; on plain http://localhost it can break service-worker and asset fetches.
     upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null } }, hsts: process.env.NODE_ENV === 'production', crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   // the billing webhook is signed over the exact bytes, so keep them for that one route
@@ -71,6 +73,10 @@ export function createApp() {
   // tenant context is not lost in stream callbacks.
   // maintenance mode closes every workspace; the platform console (mounted above) keeps working
   app.use('/api', maintenanceGate);
+  // the main (marketing) domain has its own sitemap and robots rules; workspaces keep theirs
+  const onMain = (req) => isMultiTenant() && !resolveTenant(req.hostname);
+  app.get('/sitemap.xml', (req, res, next) => (onMain(req) ? res.type('application/xml').send(platformSitemap(req)) : next()));
+  app.get('/robots.txt', (req, res, next) => (onMain(req) ? res.type('text/plain').send(platformRobots(req)) : next()));
   app.use(tenantContext);
 
   // Public website API: key-authenticated, CORS-open (no cookies involved)
@@ -132,7 +138,15 @@ export function createApp() {
   const dist = path.join(here, '..', '..', 'client', 'dist');
   if (fs.existsSync(dist)) {
     app.use(express.static(dist));
-    app.get(/^\/(?!api|uploads).*/, (_req, res) => res.sendFile(path.join(dist, 'index.html')));
+    // marketing pages on the main domain get their title, description, canonical and sharing tags on the server (crawlers)
+    let shell = null;
+    app.get(/^\/(?!api|uploads).*/, (req, res) => {
+      if (onMain(req) && MARKETING_ROUTES[req.path]) {
+        shell ||= fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
+        return res.type('html').send(injectMeta(shell, req.path, req));
+      }
+      res.sendFile(path.join(dist, 'index.html'));
+    });
   }
 
   app.use((err, req, res, _next) => {

@@ -40,7 +40,7 @@ const date = (days) => iso(days).slice(0, 10);
 const webhook = (ev) => { const raw = JSON.stringify(ev); return call('erp.test', 'POST', '/api/platform/billing/webhook/generic', null, { 'X-Signature': `sha256=${crypto.createHmac('sha256', 'whsec_test').update(raw).digest('hex')}` }, raw); };
 
 async function signup(slug, product, email = `owner@${slug}.test`) {
-  const r = await call('erp.test', 'POST', '/api/platform/signup', { slug, company_name: `${slug} Co`, admin_name: 'Owner', admin_email: email, admin_password: PW, product });
+  const r = await call('erp.test', 'POST', '/api/platform/signup', { accept_terms: true, slug, company_name: `${slug} Co`, admin_name: 'Owner', admin_email: email, admin_password: PW, product });
   assert.equal(r.status, 201, JSON.stringify(r.data));
   const host = `${slug}.erp.test`;
   const tok = outbox.filter((m) => m.to === email).pop().text.match(/verify-email\/(\S+)/)[1];
@@ -62,7 +62,7 @@ test('signup: the customer picks a product and gets a 7-day trial stored as UTC 
   assert.deepEqual(st.products, ['construction']); assert.equal(st.status, 'trialing'); assert.ok(st.days_left === 7);
   const plans = (await con.get('/api/billing')).data.plans;
   assert.ok(plans.length >= 3 && plans.every((p) => p.product === 'construction' || p.product === 'bundle'), 'only plans of its own product are offered');
-  assert.equal((await call('erp.test', 'POST', '/api/platform/signup', { slug: 'badprod', company_name: 'X', admin_email: 'x@x.test', admin_password: PW, product: 'farming' })).status, 400);
+  assert.equal((await call('erp.test', 'POST', '/api/platform/signup', { accept_terms: true, slug: 'badprod', company_name: 'X', admin_email: 'x@x.test', admin_password: PW, product: 'farming' })).status, 400);
 });
 
 test('product separation is enforced by the API, not only the menu', async () => {

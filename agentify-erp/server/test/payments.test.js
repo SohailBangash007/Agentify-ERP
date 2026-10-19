@@ -37,7 +37,7 @@ const inDays = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10
 const unix = (n) => Math.floor((Date.now() + n * 864e5) / 1000);
 
 async function workspace(slug) {
-  const r = await call('erp.test', 'POST', '/api/platform/signup', { slug, company_name: `${slug} Co`, admin_name: 'Owner', admin_email: `owner@${slug}.test`, admin_password: PW });
+  const r = await call('erp.test', 'POST', '/api/platform/signup', { accept_terms: true, slug, company_name: `${slug} Co`, admin_name: 'Owner', admin_email: `owner@${slug}.test`, admin_password: PW });
   assert.equal(r.status, 201, JSON.stringify(r.data));
   const host = `${slug}.erp.test`; const l = await call(host, 'POST', '/api/auth/login', { identifier: `owner@${slug}.test`, password: PW }); const c = l.cookie;
   return { host, id: r.data.tenant.id, slug, get: (u) => call(host, 'GET', u, null, { cookie: c }), post: (u, b) => call(host, 'POST', u, b || {}, { cookie: c }) };

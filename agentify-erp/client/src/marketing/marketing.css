@@ -1,0 +1,54 @@
+/* Public website (main domain). Builds on landing.css (.lp tokens: teal brand, Plus Jakarta Sans headings). */
+.lp{min-height:100vh;display:flex;flex-direction:column}.lp main{flex:1}
+.lp .lbar{background:var(--g2);color:#fff;text-align:center;font-size:14px;padding:8px 16px}
+.lp header nav a.on{color:var(--ink);font-weight:600}
+.lp .lmenu{display:none;background:none;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;font-size:18px;line-height:1}
+.lp .ldrawer{display:none}
+.lp .lprod{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px}
+.lp .lprod .lcard{padding:28px;display:flex;flex-direction:column;gap:10px;text-decoration:none;transition:border-color .15s,box-shadow .15s}
+.lp .lprod .lcard:hover{border-color:var(--g);box-shadow:0 8px 28px rgba(14,124,107,.10)}
+.lp .lprod .lcard h3{font-size:22px}.lp .lprod .lcard .lgo{margin-top:auto;color:var(--g);font-weight:700}
+.lp .ltag2{display:inline-block;background:#e6f4f1;color:var(--g2);border-radius:99px;padding:4px 12px;font-size:13px;font-weight:600;width:fit-content}
+.lp .lsplit{display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center}
+.lp .lshot{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 12px 40px rgba(16,35,31,.10)}
+.lp .lshot img{display:block;width:100%;height:auto}
+.lp .lshot figcaption{font-size:13px;color:var(--mut);padding:8px 12px;border-top:1px solid var(--line)}
+.lp .lshots{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px}
+.lp .lcheck{list-style:none;padding:0;margin:14px 0 0}.lp .lcheck li{padding:6px 0 6px 26px;position:relative;color:var(--mut)}.lp .lcheck li:before{content:'✓';position:absolute;left:0;color:var(--g);font-weight:800}
+.lp table.lcmp{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14.5px}
+.lp table.lcmp th,.lp table.lcmp td{padding:11px 14px;border-bottom:1px solid var(--line);text-align:left}
+.lp table.lcmp th{background:#f1f7f5;font-family:'Plus Jakarta Sans',sans-serif}.lp table.lcmp td.c{text-align:center}
+.lp .lscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.lp .lform{display:grid;gap:14px;max-width:560px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px}
+.lp .lform label{display:grid;gap:6px;font-weight:600;font-size:14px}
+.lp .lform input,.lp .lform select,.lp .lform textarea{padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:15px 'Inter',sans-serif;width:100%;background:#fff;color:var(--ink)}
+.lp .lform input:focus,.lp .lform select:focus,.lp .lform textarea:focus{outline:2px solid rgba(14,124,107,.35);border-color:var(--g)}
+.lp .lform .lrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.lp .lform .lhint{font-weight:400;color:var(--mut);font-size:13px}
+.lp .lerr{background:#fdecec;color:#9b1c1c;border:1px solid #f5c2c2;border-radius:10px;padding:10px 12px;font-size:14px}
+.lp .lok{background:#e8f6f2;color:var(--g2);border:1px solid #bfe3da;border-radius:10px;padding:12px 14px}
+.lp .lhp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.lp .lchoose{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.lp .lchoose button{text-align:left;border:2px solid var(--line);background:#fff;border-radius:14px;padding:18px;cursor:pointer;font:inherit;color:inherit}
+.lp .lchoose button.on{border-color:var(--g);background:#f0faf7}.lp .lchoose b{display:block;font:700 17px 'Plus Jakarta Sans',sans-serif;margin-bottom:4px}
+.lp .lchoose span{color:var(--mut);font-size:14px}
+.lp .ldoc{max-width:760px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:16px;padding:32px}
+.lp .ldoc h2{font-size:20px;margin:24px 0 8px}.lp .ldoc p,.lp .ldoc li{color:#2a3b37}
+.lp .ldraft{background:#fff7e6;border:1px solid #f3d29a;color:#7a4b00;border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:14px}
+.lp .lquote{font-size:16px}.lp .lquote footer{border:0;padding:10px 0 0;font-size:14px}
+.lp footer .lcols{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:24px;width:100%}
+.lp footer h4{margin:0 0 8px;color:var(--ink);font-size:14px}.lp footer .lcols a{display:block;text-decoration:none;padding:3px 0}
+.lp footer button.llink{background:none;border:0;padding:3px 0;color:inherit;font:inherit;cursor:pointer;text-decoration:underline}
+.lp .lconsent{position:fixed;left:16px;right:16px;bottom:16px;z-index:20;max-width:720px;margin:0 auto;background:#10231f;color:#fff;border-radius:14px;padding:16px 18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.lp .lconsent p{margin:0;flex:1;min-width:220px;font-size:14px;opacity:.95}.lp .lconsent a{color:#9fe3d4}
+.lp .lconsent .lbtn{padding:8px 14px;font-size:14px}
+.lp .lmini{font-size:13px;color:var(--mut)}
+@media(max-width:860px){.lp .lsplit{grid-template-columns:1fr}.lp footer .lcols{grid-template-columns:1fr 1fr}}
+@media(max-width:720px){
+  .lp header nav .hide-m{display:none}.lp .lmenu{display:inline-block}
+  .lp .ldrawer.open{display:grid;gap:4px;padding:8px 20px 16px;border-bottom:1px solid var(--line);background:#fff}
+  .lp .ldrawer a{padding:10px 0;text-decoration:none;color:var(--ink);font-weight:600}
+  .lp .lchoose,.lp .lform .lrow{grid-template-columns:1fr}
+  .lp .ldoc{padding:20px}
+}
+.lp .lconsent .lbtn:not(.p){color:var(--ink)}

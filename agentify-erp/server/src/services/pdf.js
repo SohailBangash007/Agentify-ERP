@@ -14,7 +14,7 @@ export function brand() {
   const logoRel = g('print_logo');
   const logo = logoRel && g('print_show_logo', '1') !== '0' ? path.join(uploadDir(), logoRel) : null;
   return {
-    name: g('print_header') || g('company_name', 'Expert Marketing & Developers'), address: g('print_address') || g('company_address'),
+    name: g('print_header') || g('company_name', 'Agentify ERP'), address: g('print_address') || g('company_address'),
     phone: g('print_phone') || g('company_phone'), email: g('print_email') || g('company_email'), website: g('print_website'),
     footer: g('print_footer'), social, logo: logo && fs.existsSync(logo) ? logo : null,
   };

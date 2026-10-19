@@ -265,7 +265,7 @@ export function ExpenseDetail() {
   if (error) return <div className="alert err">{error}</div>;
   if (!e) return <Loading />;
   const act = async (a, msg) => { try { await api.post(`/api/accounting/expenses/${e.id}/${a}`); toast(msg, 'ok'); reload(); if (a === 'approve' && e.vendor_id) setWa({ kind: 'approved', phone: e.vendor_phone || '' }); } catch (er) { toast(er.message, 'err'); } };
-  const companyName = co.company_name || 'Expert Marketing & Developers';
+  const companyName = co.company_name || 'Agentify ERP';
   const sendWa = async () => {
     if (!waNumber(wa.phone)) return toast('Enter the vendor’s WhatsApp number (e.g. 0300-1234567)', 'err');
     setWaBusy(true);

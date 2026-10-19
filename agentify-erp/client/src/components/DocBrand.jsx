@@ -9,7 +9,7 @@ export function useBrand(brand) {
   const s = brand || meta?.settings || {};
   return {
     s,
-    name: s.print_header || s.company_name || 'Expert Marketing & Developers',
+    name: s.print_header || s.company_name || 'Agentify ERP',
     logo: s.print_logo && s.print_show_logo !== '0' ? fileUrl(s.print_logo) : null,
     address: s.print_address || s.company_address, phone: s.print_phone || s.company_phone, email: s.print_email || s.company_email, website: s.print_website,
     social: parseSocial(s.print_social),

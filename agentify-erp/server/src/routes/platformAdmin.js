@@ -6,12 +6,15 @@ import { platformDb, BASE_DOMAIN, isMultiTenant, getTenant } from '../platform.j
 import { listAddons, saveAddon, setTenantAddon, listCoupons, saveCoupon, recordRefund, quote } from '../services/commerce.js';
 import { runLifecycle } from '../services/lifecycle.js';
 import { finance } from '../services/finance.js';
+import { marketingContent, saveMarketing, listLegal, legalDoc, saveLegal, publishLegal, listDemoRequests, updateDemoRequest } from '../services/marketing.js';
+import { analyticsReport } from '../services/analytics.js';
+import { resolveRange, utcStart, addDays, buckets, keyExpr } from '../services/platformMetrics.js';
 import { COOKIE, login, loginMfa, changePassword, requireOperator, onPlatformHost, twofaStatus, twofaSetup, twofaEnable, twofaDisable,
   loginMeta, endSession, listSessions, revokeSession, revokeAllFor, loginHistory, mfaRequired } from '../services/platformAuth.js';
 import { ROLES, PERMISSIONS, permsOf, can, need, auditContext, onDenied } from '../services/platformAccess.js';
 import { getMaintenance, setMaintenance, recentErrors } from '../services/maintenance.js';
 import { reportList, runReport, exportReport, savedViews, saveView, deleteView, reconcile } from '../services/platformReports.js';
-import { stripeView, saveStripe, stripeConfig, STRIPE_MODES, audit } from '../services/platformConfig.js';
+import { stripeView, saveStripe, stripeConfig, STRIPE_MODES, audit, getSetting, setSetting } from '../services/platformConfig.js';
 import { testConnection } from '../services/stripe.js';
 import { LOCAL_METHODS } from '../services/billing.js';
 import { runBackup, listBackups, backupDir } from '../services/backup.js';
@@ -261,6 +264,35 @@ r.post('/quote', requireOperator, need('billing.view'), asyncH((req, res) => {
   const b = req.body || {};
   const t = b.tenant_id ? tenantDetail(b.tenant_id, req) : null;
   res.json(quote(t && !t.is_legacy ? getTenant(t.id) : null, { plan: b.plan, interval: b.interval, currency: b.currency, coupon: b.coupon, addons: b.addons }));
+}));
+// ---- Public website content, legal documents, demo requests and website analytics
+r.get('/marketing', requireOperator, need('content.manage'), (_req, res) => res.json({ content: marketingContent(), legal: listLegal() }));
+r.put('/marketing', requireOperator, need('content.manage'), asyncH((req, res) => {
+  const out = saveMarketing(req.body || {}, req.operator.email);
+  audit(req.operator.email, 'website-content-saved', { fields: Object.keys(req.body || {}) });
+  res.json({ content: out, legal: listLegal() });
+}));
+r.get('/legal/:slug', requireOperator, need('content.manage'), asyncH((req, res) => res.json(legalDoc(req.params.slug))));
+r.put('/legal/:slug', requireOperator, need('content.manage'), asyncH((req, res) => {
+  const out = saveLegal(req.params.slug, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'legal-draft-saved', { doc: out.slug });
+  res.json(out);
+}));
+r.post('/legal/:slug/publish', requireOperator, need('content.manage'), asyncH((req, res) => {
+  const out = publishLegal(req.params.slug, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'legal-published', { doc: out.slug, version: out.version, reviewed_by: out.reviewed_by });
+  res.json(out);
+}));
+r.get('/demo-requests', requireOperator, need('workspaces.view'), (req, res) => res.json(listDemoRequests({ status: req.query.status })));
+r.patch('/demo-requests/:id', requireOperator, need('workspaces.edit'), asyncH((req, res) => {
+  const out = updateDemoRequest(req.params.id, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'demo-request-updated', { id: out.id, status: out.status });
+  res.json(out);
+}));
+r.get('/analytics', requireOperator, need('analytics.view'), asyncH((req, res) => {
+  const range = resolveRange(req.query);
+  const report = analyticsReport({ from: utcStart(range.from), to: utcStart(addDays(range.to, 1)), buckets: buckets(range), keyExpr: (c) => keyExpr(c, range) });
+  res.json({ range, ...report, ga4: { configured: !!getSetting('ga4_measurement_id') } });
 }));
 r.post('/lifecycle/run', requireOperator, need('system.manage'), limiter, asyncH(async (req, res) => {
   const out = await runLifecycle();

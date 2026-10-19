@@ -15,6 +15,7 @@ import { platformDb, getTenant, getTenantBySlug, logTenantEvent } from '../platf
 import * as stripe from './stripe.js';
 import { sendMail, layout } from './mailer.js';
 import { quote, recordRedemption, setTenantAddon, recordRefund } from './commerce.js';
+import { recordServerEvent } from './analytics.js';
 
 /** Explicit subscription states (see services/plans.js billingState). */
 export const SUB_STATUSES = ['trialing', 'pending', 'active', 'past_due', 'canceled', 'expired'];
@@ -106,6 +107,7 @@ export function applyBillingEvent(provider, ev) {
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
   logTenantEvent(tenant.id, `billing:${ev.type}`, { provider, plan: ev.plan });
+  if (ev.type === 'subscription.activated' && tenant.subscription_status !== 'active') recordServerEvent('subscription_activated', { product: PLANS[ev.plan || tenant.plan]?.product, plan: ev.plan || tenant.plan, tenant_id: tenant.id });
   return { applied: true, tenant: getTenant(tenant.id) };
 }
 
@@ -225,6 +227,7 @@ export async function approveSubmission(id, decisionNote, decidedBy = null) {
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
   logTenantEvent(s.tenant_id, 'billing:payment-approved', { id, method: s.method });
+  if (!['active', 'past_due'].includes(tenant.subscription_status)) recordServerEvent('subscription_activated', { product: PLANS[s.plan]?.product, plan: s.plan, tenant_id: s.tenant_id });
   const mail = layout({ heading: 'Payment received', lines: [`Thank you. We received your ${LOCAL_METHODS[s.method]} payment and your ${PLANS[s.plan].name} plan is active until ${periodEnd}.`] });
   await sendMail({ to: s.submitted_by, subject: 'Your payment was confirmed', ...mail });
   return getTenant(s.tenant_id);
