@@ -12,7 +12,7 @@ import { cleanModules } from './plansStore.js';
 import { recordSubscriptionChange, subscriptionHistory } from './subscriptions.js';
 import { approveSubmission, LOCAL_METHODS } from './billing.js';
 import path from 'node:path';
-import { ROLES, TOP_ROLES, isOwner } from './platformAccess.js';
+import { ROLES, TOP_ROLES, mayManageOwners, setOwnerCounter } from './platformAccess.js';
 import { checkPassword } from './platformStaff.js';
 import { adminResetLink, issueVerification } from './accessLinks.js';
 import { sendMail, layout } from './mailer.js';
@@ -371,8 +371,9 @@ export const listAdmins = () => platformDb().prepare('SELECT id, email, name, ro
     status: !a.active ? 'disabled' : a.invite_expires_at && !a.activated_at ? (Date.parse(a.invite_expires_at) > Date.now() ? 'invited' : 'invite_expired') : 'active' }));
 /** Active accounts holding every permission (Platform Owner / Super Admin) other than `exceptId`. */
 const activeTop = (exceptId = null) => platformDb().prepare(`SELECT COUNT(*) n FROM platform_admins WHERE role IN (${TOP_ROLES.map(() => '?').join(',')}) AND active=1 AND (invite_expires_at IS NULL OR activated_at IS NOT NULL) AND id<>?`).get(...TOP_ROLES, exceptId ?? -1).n;
-/** Only a Platform Owner can create, change or remove a Platform Owner. */
-const guardOwnerRole = (operator, ...roles) => { if (roles.includes('platform_owner') && !isOwner(operator)) throw new HttpError(403, 'Only a Platform Owner can grant, change or remove the Platform Owner role'); };
+setOwnerCounter(() => platformDb().prepare("SELECT COUNT(*) n FROM platform_admins WHERE role='platform_owner' AND active=1").get().n);
+/** Only a Platform Owner can create, change or remove a Platform Owner (a Super Admin may appoint the first one). */
+const guardOwnerRole = (operator, ...roles) => { if (roles.includes('platform_owner') && !mayManageOwners(operator)) throw new HttpError(403, 'Only a Platform Owner can grant, change or remove the Platform Owner role'); };
 export function addAdmin({ email, name, password, role = 'read_only' }, operator = null) {
   const e = String(email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) throw bad('A valid email is required');

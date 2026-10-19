@@ -49,6 +49,10 @@ export const TOP_ROLES = ['platform_owner', 'super_admin'];
 export const permsOf = (role) => ROLES[role]?.perms || [];
 export const can = (operator, perm) => operator?.via === 'token' || permsOf(operator?.role).includes(perm);
 export const isOwner = (operator) => operator?.via === 'token' || operator?.role === 'platform_owner';
+/** Who may grant or remove the Platform Owner role: an owner, or (on installs that have no owner yet, e.g. upgraded ones) a Super Admin. */
+let ownerCount = () => 1;
+export const setOwnerCounter = (fn) => { ownerCount = fn; };
+export const mayManageOwners = (operator) => isOwner(operator) || (operator?.role === 'super_admin' && ownerCount() === 0);
 
 // ---------------------------------------------------------------- request context for the audit log
 export const auditCtx = new AsyncLocalStorage();

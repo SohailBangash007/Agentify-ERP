@@ -183,7 +183,7 @@ function Pricing({ info }) {
   const [cur, setCur] = useState('PKR');
   useEffect(() => { track('pricing_view', { product: prod }); }, [prod]);
   const plans = info.plans.filter((p) => p.product === prod);
-  const currencies = [...new Set(info.plans.flatMap((p) => Object.keys(p.price)))];
+  const currencies = [...new Set(info.plans.flatMap((p) => Object.keys(p.price)))].sort((a, b) => (a === 'PKR' ? -1 : b === 'PKR' ? 1 : a.localeCompare(b)));
   const addons = info.addons.filter((a) => a.product === 'any' || a.product === prod || prod === 'bundle');
   const pay = [...(info.cards ? ['Cards'] : []), ...info.local_methods.map((k) => METHOD[k] || k)];
   const saving = (p) => (p.price[cur]?.month && p.price[cur]?.year && p.price[cur].year < p.price[cur].month * 12 ? Math.round((1 - p.price[cur].year / (p.price[cur].month * 12)) * 100) : 0);

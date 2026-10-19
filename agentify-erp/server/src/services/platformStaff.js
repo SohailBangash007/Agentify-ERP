@@ -12,7 +12,7 @@ import path from 'node:path';
 import bcrypt from 'bcryptjs';
 import { platformDb } from '../platform.js';
 import { DATA_DIR } from '../db.js';
-import { ROLES, isOwner } from './platformAccess.js';
+import { ROLES, mayManageOwners } from './platformAccess.js';
 import { sendMail, layout } from './mailer.js';
 import { bad, HttpError } from '../util.js';
 
@@ -106,7 +106,7 @@ export async function inviteAdmin({ email, name, role = 'read_only' }, operator,
   const e = String(email || '').trim().toLowerCase();
   if (!EMAIL_RE.test(e)) throw bad('A valid email is required');
   if (!ROLES[role]) throw bad(`Role must be one of: ${Object.keys(ROLES).join(', ')}`);
-  if (role === 'platform_owner' && !isOwner(operator)) throw new HttpError(403, 'Only a Platform Owner can grant, change or remove the Platform Owner role');
+  if (role === 'platform_owner' && !mayManageOwners(operator)) throw new HttpError(403, 'Only a Platform Owner can grant, change or remove the Platform Owner role');
   const db = platformDb();
   const existing = db.prepare('SELECT * FROM platform_admins WHERE email=?').get(e);
   if (existing && (existing.activated_at || !existing.invite_expires_at)) throw new HttpError(409, 'A console user with this email already exists');
