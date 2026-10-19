@@ -65,7 +65,11 @@ test('HR marks attendance in bulk and everyone sees the percentage', async () =>
 
 test('leave: employee applies, manager decides, HR can revoke; attendance follows', async () => {
   const agent = await client('agent2@expertdevelopers.pk');
-  const from = addDays(today(), 20), to = addDays(today(), 21);
+  // two consecutive working days (not Sunday, not a seeded holiday) about three weeks out, so the result does not depend on today's date
+  const working = (d) => new Date(`${d}T00:00:00Z`).getUTCDay() !== 0 && !get('SELECT 1 FROM holidays WHERE date=?', d);
+  let from = addDays(today(), 20);
+  while (!working(from) || !working(addDays(from, 1))) from = addDays(from, 1);
+  const to = addDays(from, 1);
   const ap = await agent.post('/api/staff/me/leaves', { type: 'Casual', from_date: from, to_date: to, reason: 'Wedding' });
   assert.equal(ap.status, 201, JSON.stringify(ap.data));
   assert.equal((await agent.post('/api/staff/me/leaves', { type: 'Casual', from_date: from, to_date: from })).status, 400, 'overlap refused');
