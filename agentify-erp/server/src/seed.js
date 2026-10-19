@@ -514,6 +514,14 @@ export function upgradePermissions() {
     run("UPDATE employees SET employment_type='Full time' WHERE employment_type='Full-time'");
     setSetting('perm_upgrade_v3', '1');
   }
+  if (!getSetting('perm_upgrade_con1')) {
+    // Construction Management: project managers run it, finance approves and sees costs, sales managers can look
+    grant('Admin', P(['construction']));
+    grant('Project Manager', P(['construction'], [...RW, 'delete', 'approve', 'export', 'print']));
+    grant('Finance Manager', P(['construction'], ['view', 'approve', 'export', 'print']));
+    grant('Sales Manager', P(['construction'], ['view']));
+    setSetting('perm_upgrade_con1', '1');
+  }
 }
 
 export function ensureBootstrapped() {

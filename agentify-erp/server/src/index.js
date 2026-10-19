@@ -34,6 +34,7 @@ import vendorPortal from './routes/vendorPortal.js';
 import content, { contentReminders } from './routes/content.js';
 import promos from './routes/promos.js';
 import announcements from './routes/announcements.js';
+import construction from './routes/construction.js';
 import { sendAlert } from './services/integrations.js';
 
 import auth from './routes/auth.js';
@@ -118,6 +119,7 @@ export function createApp() {
   app.use('/api/content', content);
   app.use('/api/promos', promos);
   app.use('/api/announcements', announcements);
+  app.use('/api/construction', construction);
   app.use('/api/push', push);
   app.use('/api/assistant', assistant);
   app.use('/api/portal', portal);

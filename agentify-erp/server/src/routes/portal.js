@@ -155,6 +155,23 @@ r.get('/development', asyncH((req, res) => {
   }));
 }));
 
+/**
+ * Construction progress for the client's own projects (projects of their construction contracts): % complete from
+ * measured BOQ progress, milestones, change orders and site reports that staff marked as visible to the client.
+ * Costs, budgets, suppliers and internal notes are never included.
+ */
+r.get('/construction', asyncH((req, res) => {
+  const projects = all("SELECT DISTINCT p.id, p.name, p.location, p.start_date, p.expected_completion FROM sales s JOIN projects p ON p.id=s.project_id WHERE s.contact_id=? AND s.kind='construction' AND s.status='confirmed'", mine(req));
+  res.json(projects.map((p) => {
+    const boq = get('SELECT COALESCE(SUM(qty*rate),0) v, COALESCE(SUM(MIN(completed_qty,qty)*rate),0) e FROM con_boq_items WHERE project_id=?', p.id);
+    return {
+      ...p, percent_complete: boq.v ? Math.round((boq.e / boq.v) * 1000) / 10 : null,
+      milestones: all('SELECT id, name, due_date, achieved_at FROM con_milestones WHERE project_id=? AND client_visible=1 ORDER BY due_date IS NULL, due_date', p.id),
+      change_orders: all("SELECT co_no, title, description, amount, days_impact, status, decided_at FROM con_change_orders WHERE project_id=? AND client_visible=1 AND status IN ('submitted','approved') ORDER BY id DESC", p.id),
+      reports: all('SELECT id, date, weather, work_done FROM con_daily_reports WHERE project_id=? AND client_visible=1 ORDER BY date DESC, id DESC LIMIT 30', p.id),
+    };
+  }));
+}));
 r.get('/payments', asyncH((req, res) => {
   res.json(all(`SELECT r.id,r.receipt_no,r.date,r.amount,r.payment_type,r.method,${RECEIPT_SUBJECT} property FROM receipts r LEFT JOIN properties p ON p.id=r.property_id
     WHERE r.contact_id=? AND r.status='valid' ORDER BY r.date DESC, r.id DESC`, mine(req)));

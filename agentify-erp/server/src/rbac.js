@@ -7,7 +7,7 @@ import { HttpError, forbidden } from './util.js';
 import { currentTenant } from './context.js';
 
 export const MODULES = ['dashboard', 'crm', 'sales', 'commissions', 'properties', 'projects', 'customers', 'payments', 'accounting',
-  'vendors', 'hrm', 'reports', 'settings', 'documents', 'website', 'content', 'listings', 'seo'];
+  'vendors', 'hrm', 'reports', 'settings', 'documents', 'website', 'content', 'listings', 'seo', 'construction'];
 export const ACTIONS = ['view', 'create', 'edit', 'delete', 'approve', 'export', 'print'];
 
 function secret() {
