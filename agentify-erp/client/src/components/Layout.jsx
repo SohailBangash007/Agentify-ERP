@@ -11,6 +11,7 @@ import { api } from '../api.js';
 import { useAuth, useMeta } from '../context.jsx';
 import { useBrand } from '../brand.js';
 import { BillingBanner, VerifyBanner } from '../pages/Billing.jsx';
+import Announcements from './Announcements.jsx';
 
 // [label, path, perm module (view)]
 const NAV = [
@@ -201,7 +202,7 @@ export default function Layout() {
           <Appearance />
           <NotificationBell />
         </header>
-        <main className="content" id="content"><VerifyBanner /><BillingBanner /><Outlet /></main>
+        <main className="content" id="content"><VerifyBanner /><BillingBanner /><Announcements /><Outlet /></main>
         <Assistant />
         <MobileTabs />
         <OfflineBar />

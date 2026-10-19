@@ -11,6 +11,7 @@ import { ReportsPage, ReconciliationPage } from './platform/Reports.jsx';
 import { Dashboard, HealthPage, NotificationsPage, SetupPage } from './platform/Dashboard.jsx';
 import { PlansPage, TransactionsPage, SubscriptionHistoryPage } from './platform/Billing.jsx';
 import { FinancePage } from './platform/Finance.jsx';
+import { AnalyticsPage, WebsitePage, DemoRequestsPage, AnnouncementsPage, IntegrationsPage } from './platform/Content.jsx';
 
 const A = '/api/platform/admin';
 const SLOT_LABEL = (s) => s.replace('_', ' · ').replace(/^./, (c) => c.toUpperCase());
@@ -290,6 +291,11 @@ function ConsoleRoutes() {
         <Route path="workspaces/*" element={<Allowed perm="workspaces.view">{page(filterLabel, 'Every company on the platform, with setup progress, usage and access dates. Click a row to manage it.', <Workspaces onOpen={open} />)}</Allowed>} />
         <Route path="expiry" element={<Allowed perm="workspaces.view">{page('Renewals & expiry', 'Trials and paid periods by how soon they end.', <Expiry onOpen={open} />)}</Allowed>} />
         <Route path="plans" element={<Allowed perm="billing.view"><PlansPage /></Allowed>} />
+        <Route path="analytics" element={<Allowed perm="analytics.view"><AnalyticsPage /></Allowed>} />
+        <Route path="website" element={<Allowed perm="content.manage"><WebsitePage /></Allowed>} />
+        <Route path="demo-requests" element={<Allowed perm="workspaces.view"><DemoRequestsPage /></Allowed>} />
+        <Route path="announcements" element={<Allowed perm="dashboard.view"><AnnouncementsPage /></Allowed>} />
+        <Route path="integrations" element={<Allowed perm="system.view"><IntegrationsPage /></Allowed>} />
         <Route path="finance" element={<Allowed perm="finance.view"><FinancePage /></Allowed>} />
         <Route path="transactions" element={<Allowed perm="billing.view"><TransactionsPage /></Allowed>} />
         <Route path="subscriptions/history" element={<Allowed perm="billing.view"><SubscriptionHistoryPage /></Allowed>} />

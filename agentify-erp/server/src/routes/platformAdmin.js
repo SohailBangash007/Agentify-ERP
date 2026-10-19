@@ -6,6 +6,9 @@ import { platformDb, BASE_DOMAIN, isMultiTenant, getTenant } from '../platform.j
 import { listAddons, saveAddon, setTenantAddon, listCoupons, saveCoupon, recordRefund, quote } from '../services/commerce.js';
 import { runLifecycle } from '../services/lifecycle.js';
 import { finance } from '../services/finance.js';
+import { listAnnouncements, saveAnnouncement, setAnnouncementStatus } from '../services/announcements.js';
+import { versionInfo } from '../services/version.js';
+import { registry as integrationRegistry, configure as configureIntegration, test as testIntegration, disconnect as disconnectIntegration } from '../services/integrations.js';
 import { marketingContent, saveMarketing, listLegal, legalDoc, saveLegal, publishLegal, listDemoRequests, updateDemoRequest } from '../services/marketing.js';
 import { analyticsReport } from '../services/analytics.js';
 import { resolveRange, utcStart, addDays, buckets, keyExpr } from '../services/platformMetrics.js';
@@ -293,6 +296,40 @@ r.get('/analytics', requireOperator, need('analytics.view'), asyncH((req, res) =
   const range = resolveRange(req.query);
   const report = analyticsReport({ from: utcStart(range.from), to: utcStart(addDays(range.to, 1)), buckets: buckets(range), keyExpr: (c) => keyExpr(c, range) });
   res.json({ range, ...report, ga4: { configured: !!getSetting('ga4_measurement_id') } });
+}));
+// ---- Announcements and release notes, integrations, running version
+r.get('/announcements', requireOperator, need('dashboard.view'), (_req, res) => res.json({ items: listAnnouncements(), version: versionInfo() }));
+r.post('/announcements', requireOperator, need('content.manage'), asyncH((req, res) => {
+  const out = saveAnnouncement(null, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'announcement-created', { id: out.id, title: out.title });
+  res.status(201).json(out);
+}));
+r.put('/announcements/:id', requireOperator, need('content.manage'), asyncH((req, res) => {
+  const out = saveAnnouncement(req.params.id, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'announcement-edited', { id: out.id });
+  res.json(out);
+}));
+r.post('/announcements/:id/:action(publish|retire|draft)', requireOperator, need('content.manage'), asyncH((req, res) => {
+  const out = setAnnouncementStatus(req.params.id, req.params.action);
+  audit(req.operator.email, `announcement-${req.params.action}`, { id: out.id, title: out.title, audience: out.audience, publish_at: out.publish_at });
+  res.json(out);
+}));
+r.get('/version', requireOperator, need('dashboard.view'), (_req, res) => res.json(versionInfo()));
+r.get('/integrations', requireOperator, need('system.view'), (_req, res) => res.json(integrationRegistry()));
+r.put('/integrations/:id', requireOperator, need('integrations.manage'), asyncH(async (req, res) => {
+  const out = await configureIntegration(req.params.id, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'integration-configured', { integration: req.params.id });
+  res.json(out);
+}));
+r.post('/integrations/:id/test', requireOperator, need('integrations.manage'), limiter, asyncH(async (req, res) => {
+  const out = await testIntegration(req.params.id, req.operator.email, { to: req.operator.email.includes('@') ? req.operator.email : req.body?.to });
+  audit(req.operator.email, 'integration-tested', { integration: req.params.id, ok: out.ok }, { outcome: out.ok ? 'success' : 'failed' });
+  res.json(out);
+}));
+r.delete('/integrations/:id', requireOperator, need('integrations.manage'), asyncH(async (req, res) => {
+  const out = await disconnectIntegration(req.params.id, req.operator.email);
+  audit(req.operator.email, 'integration-disconnected', { integration: req.params.id });
+  res.json(out);
 }));
 r.post('/lifecycle/run', requireOperator, need('system.manage'), limiter, asyncH(async (req, res) => {
   const out = await runLifecycle();

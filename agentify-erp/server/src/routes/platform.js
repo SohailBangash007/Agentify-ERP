@@ -9,6 +9,7 @@ import { audit } from '../services/platformConfig.js';
 import { planCatalog, PLAN_SETTINGS, PRODUCTS, PLANS } from '../services/plans.js';
 import { publicContent, publicLegal, createDemoRequest, marketingContent, termsVersion } from '../services/marketing.js';
 import { recordServerEvent, collect } from '../services/analytics.js';
+import { publicAnnouncements } from '../services/announcements.js';
 import { listAddons } from '../services/commerce.js';
 import { issueVerification } from '../services/accessLinks.js';
 import { get, run } from '../db.js';
@@ -124,6 +125,7 @@ r.get('/marketing', asyncH((req, res) => {
     plans: planCatalog().filter((p) => PLANS[p.id]?.visible), addons: listAddons({ activeOnly: true }).map(({ id, name, description, product, price, entitlements }) => ({ id, name, description, product, price, entitlements })),
     local_methods: methods, cards: stripe.stripeConfigured(), terms_version: termsVersion(), ga4_id: getSetting('ga4_measurement_id') || null });
 }));
+r.get('/announcements', asyncH((req, res) => { mainOnly(req); res.json(publicAnnouncements()); }));
 r.get('/legal/:slug', asyncH((req, res) => { mainOnly(req); res.json(publicLegal(req.params.slug)); }));
 /** Contact / demo request form. A hidden "website" field catches bots; nothing is sent to the visitor. */
 r.post('/demo-request', publicLimiter, asyncH(async (req, res) => {

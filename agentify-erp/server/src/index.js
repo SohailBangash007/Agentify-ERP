@@ -33,6 +33,8 @@ import claims, { feed as paymentFeed } from './routes/claims.js';
 import vendorPortal from './routes/vendorPortal.js';
 import content, { contentReminders } from './routes/content.js';
 import promos from './routes/promos.js';
+import announcements from './routes/announcements.js';
+import { sendAlert } from './services/integrations.js';
 
 import auth from './routes/auth.js';
 import settings from './routes/settings.js';
@@ -115,6 +117,7 @@ export function createApp() {
   app.use('/api/vendor', vendorPortal);
   app.use('/api/content', content);
   app.use('/api/promos', promos);
+  app.use('/api/announcements', announcements);
   app.use('/api/push', push);
   app.use('/api/assistant', assistant);
   app.use('/api/portal', portal);
@@ -157,6 +160,7 @@ export function createApp() {
     if (/UNIQUE constraint failed/.test(err.message || '')) return res.status(409).json({ error: 'A record with this unique value already exists' });
     console.error(err);
     recordError(err, req);
+    sendAlert(`Server error on ${req.method} ${req.path}: ${err.message}`);
     res.status(500).json({ error: 'Internal server error' });
   });
   return app;
@@ -173,7 +177,7 @@ if (isMain) {
   // platform-wide: daily metric snapshot (for period comparisons) and super-admin alerts
   const platformTick = () => { try { snapshot(); generateNotifications(null, true); markJob('platform-jobs'); } catch (e) { console.error('[platform jobs]', e); markJob('platform-jobs', e); }
     // trial expiry, reminders and renewals (idempotent; safe to run as often as you like)
-    runLifecycle().then((r) => markJob('lifecycle', r.errors.length ? new Error(`${r.errors.length} workspace(s) failed`) : null)).catch((e) => { console.error('[lifecycle]', e); markJob('lifecycle', e); }); };
+    runLifecycle().then((r) => markJob('lifecycle', r.errors.length ? new Error(`${r.errors.length} workspace(s) failed`) : null)).catch((e) => { console.error('[lifecycle]', e); markJob('lifecycle', e); sendAlert(`Lifecycle job failed: ${e.message}`); }); };
   setTimeout(platformTick, 5000).unref();
   setInterval(platformTick, 60 * 60 * 1000).unref();
 }

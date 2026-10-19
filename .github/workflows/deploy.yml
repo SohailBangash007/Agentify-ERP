@@ -102,6 +102,9 @@ jobs:
             "$REMOTE_ENV bash -s" \
             -- "$APP_DIR" "$SERVICE" "$DOMAIN" < .github/scripts/remote-bootstrap.sh
 
+          # what is running: shown in the platform console (System > Releases); never typed by hand
+          printf '{"commit":"%s","ref":"%s","deployed_at":"%s"}\n' "$GITHUB_SHA" "$GITHUB_REF_NAME" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > agentify-erp/server/release.json
+
           echo "==> Uploading server code"
           sshpass -e rsync -az --delete -e "$SSH -p $PORT" \
             --exclude 'node_modules' --exclude '.env' --exclude '.env.*' \
