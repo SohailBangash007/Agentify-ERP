@@ -2,23 +2,34 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { asyncH, bad, HttpError } from '../util.js';
-import { platformDb, BASE_DOMAIN, isMultiTenant } from '../platform.js';
+import { platformDb, BASE_DOMAIN, isMultiTenant, getTenant } from '../platform.js';
+import { listAddons, saveAddon, setTenantAddon, listCoupons, saveCoupon, recordRefund, quote } from '../services/commerce.js';
+import { runLifecycle } from '../services/lifecycle.js';
+import { finance } from '../services/finance.js';
+import { retentionDays, setRetentionDays, eligibleForDeletion, retentionState, deleteWorkspaceData } from '../services/retention.js';
+import { listAnnouncements, saveAnnouncement, setAnnouncementStatus } from '../services/announcements.js';
+import { versionInfo } from '../services/version.js';
+import { registry as integrationRegistry, configure as configureIntegration, test as testIntegration, disconnect as disconnectIntegration } from '../services/integrations.js';
+import { marketingContent, saveMarketing, listLegal, legalDoc, saveLegal, publishLegal, listDemoRequests, updateDemoRequest } from '../services/marketing.js';
+import { analyticsReport } from '../services/analytics.js';
+import { resolveRange, utcStart, addDays, buckets, keyExpr } from '../services/platformMetrics.js';
 import { COOKIE, login, loginMfa, changePassword, requireOperator, onPlatformHost, twofaStatus, twofaSetup, twofaEnable, twofaDisable,
   loginMeta, endSession, listSessions, revokeSession, revokeAllFor, loginHistory, mfaRequired } from '../services/platformAuth.js';
-import { ROLES, PERMISSIONS, permsOf, can, need, auditContext, onDenied } from '../services/platformAccess.js';
+import { ROLES, PERMISSIONS, TOP_ROLES, permsOf, can, need, auditContext, onDenied } from '../services/platformAccess.js';
 import { getMaintenance, setMaintenance, recentErrors } from '../services/maintenance.js';
 import { reportList, runReport, exportReport, savedViews, saveView, deleteView, reconcile } from '../services/platformReports.js';
-import { stripeView, saveStripe, stripeConfig, STRIPE_MODES, audit } from '../services/platformConfig.js';
+import { stripeView, saveStripe, stripeConfig, STRIPE_MODES, audit, getSetting, setSetting } from '../services/platformConfig.js';
 import { testConnection } from '../services/stripe.js';
 import { LOCAL_METHODS } from '../services/billing.js';
 import { runBackup, listBackups, backupDir } from '../services/backup.js';
 import { dashboard, health, listNotifications, markRead, search, generateNotifications } from '../services/platformMetrics.js';
-import { overview, tenantSummaries, tenantDetail, createWorkspace, extendTrial, extendGrace, remindOwner, setOwner, userAction, setupChecklist, listAdmins, addAdmin, removeAdmin,
+import { overview, tenantSummaries, tenantDetail, createWorkspace, extendTrial, trialAction, extendGrace, remindOwner, setOwner, userAction, setupChecklist, listAdmins, addAdmin, removeAdmin,
   updateAdmin, changeStatus, updateProfile, setEntitlements, listNotes, addNote, recordManualPayment, resendOnboarding, transactions } from '../services/platformTenants.js';
 import { listPlans, savePlan, savePlanSettings } from '../services/plansStore.js';
-import { PLAN_SETTINGS, MODULES } from '../services/plans.js';
+import { PLAN_SETTINGS, MODULES, PRODUCTS } from '../services/plans.js';
 import { setSubscription } from '../services/billing.js';
 import { subscriptionHistory } from '../services/subscriptions.js';
+import { setupNeeded, completeSetup, inviteAdmin, inviteInfo, acceptInvite } from '../services/platformStaff.js';
 
 const r = Router();
 // every console request gets a request id and its IP / browser recorded with any audit row it writes
@@ -43,6 +54,25 @@ r.post('/login/mfa', limiter, asyncH((req, res) => {
   res.cookie(COOKIE, token, cookieOpts);
   audit(admin.email, 'login (2fa)');
   res.json(admin);
+}));
+// ---- First-run owner setup (open only while no console account exists) and console invitations
+const platformOnly = (req, write = false) => {
+  if (!onPlatformHost(req)) throw new HttpError(404, 'Not found');
+  if (write && req.headers['x-requested-with'] !== 'ERP') throw new HttpError(403, 'CSRF check failed');
+};
+r.get('/setup/status', (req, res) => { platformOnly(req); res.json({ needed: setupNeeded() }); });
+r.post('/setup', limiter, asyncH((req, res) => {
+  platformOnly(req, true);
+  const out = completeSetup(req.body || {});
+  audit(out.email, 'platform-owner-created', { via: 'setup-token' });
+  res.status(201).json({ ok: true, email: out.email });
+}));
+r.get('/invite/:token', limiter, asyncH((req, res) => { platformOnly(req); res.json(inviteInfo(req.params.token)); }));
+r.post('/invite/accept', limiter, asyncH((req, res) => {
+  platformOnly(req, true);
+  const out = acceptInvite(req.body || {});
+  audit(out.email, 'invitation-accepted');
+  res.json({ ok: true, email: out.email });
 }));
 const adminOnly = (req) => { if (req.operator.via !== 'session') throw bad('Sign in as an admin to manage two-factor sign-in'); };
 r.get('/2fa', requireOperator, need('self'), (req, res) => { adminOnly(req); res.json(twofaStatus(req.operator.id)); });
@@ -127,9 +157,10 @@ r.post('/workspaces', requireOperator, need('workspaces.create'), asyncH((req, r
   res.status(201).json(t);
 }));
 r.get('/workspaces/:id', requireOperator, need('workspaces.view'), asyncH((req, res) => res.json(tenantDetail(req.params.id, req))));
-r.post('/workspaces/:id/trial', requireOperator, need('workspaces.edit'), asyncH((req, res) => {
-  const t = extendTrial(req.params.id, req.body || {}, req.operator.email);
-  audit(req.operator.email, 'trial-extended', { slug: t.slug, until: t.trial_ends_at, reason: req.body?.reason });
+r.post('/workspaces/:id/trial', requireOperator, need('trials.manage'), asyncH((req, res) => {
+  const action = req.body?.action || 'extend';
+  const t = trialAction(req.params.id, { ...(req.body || {}), action }, req.operator.email);
+  audit(req.operator.email, action === 'extend' ? 'trial-extended' : `trial-${action}`, { slug: t.slug, until: t.trial_ends_at, status: t.subscription_status, reason: req.body?.reason });
   res.json(tenantDetail(t.id, req));
 }));
 r.post('/workspaces/:id/grace', requireOperator, need('billing.manage'), asyncH((req, res) => {
@@ -195,7 +226,7 @@ r.post('/workspaces/:id/onboarding-email', requireOperator, need('workspaces.sup
 }));
 
 // ---- Plans, subscriptions and money
-r.get('/plans', requireOperator, need('billing.view'), (_req, res) => res.json({ plans: listPlans(), settings: { ...PLAN_SETTINGS }, modules: MODULES }));
+r.get('/plans', requireOperator, need('billing.view'), (_req, res) => res.json({ plans: listPlans(), settings: { ...PLAN_SETTINGS }, modules: MODULES, products: PRODUCTS }));
 r.put('/plans/:id', requireOperator, need('billing.configure'), asyncH((req, res) => {
   const out = savePlan(req.params.id, req.body || {}, req.operator.email);
   audit(req.operator.email, out.changes.created ? 'plan-created' : 'plan-edited', { plan: out.plan.id, ...out.changes });
@@ -206,13 +237,151 @@ r.put('/plan-settings', requireOperator, need('billing.configure'), asyncH((req,
   audit(req.operator.email, 'plan-settings', out);
   res.json(out);
 }));
+// ---- Add-ons, coupons, refunds and the lifecycle job
+r.get('/addons', requireOperator, need('billing.view'), (_req, res) => res.json(listAddons()));
+r.put('/addons/:id', requireOperator, need('billing.configure'), asyncH((req, res) => {
+  const out = saveAddon(req.params.id, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'addon-saved', { id: out.id, price: out.price, entitlements: out.entitlements, active: out.active });
+  res.json(out);
+}));
+r.post('/workspaces/:id/addons', requireOperator, need('billing.manage'), asyncH((req, res) => {
+  const reason = String(req.body?.reason || '').trim();
+  if (reason.length < 3) throw bad('A reason is required for changing add-ons by hand');
+  const t = tenantDetail(req.params.id, req);
+  if (t.is_legacy) throw bad('The original workspace is not billed');
+  const out = setTenantAddon(t.id, { ...(req.body || {}), reason }, req.operator.email);
+  audit(req.operator.email, 'addon-changed', { slug: t.slug, addon: req.body?.addon_id, active: req.body?.active !== false, quantity: req.body?.quantity, reason });
+  res.json(out);
+}));
+r.get('/coupons', requireOperator, need('billing.view'), (_req, res) => res.json(listCoupons()));
+r.put('/coupons/:code', requireOperator, need('billing.configure'), asyncH((req, res) => {
+  const out = saveCoupon(req.params.code, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'coupon-saved', { code: out.code, percent_off: out.percent_off, amount_off: out.amount_off, active: out.active });
+  res.json(out);
+}));
+r.post('/workspaces/:id/refunds', requireOperator, need('billing.manage'), limiter, asyncH((req, res) => {
+  const out = recordRefund(req.params.id, { invoice_id: req.body?.invoice_id, amount: req.body?.amount, reason: req.body?.reason, reference: req.body?.reference, provider: 'manual' }, req.operator.email);
+  audit(req.operator.email, 'refund-recorded', { tenant: Number(req.params.id), invoice: out.invoice_id, amount: out.amount, currency: out.currency, reason: req.body?.reason });
+  res.status(201).json(out);
+}));
+r.post('/quote', requireOperator, need('billing.view'), asyncH((req, res) => {
+  const b = req.body || {};
+  const t = b.tenant_id ? tenantDetail(b.tenant_id, req) : null;
+  res.json(quote(t && !t.is_legacy ? getTenant(t.id) : null, { plan: b.plan, interval: b.interval, currency: b.currency, coupon: b.coupon, addons: b.addons }));
+}));
+// ---- Public website content, legal documents, demo requests and website analytics
+r.get('/marketing', requireOperator, need('content.manage'), (_req, res) => res.json({ content: marketingContent(), legal: listLegal() }));
+r.put('/marketing', requireOperator, need('content.manage'), asyncH((req, res) => {
+  const out = saveMarketing(req.body || {}, req.operator.email);
+  audit(req.operator.email, 'website-content-saved', { fields: Object.keys(req.body || {}) });
+  res.json({ content: out, legal: listLegal() });
+}));
+r.get('/legal/:slug', requireOperator, need('content.manage'), asyncH((req, res) => res.json(legalDoc(req.params.slug))));
+r.put('/legal/:slug', requireOperator, need('content.manage'), asyncH((req, res) => {
+  const out = saveLegal(req.params.slug, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'legal-draft-saved', { doc: out.slug });
+  res.json(out);
+}));
+r.post('/legal/:slug/publish', requireOperator, need('content.manage'), asyncH((req, res) => {
+  const out = publishLegal(req.params.slug, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'legal-published', { doc: out.slug, version: out.version, reviewed_by: out.reviewed_by });
+  res.json(out);
+}));
+r.get('/demo-requests', requireOperator, need('workspaces.view'), (req, res) => res.json(listDemoRequests({ status: req.query.status })));
+r.patch('/demo-requests/:id', requireOperator, need('workspaces.edit'), asyncH((req, res) => {
+  const out = updateDemoRequest(req.params.id, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'demo-request-updated', { id: out.id, status: out.status });
+  res.json(out);
+}));
+r.get('/analytics', requireOperator, need('analytics.view'), asyncH((req, res) => {
+  const range = resolveRange(req.query);
+  const report = analyticsReport({ from: utcStart(range.from), to: utcStart(addDays(range.to, 1)), buckets: buckets(range), keyExpr: (c) => keyExpr(c, range) });
+  res.json({ range, ...report, ga4: { configured: !!getSetting('ga4_measurement_id') } });
+}));
+// ---- Announcements and release notes, integrations, running version
+r.get('/announcements', requireOperator, need('dashboard.view'), (_req, res) => res.json({ items: listAnnouncements(), version: versionInfo() }));
+r.post('/announcements', requireOperator, need('content.manage'), asyncH((req, res) => {
+  const out = saveAnnouncement(null, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'announcement-created', { id: out.id, title: out.title });
+  res.status(201).json(out);
+}));
+r.put('/announcements/:id', requireOperator, need('content.manage'), asyncH((req, res) => {
+  const out = saveAnnouncement(req.params.id, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'announcement-edited', { id: out.id });
+  res.json(out);
+}));
+r.post('/announcements/:id/:action(publish|retire|draft)', requireOperator, need('content.manage'), asyncH((req, res) => {
+  const out = setAnnouncementStatus(req.params.id, req.params.action);
+  audit(req.operator.email, `announcement-${req.params.action}`, { id: out.id, title: out.title, audience: out.audience, publish_at: out.publish_at });
+  res.json(out);
+}));
+r.get('/version', requireOperator, need('dashboard.view'), (_req, res) => res.json(versionInfo()));
+r.get('/integrations', requireOperator, need('system.view'), (_req, res) => res.json(integrationRegistry()));
+r.put('/integrations/:id', requireOperator, need('integrations.manage'), asyncH(async (req, res) => {
+  const out = await configureIntegration(req.params.id, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'integration-configured', { integration: req.params.id });
+  res.json(out);
+}));
+r.post('/integrations/:id/test', requireOperator, need('integrations.manage'), limiter, asyncH(async (req, res) => {
+  const out = await testIntegration(req.params.id, req.operator.email, { to: req.operator.email.includes('@') ? req.operator.email : req.body?.to });
+  audit(req.operator.email, 'integration-tested', { integration: req.params.id, ok: out.ok }, { outcome: out.ok ? 'success' : 'failed' });
+  res.json(out);
+}));
+r.delete('/integrations/:id', requireOperator, need('integrations.manage'), asyncH(async (req, res) => {
+  const out = await disconnectIntegration(req.params.id, req.operator.email);
+  audit(req.operator.email, 'integration-disconnected', { integration: req.params.id });
+  res.json(out);
+}));
+// ---- Data retention and deletion (never automatic)
+r.get('/retention', requireOperator, need('workspaces.view'), (_req, res) => res.json({ retention_days: retentionDays(), eligible: eligibleForDeletion().map((t) => ({ id: t.id, slug: t.slug, name: t.name, ...retentionState(t) })) }));
+r.put('/retention', requireOperator, need('system.manage'), asyncH((req, res) => {
+  const days = setRetentionDays(req.body?.retention_days, req.operator.email);
+  audit(req.operator.email, 'retention-policy', { retention_days: days });
+  res.json({ retention_days: days });
+}));
+r.post('/workspaces/:id/delete-data', requireOperator, need('workspaces.suspend'), limiter, asyncH((req, res) => {
+  if (!TOP_ROLES.includes(req.operator.role) && req.operator.via !== 'token') throw new HttpError(403, 'Only a Platform Owner or Super Admin can delete workspace data');
+  const out = deleteWorkspaceData(req.params.id, req.body || {}, req.operator.email);
+  audit(req.operator.email, 'workspace-data-deleted', { slug: out.slug, reason: req.body?.reason, owner_request: !!req.body?.owner_request, archive: out.archive });
+  res.json(out);
+}));
+r.post('/lifecycle/run', requireOperator, need('system.manage'), limiter, asyncH(async (req, res) => {
+  const out = await runLifecycle();
+  audit(req.operator.email, 'lifecycle-run', out);
+  res.json(out);
+}));
 r.get('/subscriptions/history', requireOperator, need('billing.view'), (req, res) => res.json(subscriptionHistory({ tenantId: req.query.tenant, limit: Number(req.query.per) || 100, offset: (Number(req.query.page) || 0) * (Number(req.query.per) || 100) })));
 r.get('/transactions', requireOperator, need('billing.view'), (req, res) => res.json(transactions(req.query)));
 
 r.get('/setup', requireOperator, need('system.view'), (req, res) => res.json(setupChecklist(req.operator)));
 
 // ---- Dashboard, health, notifications, search
-r.get('/dashboard', requireOperator, need('dashboard.view'), asyncH((req, res) => res.json(dashboard(req.query, req))));
+r.get('/dashboard', requireOperator, need('dashboard.view'), asyncH((req, res) => {
+  const out = dashboard(req.query, req);
+  // roles without financial reporting see counts and activity, never money
+  if (!can(req.operator, 'finance.view')) {
+    for (const k of ['mrr', 'arr', 'payments_received']) if (out.kpis[k]) out.kpis[k] = { hidden: true };
+    out.charts.revenue = []; out.charts.top_workspaces = []; out.charts.recent_transactions = [];
+  }
+  if (!can(req.operator, 'workspaces.view')) { out.charts.top_workspaces = []; out.charts.recent_transactions = []; out.charts.recent_activity = []; }
+  res.json(out);
+}));
+/** Revenue & subscriptions: MRR/ARR, invoiced vs collected, refunds, net, recognised revenue, movement; filterable. */
+r.get('/finance', requireOperator, need('finance.view'), asyncH((req, res) => res.json(finance(req.query))));
+r.get('/finance/export', requireOperator, need('finance.view'), need('workspaces.export'), asyncH(async (req, res) => {
+  const f = finance(req.query);
+  const rows = [];
+  for (const [metric, byCur] of Object.entries(f.money)) for (const [currency, amount] of Object.entries(byCur)) rows.push({ section: 'Money', metric, currency, value: amount, definition: f.definitions[metric] || '' });
+  for (const [k, v] of Object.entries({ ...f.counts, failed_payments: f.failed_payments, ...f.movement })) rows.push({ section: 'Counts', metric: k, currency: '', value: v ?? '', definition: '' });
+  for (const p of f.by_plan) for (const [currency, amount] of Object.entries(p.mrr)) rows.push({ section: 'MRR by plan', metric: `${p.name} (${p.plan}), ${p.subscribers} subscribers`, currency, value: amount, definition: '' });
+  const rep = { id: 'revenue-summary', title: 'Revenue & subscriptions', range: f.range, rows, columns: [['section', 'Section'], ['metric', 'Metric'], ['currency', 'Currency'], ['value', 'Value'], ['definition', 'Definition']] };
+  const file = await exportReport(rep, String(req.query.format || 'csv'));
+  audit(req.operator.email, 'report-exported', { report: rep.id, format: req.query.format || 'csv', filters: f.filters, from: f.range.from, to: f.range.to });
+  res.setHeader('Content-Type', file.type);
+  res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(file.body);
+}));
 r.get('/health', requireOperator, need('system.view'), (_req, res) => res.json(health()));
 r.get('/notifications', requireOperator, need('dashboard.view'), asyncH((req, res) => { generateNotifications(req); res.json(listNotifications(req.operator.id, { all: req.query.all === '1' })); }));
 r.post('/notifications/read', requireOperator, need('dashboard.view'), asyncH((req, res) => res.json({ marked: markRead(req.operator.id, req.body?.ids) })));
@@ -292,19 +461,25 @@ r.get('/reconciliation', requireOperator, need('billing.view'), (_req, res) => r
 r.get('/admins', requireOperator, need('admins.manage'), (req, res) => res.json({ me: req.operator.id ?? null, admins: listAdmins(), roles: Object.fromEntries(Object.entries(ROLES).map(([k, v]) => [k, { label: v.label, perms: v.perms }])), permissions: PERMISSIONS }));
 r.patch('/admins/:id', requireOperator, need('admins.manage'), asyncH((req, res) => {
   adminOnly(req);
-  const out = updateAdmin(req.params.id, req.body || {}, req.operator.id);
+  const out = updateAdmin(req.params.id, req.body || {}, req.operator.id, req.operator);
   if (out.changed.length) audit(req.operator.email, 'admin-changed', { email: out.admin.email, from: out.before, to: { role: out.admin.role, active: out.admin.active }, reason: req.body?.reason });
   res.json(out.admin);
 }));
-r.post('/admins', requireOperator, need('admins.manage'), limiter, asyncH((req, res) => {
+r.post('/admins', requireOperator, need('admins.manage'), limiter, asyncH(async (req, res) => {
   adminOnly(req);
-  const a = addAdmin(req.body || {});
+  // without a password the person is invited by email and chooses their own (recommended); with one, the account is ready at once
+  if (!req.body?.password) {
+    const inv = await inviteAdmin(req.body || {}, req.operator, `${req.protocol}://${req.get('host')}`);
+    audit(req.operator.email, 'admin-invited', { email: inv.email, role: inv.role, emailed: inv.emailed });
+    return res.status(201).json(inv);
+  }
+  const a = addAdmin(req.body || {}, req.operator);
   audit(req.operator.email, 'admin-added', { email: a.email, role: a.role });
   res.status(201).json(a);
 }));
 r.delete('/admins/:id', requireOperator, need('admins.manage'), asyncH((req, res) => {
   adminOnly(req);
-  const gone = removeAdmin(req.params.id, req.operator.id);
+  const gone = removeAdmin(req.params.id, req.operator.id, req.operator);
   audit(req.operator.email, 'admin-removed', { email: gone.email, id: gone.id });
   res.json({ ok: true });
 }));

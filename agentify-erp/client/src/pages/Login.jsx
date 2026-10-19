@@ -5,11 +5,6 @@ import { Field } from '../components/ui.jsx';
 import { useAuth } from '../context.jsx';
 import { useBrand } from '../brand.js';
 
-const DEMO = [
-  ['Super Admin', 'admin@expertdevelopers.pk'], ['Admin', 'admin.demo@expertdevelopers.pk'], ['Finance Manager', 'finance@expertdevelopers.pk'], ['Sales Manager', 'salesmanager@expertdevelopers.pk'],
-  ['Sales Agent', 'agent1@expertdevelopers.pk'], ['HR Manager', 'hr@expertdevelopers.pk'], ['Project Manager', 'pm@expertdevelopers.pk'], ['Listing Manager', 'listing@expertdevelopers.pk'], ['Website Manager', 'web@expertdevelopers.pk'], ['SEO Manager', 'seo@expertdevelopers.pk'],
-];
-
 export default function Login({ portal = false, vendor = false }) {
   const { login, loginMfa } = useAuth();
   const brand = useBrand();
@@ -49,10 +44,10 @@ export default function Login({ portal = false, vendor = false }) {
         <button className="btn primary" disabled={busy}>{busy ? 'Signing in…' : mfa ? 'Verify' : 'Sign in'}</button>
         {!vendor && <div className="center muted"><Link to="/forgot-password">Forgot password?</Link>{!portal && <> · <Link to="/signup">Create a workspace</Link></>}</div>}
         <div className="center muted">{portal ? <><Link to="/login">Staff sign in</Link> · {vendor ? <Link to="/portal/login">Customer portal</Link> : <Link to="/vendor/login">Vendor portal</Link>}</> : <><Link to="/portal/login">Customer portal →</Link> · <Link to="/vendor/login">Vendor portal →</Link></>}</div>
-        {!portal && (
+        {!portal && brand.demo_logins.length > 0 && (
           <div className="demo-box">
             <b>Demo accounts</b> <span className="muted">(password <code>Demo@12345</code>)</span>
-            {DEMO.map(([r, e]) => <button type="button" key={e} onClick={() => { setId(e); setPw('Demo@12345'); }}>{r} — {e}</button>)}
+            {brand.demo_logins.map(({ role: r, email: e }) => <button type="button" key={e} onClick={() => { setId(e); setPw('Demo@12345'); }}>{r} — {e}</button>)}
           </div>
         )}
         {vendor && <div className="demo-box"><b>Demo vendors</b><button type="button" onClick={() => { setId('abc.bricks@example.com'); setPw('Demo@12345'); }}>ABC Bricks — abc.bricks@example.com</button><button type="button" onClick={() => { setId('wood@example.com'); setPw('Demo@12345'); }}>Expert Wood Suppliers — wood@example.com</button></div>}

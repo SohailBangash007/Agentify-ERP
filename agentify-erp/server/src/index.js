@@ -7,13 +7,15 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { uploadDir, get } from './db.js';
 import { scheduleBackups } from './services/backup.js';
-import { tenantContext, bootstrapTenants, forEachTenant } from './platform.js';
+import { tenantContext, bootstrapTenants, forEachTenant, isMultiTenant, resolveTenant } from './platform.js';
+import { injectMeta, platformSitemap, platformRobots, MARKETING_ROUTES } from './services/marketing.js';
 import { ensureFirstAdmin } from './services/platformAuth.js';
 import { markJob, snapshot, generateNotifications } from './services/platformMetrics.js';
 import { maintenanceGate, recordError } from './services/maintenance.js';
+import { runLifecycle } from './services/lifecycle.js';
 import platformRoutes from './routes/platform.js';
 import billing from './routes/billing.js';
-import { billingGuard } from './services/plans.js';
+import { billingGuard, apiAccessGuard } from './services/plans.js';
 import { authenticate, csrfGuard, requireStaff } from './rbac.js';
 import { HttpError } from './util.js';
 import { runReminders } from './services/reminders.js';
@@ -31,6 +33,9 @@ import claims, { feed as paymentFeed } from './routes/claims.js';
 import vendorPortal from './routes/vendorPortal.js';
 import content, { contentReminders } from './routes/content.js';
 import promos from './routes/promos.js';
+import announcements from './routes/announcements.js';
+import construction from './routes/construction.js';
+import { sendAlert } from './services/integrations.js';
 
 import auth from './routes/auth.js';
 import settings from './routes/settings.js';
@@ -56,7 +61,8 @@ export function createApp() {
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
   app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], imgSrc: ["'self'", 'data:', 'blob:', 'https:'], mediaSrc: ["'self'", 'blob:', 'https:'], styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-    fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'], scriptSrc: ["'self'"], frameSrc: ["'self'", 'https://www.youtube.com', 'https://www.google.com', 'https://www.openstreetmap.org'], connectSrc: ["'self'"], workerSrc: ["'self'"], manifestSrc: ["'self'"],
+    fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'], // Google Analytics 4 is loaded only after a visitor consents and only when the platform owner configured it
+    scriptSrc: ["'self'", 'https://www.googletagmanager.com'], frameSrc: ["'self'", 'https://www.youtube.com', 'https://www.google.com', 'https://www.openstreetmap.org'], connectSrc: ["'self'", 'https://www.google-analytics.com', 'https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://www.googletagmanager.com'], workerSrc: ["'self'"], manifestSrc: ["'self'"],
     // Only force https in production; on plain http://localhost it can break service-worker and asset fetches.
     upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null } }, hsts: process.env.NODE_ENV === 'production', crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   // the billing webhook is signed over the exact bytes, so keep them for that one route
@@ -70,6 +76,10 @@ export function createApp() {
   // tenant context is not lost in stream callbacks.
   // maintenance mode closes every workspace; the platform console (mounted above) keeps working
   app.use('/api', maintenanceGate);
+  // the main (marketing) domain has its own sitemap and robots rules; workspaces keep theirs
+  const onMain = (req) => isMultiTenant() && !resolveTenant(req.hostname);
+  app.get('/sitemap.xml', (req, res, next) => (onMain(req) ? res.type('application/xml').send(platformSitemap(req)) : next()));
+  app.get('/robots.txt', (req, res, next) => (onMain(req) ? res.type('text/plain').send(platformRobots(req)) : next()));
   app.use(tenantContext);
 
   // Public website API: key-authenticated, CORS-open (no cookies involved)
@@ -79,7 +89,7 @@ export function createApp() {
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
-  }, pub);
+  }, apiAccessGuard, pub);
 
   app.use('/api', rateLimit({ windowMs: 60_000, limit: 900, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many requests' } }));
   app.use('/api', authenticate, csrfGuard);
@@ -108,6 +118,8 @@ export function createApp() {
   app.use('/api/vendor', vendorPortal);
   app.use('/api/content', content);
   app.use('/api/promos', promos);
+  app.use('/api/announcements', announcements);
+  app.use('/api/construction', construction);
   app.use('/api/push', push);
   app.use('/api/assistant', assistant);
   app.use('/api/portal', portal);
@@ -131,7 +143,15 @@ export function createApp() {
   const dist = path.join(here, '..', '..', 'client', 'dist');
   if (fs.existsSync(dist)) {
     app.use(express.static(dist));
-    app.get(/^\/(?!api|uploads).*/, (_req, res) => res.sendFile(path.join(dist, 'index.html')));
+    // marketing pages on the main domain get their title, description, canonical and sharing tags on the server (crawlers)
+    let shell = null;
+    app.get(/^\/(?!api|uploads).*/, (req, res) => {
+      if (onMain(req) && MARKETING_ROUTES[req.path]) {
+        shell ||= fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
+        return res.type('html').send(injectMeta(shell, req.path, req));
+      }
+      res.sendFile(path.join(dist, 'index.html'));
+    });
   }
 
   app.use((err, req, res, _next) => {
@@ -142,6 +162,7 @@ export function createApp() {
     if (/UNIQUE constraint failed/.test(err.message || '')) return res.status(409).json({ error: 'A record with this unique value already exists' });
     console.error(err);
     recordError(err, req);
+    sendAlert(`Server error on ${req.method} ${req.path}: ${err.message}`);
     res.status(500).json({ error: 'Internal server error' });
   });
   return app;
@@ -156,7 +177,9 @@ if (isMain) {
   scheduleBackups();
   setInterval(tick, 30 * 60 * 1000).unref(); // goal nudges are once-per-day via dedupe keys
   // platform-wide: daily metric snapshot (for period comparisons) and super-admin alerts
-  const platformTick = () => { try { snapshot(); generateNotifications(null, true); markJob('platform-jobs'); } catch (e) { console.error('[platform jobs]', e); markJob('platform-jobs', e); } };
+  const platformTick = () => { try { snapshot(); generateNotifications(null, true); markJob('platform-jobs'); } catch (e) { console.error('[platform jobs]', e); markJob('platform-jobs', e); }
+    // trial expiry, reminders and renewals (idempotent; safe to run as often as you like)
+    runLifecycle().then((r) => markJob('lifecycle', r.errors.length ? new Error(`${r.errors.length} workspace(s) failed`) : null)).catch((e) => { console.error('[lifecycle]', e); markJob('lifecycle', e); sendAlert(`Lifecycle job failed: ${e.message}`); }); };
   setTimeout(platformTick, 5000).unref();
   setInterval(platformTick, 60 * 60 * 1000).unref();
 }

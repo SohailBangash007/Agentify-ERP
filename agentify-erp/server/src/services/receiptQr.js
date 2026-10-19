@@ -48,7 +48,7 @@ export function receiptPlans(rc) {
 }
 
 export function buildReceiptQrText(rc, base) {
-  const brand = getSetting('company_name') || 'Expert Marketing & Developers';
+  const brand = getSetting('company_name') || 'Agentify ERP';
   const saleIds = rc.sale_id ? [rc.sale_id] : all('SELECT sale_id FROM receipt_sales WHERE receipt_id=? ORDER BY sale_id', rc.id).map((x) => x.sale_id);
   const lines = [`${brand}`, `${rc.payment_type === 'Refund' ? 'Refund' : 'Receipt'} ${rc.receipt_no} | ${dmy(rc.date)} | ${pkr(rc.amount)}`, `Customer: ${rc.customer_name}${rc.customer_code ? ` (${rc.customer_code})` : ''}`];
   const plans = saleIds.map((id) => planLine(rc, id)).filter(Boolean);

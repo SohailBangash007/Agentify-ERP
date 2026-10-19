@@ -255,7 +255,7 @@ export function ReceiptDetail() {
     <div>
       <div className="no-print"><BackLink to="/receipts">Receipt vouchers</BackLink>
         <PageHead title={<span>{r.receipt_no} <StatusBadge status={r.status} /></span>} sub={`${date(r.date)} · ${r.payment_type}`}>
-          {r.status === 'valid' && r.record?.phone && <button className="btn success" onClick={() => sharePdf({ pdfUrl: `/api/receipts/${r.id}/pdf`, filename: `receipt-${r.receipt_no}.pdf`, phone: r.record.phone, text: WA.receipt({ name: (r.record.customer_name || '').split(' ')[0], amount: r.amount, receipt_no: r.receipt_no, date: r.date }, co.company_name || 'Expert Marketing & Developers') })}><Icon name="whatsapp" size={14} />Share on WhatsApp</button>}
+          {r.status === 'valid' && r.record?.phone && <button className="btn success" onClick={() => sharePdf({ pdfUrl: `/api/receipts/${r.id}/pdf`, filename: `receipt-${r.receipt_no}.pdf`, phone: r.record.phone, text: WA.receipt({ name: (r.record.customer_name || '').split(' ')[0], amount: r.amount, receipt_no: r.receipt_no, date: r.date }, co.company_name || 'Agentify ERP') })}><Icon name="whatsapp" size={14} />Share on WhatsApp</button>}
           <button className="btn primary" onClick={() => download(`/api/receipts/${r.id}/pdf`, pdfParams, `receipt-${r.receipt_no}.pdf`).catch((e) => toast(e.message, 'err'))}><Icon name="download" size={14} />Download PDF</button>
           <button className="btn" onClick={() => printPdf(`/api/receipts/${r.id}/pdf`, pdfParams).catch((e) => toast(e.message, 'err'))}><Icon name="print" size={14} />Print A4</button>
           {r.status === 'valid' && can('payments', 'approve') && <button className="btn danger" onClick={() => setVoiding(true)}>Void receipt</button>}

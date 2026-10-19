@@ -23,6 +23,7 @@ function useData(url) {
 
 function Kpi({ label, k, currency, onClick }) {
   if (!k) return null;
+  if (k.hidden) return <div className="pa-kpi"><div className="l">{label}</div><div className="v">—</div><div className="c">Not included in your role</div></div>;
   const fmt = (v) => (v == null ? '—' : k.percent_unit ? `${v}%` : k.money ? `${currency} ${n0(v)}` : n0(v));
   let delta = null;
   if (k.change != null) {

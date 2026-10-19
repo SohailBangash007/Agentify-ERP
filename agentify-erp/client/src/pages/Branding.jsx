@@ -62,7 +62,7 @@ export default function Branding() {
             </div>
           </Card>
           <Card title="Header & contact details"><div className="form-grid">
-            <Field label="Header / company name" className="full"><input className="input" disabled={ro} value={f.print_header || ''} onChange={(e) => set('print_header', e.target.value)} placeholder="Expert Marketing & Developers" /></Field>
+            <Field label="Header / company name" className="full"><input className="input" disabled={ro} value={f.print_header || ''} onChange={(e) => set('print_header', e.target.value)} placeholder="Your company name" /></Field>
             <Field label="Address" className="full"><input className="input" disabled={ro} value={f.print_address || ''} onChange={(e) => set('print_address', e.target.value)} /></Field>
             <Field label="Contact number"><input className="input" disabled={ro} value={f.print_phone || ''} onChange={(e) => set('print_phone', e.target.value)} placeholder="Mobile: 0300-5551350  |  Ph: 051-5575280" /></Field>
             <Field label="Email"><input className="input" type="email" disabled={ro} value={f.print_email || ''} onChange={(e) => set('print_email', e.target.value)} /></Field>

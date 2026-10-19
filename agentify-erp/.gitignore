@@ -10,3 +10,4 @@ server/uploads/
 .env.*
 !.env.example
 .DS_Store
+server/release.json

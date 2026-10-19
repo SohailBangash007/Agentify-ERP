@@ -36,9 +36,9 @@ async function loginAs(host, identifier, password) {
 }
 
 test('signup sends a welcome email to the new owner', async () => {
-  const r = await call('erp.test', 'POST', '/api/platform/signup', { slug: 'acme', company_name: 'Acme Realty', admin_name: 'Amir', admin_email: 'amir@acme.test', admin_password: PW });
+  const r = await call('erp.test', 'POST', '/api/platform/signup', { accept_terms: true, slug: 'acme', company_name: 'Acme Realty', admin_name: 'Amir', admin_email: 'amir@acme.test', admin_password: PW });
   assert.equal(r.status, 201, JSON.stringify(r.data));
-  await call('erp.test', 'POST', '/api/platform/signup', { slug: 'beta', company_name: 'Beta Homes', admin_name: 'Bilal', admin_email: 'bilal@beta.test', admin_password: PW });
+  await call('erp.test', 'POST', '/api/platform/signup', { accept_terms: true, slug: 'beta', company_name: 'Beta Homes', admin_name: 'Bilal', admin_email: 'bilal@beta.test', admin_password: PW });
   const m = lastMail('amir@acme.test');
   assert.match(m.subject, /Acme Realty is ready/);
   assert.match(m.text, /https:\/\/acme\.erp\.test/);

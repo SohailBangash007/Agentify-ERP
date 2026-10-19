@@ -5,7 +5,7 @@ import { asyncH, bad, notFound, int, jparse, today } from '../util.js';
 import { websiteState } from '../services/website.js';
 import { progressSql, scheduleFor } from '../services/schedule.js';
 import { ingest } from './public.js';
-import { DEFAULT_CONFIG } from '../services/siteDefaults.js';
+import { defaultConfig } from '../services/siteDefaults.js';
 import { sendPdf } from '../services/pdf.js';
 import { buildPlan } from '../../../shared/installmentPlan.js';
 import { botConfig, logChat, reply } from '../services/bot.js';
@@ -23,7 +23,7 @@ export const siteConfig = () => {
   const saved = jparse(getSetting('site_config'), {});
   // `rates` is a user-defined list of grades: replace it as a whole so deleted / renamed grades do not come back from the defaults
   const merge = (a, b) => (Array.isArray(b) || typeof b !== 'object' || b === null ? (b ?? a) : Object.fromEntries([...new Set([...Object.keys(a || {}), ...Object.keys(b)])].map((k) => [k, k in b ? (k !== 'rates' && typeof a?.[k] === 'object' && !Array.isArray(a[k]) ? merge(a[k], b[k]) : b[k]) : a[k]])));
-  return merge(DEFAULT_CONFIG, saved);
+  return merge(defaultConfig(), saved);
 };
 
 const VISIBLE = "p.published=1 AND p.status IN ('available','featured','reserved')";

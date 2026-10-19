@@ -26,6 +26,7 @@ export function PortalLayout() {
         <nav className="row" style={{ gap: 16, marginLeft: 20 }}>
           <NavLink to="/portal" end className={({ isActive }) => (isActive ? 'active' : '')}>My properties</NavLink>
           <NavLink to="/portal/development" className={({ isActive }) => (isActive ? 'active' : '')}>Development</NavLink>
+          <NavLink to="/portal/construction" className={({ isActive }) => (isActive ? 'active' : '')}>Construction</NavLink>
           <NavLink to="/portal/payments" className={({ isActive }) => (isActive ? 'active' : '')}>Payments</NavLink>
           <NavLink to="/portal/documents" className={({ isActive }) => (isActive ? 'active' : '')}>Documents</NavLink>
           <NavLink to="/portal/offers" className={({ isActive }) => (isActive ? 'active' : '')}>Offers</NavLink>
@@ -262,6 +263,27 @@ export function PortalOffers() {
             </div>
           </Card>))}</div>
       )}
+    </div>
+  );
+}
+
+/** Construction progress for the client's own projects: completion, milestones, change orders and site reports. */
+export function PortalConstruction() {
+  const { data, error } = useFetch('/api/portal/construction');
+  if (error) return <div className="alert err">{error}</div>;
+  if (!data) return <Loading />;
+  if (!data.length) return <Empty title="No construction projects" hint="When we build for you, progress appears here." />;
+  return (
+    <div className="stack">
+      {data.map((p) => (
+        <Card key={p.id} title={p.name}>
+          <div className="muted">{[p.location, p.expected_completion && `expected completion ${p.expected_completion}`].filter(Boolean).join(' · ')}</div>
+          {p.percent_complete != null && <div style={{ margin: '10px 0' }}><ProgressBar value={p.percent_complete} tone="green" /><div className="muted">{p.percent_complete}% of the work measured as complete</div></div>}
+          {!!p.milestones.length && <><h4>Milestones</h4><ul>{p.milestones.map((m) => <li key={m.id}>{m.achieved_at ? '✅' : '⬜'} {m.name}{m.due_date ? ` (due ${m.due_date})` : ''}</li>)}</ul></>}
+          {!!p.change_orders.length && <><h4>Changes to the work</h4><ul>{p.change_orders.map((c) => <li key={c.co_no}><b>{c.title}</b> · {c.status === 'approved' ? 'approved' : 'awaiting decision'}{c.days_impact ? ` · ${c.days_impact > 0 ? '+' : ''}${c.days_impact} days` : ''}{c.description ? <div className="muted">{c.description}</div> : null}</li>)}</ul></>}
+          {!!p.reports.length && <><h4>Site updates</h4>{p.reports.map((r) => <div key={r.id} style={{ marginBottom: 8 }}><b>{r.date}</b>{r.weather ? <span className="muted"> · {r.weather}</span> : null}<div style={{ whiteSpace: 'pre-wrap' }}>{r.work_done}</div></div>)}</>}
+        </Card>
+      ))}
     </div>
   );
 }

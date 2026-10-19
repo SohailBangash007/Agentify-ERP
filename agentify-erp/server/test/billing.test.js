@@ -34,7 +34,7 @@ const daysFromNow = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(
 const webhook = (ev, secret = 'whsec_test') => { const raw = JSON.stringify(ev); return call('erp.test', 'POST', '/api/platform/billing/webhook/generic', null, { 'X-Signature': `sha256=${crypto.createHmac('sha256', secret).update(raw).digest('hex')}` }, raw); };
 
 async function workspace(slug) {
-  const r = await call('erp.test', 'POST', '/api/platform/signup', { slug, company_name: `${slug} Co`, admin_name: 'Owner', admin_email: `owner@${slug}.test`, admin_password: PW });
+  const r = await call('erp.test', 'POST', '/api/platform/signup', { accept_terms: true, slug, company_name: `${slug} Co`, admin_name: 'Owner', admin_email: `owner@${slug}.test`, admin_password: PW });
   assert.equal(r.status, 201, JSON.stringify(r.data));
   const host = `${slug}.erp.test`;
   const tok = outbox.filter((m) => m.to === `owner@${slug}.test`).pop().text.match(/verify-email\/(\S+)/)[1];
@@ -44,12 +44,12 @@ async function workspace(slug) {
   return { host, id: r.data.tenant.id, get: (u) => call(host, 'GET', u, null, { cookie: c }), post: (u, b) => call(host, 'POST', u, b || {}, { cookie: c }), put: (u, b) => call(host, 'PUT', u, b || {}, { cookie: c }) };
 }
 
-test('a new workspace starts on a 14-day trial with trial limits', async () => {
+test('a new workspace starts on a 7-day trial (the default) with trial limits', async () => {
   const w = await workspace('trialco');
   const b = await w.get('/api/billing');
   assert.equal(b.status, 200);
   assert.equal(b.data.status, 'trialing'); assert.equal(b.data.locked, false);
-  assert.ok(b.data.days_left >= 13 && b.data.days_left <= 14, `days_left ${b.data.days_left}`);
+  assert.ok(b.data.days_left >= 6 && b.data.days_left <= 7, `days_left ${b.data.days_left}`);
   assert.equal(b.data.usage.seats, 1);
   assert.equal(b.data.plans.length, 3);
 });

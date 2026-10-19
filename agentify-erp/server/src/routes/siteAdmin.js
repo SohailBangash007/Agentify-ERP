@@ -8,7 +8,7 @@ import { uploader } from './helpers.js';
 import { asyncH, bad, notFound, jparse, now } from '../util.js';
 import { siteConfig } from './site.js';
 import { validateSiteConfig, validateSections } from '../services/siteValidate.js';
-import { DEFAULT_CONFIG, defaultPages } from '../services/siteDefaults.js';
+import { defaultConfig, defaultPages } from '../services/siteDefaults.js';
 import { buildKnowledge, reply } from '../services/bot.js';
 import { isHtml, sanitizeHtml, wordCount } from '../services/richText.js';
 
@@ -29,7 +29,7 @@ r.put('/config', can('website', 'edit'), asyncH((req, res) => {
   res.json({ ok: true });
 }));
 r.post('/config/reset', can('website', 'delete'), asyncH((req, res) => {
-  setSetting('site_config', JSON.stringify(DEFAULT_CONFIG));
+  setSetting('site_config', JSON.stringify(defaultConfig()));
   audit(req, 'Reset website settings', 'website');
   res.json({ ok: true });
 }));

@@ -75,7 +75,7 @@ r.get('/search', requireStaff, asyncH((req, res) => {
 }));
 
 // ---------------- Documents
-const ENTITY_MODULE = { contact: 'crm', customer: 'customers', property: 'properties', project: 'projects', employee: 'hrm', vendor: 'vendors', tender: 'vendors', bid: 'vendors', receipt: 'payments', expense: 'accounting', sale: 'sales' };
+const ENTITY_MODULE = { con_report: 'construction', purchase_order: 'construction', subcontract: 'construction', estimate: 'construction', contact: 'crm', customer: 'customers', property: 'properties', project: 'projects', employee: 'hrm', vendor: 'vendors', tender: 'vendors', bid: 'vendors', receipt: 'payments', expense: 'accounting', sale: 'sales' };
 function docAccess(req, entityType, entityId, action) {
   const mod = ENTITY_MODULE[entityType];
   if (!mod) throw bad('Unsupported document target');

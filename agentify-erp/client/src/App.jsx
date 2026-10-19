@@ -27,7 +27,7 @@ import { CreditBook, ExpenseDetail, ExpenseForm, ExpenseList, VendorDetail, Vend
 import { EmployeeDocuments, EmployeeProfile, Employees, HrReports, Recruitment, Salary } from './pages/Hrm.jsx';
 import Reports from './pages/Reports.jsx';
 import { AuditLog, CategorySettings, CommissionRules, CustomFields, LeadStages, NotificationSettings, NotificationsPage, PaymentMethods, PropertySettings, Roles, SystemSettings, Users, LookupSettings } from './pages/Settings.jsx';
-import { PortalDashboard, PortalDevelopment, PortalDocuments, PortalLayout, PortalNotifications, PortalOffers, PortalPayments, PortalProperty } from './pages/Portal.jsx';
+import { PortalDashboard, PortalDevelopment, PortalDocuments, PortalLayout, PortalNotifications, PortalOffers, PortalPayments, PortalProperty, PortalConstruction } from './pages/Portal.jsx';
 import Security from './pages/Security.jsx';
 import { MyAttendance, MyLeave, MyPayroll, MyProfile, MyTasks } from './pages/MySpace.jsx';
 import { AttendanceBoard, Assets, LeaveBoard } from './pages/HrExtras.jsx';
@@ -42,15 +42,19 @@ import BotKnowledge from './pages/BotKnowledge.jsx';
 import { VendorBids, VendorDashboard, VendorLayout, VendorLedger, VendorPayments, VendorProfile, VendorTenderDetail, VendorTenders } from './pages/VendorPortal.jsx';
 import Customer360 from './pages/Customer360.jsx';
 import PlatformConsole from './pages/PlatformConsole.jsx';
-import Landing from './pages/Landing.jsx';
+import MarketingSite from './marketing/Marketing.jsx';
 import { VerifyEmail } from './pages/AuthPages.jsx';
+import { ConstructionOverview, ConstructionProject, EstimatesPage, MaterialsPage, PurchaseOrdersPage, SubcontractsPage } from './pages/Construction.jsx';
 
-/** Main-domain home: the product page; on a workspace address (or a single-company install) it goes to that site as before. */
-function Home() {
+/**
+ * Main domain (multi-tenant mode): the public website. On a workspace address, or in a single-company install, the same
+ * paths keep their old meaning ("/" goes to the company's own /site, /login and /signup are the workspace pages).
+ */
+function MainGate({ fallback }) {
   const [info, setInfo] = useState(null);
   useEffect(() => { api.get('/api/platform/site').then(setInfo).catch(() => setInfo({ landing: false })); }, []);
   if (!info) return <Loading />;
-  return info.landing ? <Landing info={info} /> : <Navigate to="/site" replace />;
+  return info.landing ? <MarketingSite /> : fallback;
 }
 
 /** Route-level permission gate (the API enforces the same rules; this just avoids dead-end pages). */
@@ -79,11 +83,12 @@ export default function App() {
   if (!user) {
     return (
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<MainGate fallback={<Navigate to="/site" replace />} />} />
+        {['/real-estate', '/construction', '/pricing', '/contact', '/legal/:slug'].map((p) => <Route key={p} path={p} element={<MainGate fallback={<Navigate to="/login" replace />} />} />)}
         <Route path="/portal/login" element={<Login portal />} />
         <Route path="/vendor/login" element={<Login portal vendor />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
+        <Route path="/login" element={<MainGate fallback={<Login />} />} />
+        <Route path="/signup" element={<MainGate fallback={<Signup />} />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/invite/:token" element={<AcceptInvite />} />
@@ -107,7 +112,7 @@ export default function App() {
       <Routes>
         <Route path="/portal" element={<PortalLayout />}>
           <Route index element={<PortalDashboard />} /><Route path="property/:id" element={<PortalProperty />} /><Route path="development" element={<PortalDevelopment />} />
-          <Route path="payments" element={<PortalPayments />} /><Route path="notifications" element={<PortalNotifications />} /><Route path="documents" element={<PortalDocuments />} /><Route path="offers" element={<PortalOffers />} />
+          <Route path="payments" element={<PortalPayments />} /><Route path="notifications" element={<PortalNotifications />} /><Route path="documents" element={<PortalDocuments />} /><Route path="offers" element={<PortalOffers />} /><Route path="construction" element={<PortalConstruction />} />
         </Route>
         <Route path="*" element={<Navigate to="/portal" replace />} />
       </Routes>
@@ -154,6 +159,13 @@ export default function App() {
         <Route path="projects/financials" element={G('accounting', <ProjectFinancials />)} />
         <Route path="projects/map" element={G('properties', <PlotMap />)} />
         <Route path="projects/:id" element={G('projects', <ProjectWorkspace />)} />
+        {/* Construction */}
+        <Route path="construction" element={G('construction', <ConstructionOverview />)} />
+        <Route path="construction/projects/:id" element={G('construction', <ConstructionProject />)} />
+        <Route path="construction/estimates" element={G('construction', <EstimatesPage />)} />
+        <Route path="construction/purchase-orders" element={G('construction', <PurchaseOrdersPage />)} />
+        <Route path="construction/materials" element={G('construction', <MaterialsPage />)} />
+        <Route path="construction/subcontracts" element={G('construction', <SubcontractsPage />)} />
         {/* Customers & sales */}
         <Route path="customers" element={G('customers', <CustomerList />)} />
         <Route path="customers/active" element={G('customers', <CustomerList segment="active" />)} />

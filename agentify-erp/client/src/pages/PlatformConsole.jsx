@@ -10,9 +10,74 @@ import { AdminsPage, SessionsPage, LoginsPage, AuditPage, MaintenancePage } from
 import { ReportsPage, ReconciliationPage } from './platform/Reports.jsx';
 import { Dashboard, HealthPage, NotificationsPage, SetupPage } from './platform/Dashboard.jsx';
 import { PlansPage, TransactionsPage, SubscriptionHistoryPage } from './platform/Billing.jsx';
+import { FinancePage } from './platform/Finance.jsx';
+import { AnalyticsPage, WebsitePage, DemoRequestsPage, AnnouncementsPage, IntegrationsPage } from './platform/Content.jsx';
 
 const A = '/api/platform/admin';
 const SLOT_LABEL = (s) => s.replace('_', ' · ').replace(/^./, (c) => c.toUpperCase());
+
+/** First run: create the Platform Owner with the one-time token from the server (no default account exists). */
+function FirstRun({ onDone }) {
+  const [f, setF] = useState({ token: '', name: '', email: '', password: '', confirm: '' });
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
+  const go = async (e) => {
+    e.preventDefault(); setErr('');
+    if (f.password !== f.confirm) { setErr('The two passwords do not match'); return; }
+    setBusy(true);
+    try { await api.post(`${A}/setup`, { token: f.token, name: f.name, email: f.email, password: f.password }); onDone(); } catch (x) { setErr(x.message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="empty" style={{ paddingTop: 60 }}>
+      <form onSubmit={go} style={{ width: 380, maxWidth: '92vw', textAlign: 'left' }}>
+        <h2 style={{ textAlign: 'center' }}>Set up Agentify ERP</h2>
+        <p className="muted">Create the Platform Owner account. The one-time setup token is in <code>platform-setup-token.txt</code> in the server's data folder, or run <code>npm run platform:setup-token</code> on the server.</p>
+        {err && <div className="alert err">{err}</div>}
+        <Field label="Setup token" required><TextInput autoComplete="off" value={f.token} onChange={set('token')} autoFocus /></Field>
+        <Field label="Your name"><TextInput value={f.name} onChange={set('name')} /></Field>
+        <Field label="Email" required><TextInput type="email" value={f.email} onChange={set('email')} /></Field>
+        <Field label="Password" required hint="10+ characters using at least three of: lower case, capitals, digits, symbols."><TextInput type="password" autoComplete="new-password" value={f.password} onChange={set('password')} /></Field>
+        <Field label="Repeat password" required><TextInput type="password" autoComplete="new-password" value={f.confirm} onChange={set('confirm')} /></Field>
+        <button className="btn primary" style={{ width: '100%' }} disabled={busy}>{busy ? 'Creating…' : 'Create owner account'}</button>
+        <p className="muted" style={{ fontSize: 12 }}>After signing in, turn on two-factor sign-in under Security.</p>
+      </form>
+    </div>
+  );
+}
+
+/** A console invitation: the invitee picks their own password. */
+function AcceptInvite({ token }) {
+  const [info, setInfo] = useState(undefined);
+  const [f, setF] = useState({ name: '', password: '', confirm: '' });
+  const [err, setErr] = useState('');
+  const [done, setDone] = useState(false);
+  const nav = useNavigate();
+  useEffect(() => { api.get(`${A}/invite/${token}`).then((d) => { setInfo(d); setF((x) => ({ ...x, name: d.name || '' })); }).catch((e) => { setInfo(null); setErr(e.message); }); }, [token]);
+  if (info === undefined) return <Loading />;
+  const go = async (e) => {
+    e.preventDefault(); setErr('');
+    if (f.password !== f.confirm) { setErr('The two passwords do not match'); return; }
+    try { await api.post(`${A}/invite/accept`, { token, name: f.name, password: f.password }); setDone(true); } catch (x) { setErr(x.message); }
+  };
+  return (
+    <div className="empty" style={{ paddingTop: 60 }}>
+      <div style={{ width: 380, maxWidth: '92vw', textAlign: 'left' }}>
+        <h2 style={{ textAlign: 'center' }}>Join the platform console</h2>
+        {err && <div className="alert err">{err}</div>}
+        {done ? <><p>Your account is ready. Sign in with {info.email}.</p><button className="btn primary" onClick={() => nav('/platform')}>Go to sign in</button></> : info && (
+          <form onSubmit={go}>
+            <p>You were invited as <b>{info.role}</b> with <b>{info.email}</b>.</p>
+            <Field label="Your name"><TextInput value={f.name} onChange={(v) => setF({ ...f, name: v })} /></Field>
+            <Field label="Choose a password" required hint="10+ characters using at least three of: lower case, capitals, digits, symbols."><TextInput type="password" autoComplete="new-password" value={f.password} onChange={(v) => setF({ ...f, password: v })} /></Field>
+            <Field label="Repeat password" required><TextInput type="password" autoComplete="new-password" value={f.confirm} onChange={(v) => setF({ ...f, confirm: v })} /></Field>
+            <button className="btn primary" style={{ width: '100%' }}>Activate account</button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function SignIn({ onDone }) {
   const [f, setF] = useState({ email: '', password: '' });
@@ -226,6 +291,12 @@ function ConsoleRoutes() {
         <Route path="workspaces/*" element={<Allowed perm="workspaces.view">{page(filterLabel, 'Every company on the platform, with setup progress, usage and access dates. Click a row to manage it.', <Workspaces onOpen={open} />)}</Allowed>} />
         <Route path="expiry" element={<Allowed perm="workspaces.view">{page('Renewals & expiry', 'Trials and paid periods by how soon they end.', <Expiry onOpen={open} />)}</Allowed>} />
         <Route path="plans" element={<Allowed perm="billing.view"><PlansPage /></Allowed>} />
+        <Route path="analytics" element={<Allowed perm="analytics.view"><AnalyticsPage /></Allowed>} />
+        <Route path="website" element={<Allowed perm="content.manage"><WebsitePage /></Allowed>} />
+        <Route path="demo-requests" element={<Allowed perm="workspaces.view"><DemoRequestsPage /></Allowed>} />
+        <Route path="announcements" element={<Allowed perm="dashboard.view"><AnnouncementsPage /></Allowed>} />
+        <Route path="integrations" element={<Allowed perm="system.view"><IntegrationsPage /></Allowed>} />
+        <Route path="finance" element={<Allowed perm="finance.view"><FinancePage /></Allowed>} />
         <Route path="transactions" element={<Allowed perm="billing.view"><TransactionsPage /></Allowed>} />
         <Route path="subscriptions/history" element={<Allowed perm="billing.view"><SubscriptionHistoryPage /></Allowed>} />
         <Route path="payments" element={<Allowed perm="billing.view">{page('Payment approvals', 'Bank and wallet payments waiting for you to confirm the money arrived.', <Payments />)}</Allowed>} />
@@ -248,13 +319,22 @@ function ConsoleRoutes() {
 }
 
 export default function PlatformConsole() {
+  const loc = useLocation();
+  const invite = loc.pathname.match(/^\/platform\/accept-invite\/([\w-]+)/);
+  if (invite) return <AcceptInvite token={invite[1]} />;
+  return <ConsoleApp />;
+}
+
+function ConsoleApp() {
   const [me, setMe] = useState(undefined);
+  const [firstRun, setFirstRun] = useState(false);
   const [pw, setPw] = useState(null);
   const toast = useToast();
-  const loadMe = useCallback(() => api.get(`${A}/me`).then(setMe).catch(() => setMe(null)), []);
+  const loadMe = useCallback(() => api.get(`${A}/me`).then(setMe).catch(() => { setMe(null); api.get(`${A}/setup/status`).then((d) => setFirstRun(!!d.needed)).catch(() => {}); }), []);
   useEffect(() => { loadMe(); }, [loadMe]);
   useEffect(() => { const h = () => loadMe(); window.addEventListener('pa:me', h); return () => window.removeEventListener('pa:me', h); }, [loadMe]);
   if (me === undefined) return <Loading />;
+  if (!me && firstRun) return <FirstRun onDone={() => { setFirstRun(false); loadMe(); }} />;
   if (!me) return <SignIn onDone={loadMe} />;
   const out = async () => { try { await api.post(`${A}/logout`); } catch { /* ignore */ } setMe(null); };
   const changePw = async () => { try { await api.post(`${A}/change-password`, pw); setPw(null); toast('Password changed'); } catch (e) { toast(e.message, 'err'); } };

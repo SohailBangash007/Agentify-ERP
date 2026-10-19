@@ -7,7 +7,9 @@
     "start": "node --disable-warning=ExperimentalWarning src/index.js",
     "dev": "node --disable-warning=ExperimentalWarning --watch src/index.js",
     "seed": "node --disable-warning=ExperimentalWarning src/reset.js",
-    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
+    "platform:setup-token": "node --disable-warning=ExperimentalWarning src/cli.js setup-token",
+    "platform:lifecycle": "node --disable-warning=ExperimentalWarning src/cli.js lifecycle"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

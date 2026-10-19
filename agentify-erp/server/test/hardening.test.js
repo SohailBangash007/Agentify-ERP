@@ -35,7 +35,7 @@ let owner, ownerCookie;
 const as = (cookie) => ({ get: (u) => call(H, 'GET', u, null, { cookie }), post: (u, b) => call(H, 'POST', u, b || {}, { cookie }) });
 
 test('email confirmation: the owner cannot invite until the link from the welcome email is used once', async () => {
-  const r = await call(P, 'POST', '/api/platform/signup', { slug: 'hard', company_name: 'Hard Co', admin_name: 'Owner', admin_email: 'owner@hard.test', admin_password: PW });
+  const r = await call(P, 'POST', '/api/platform/signup', { accept_terms: true, slug: 'hard', company_name: 'Hard Co', admin_name: 'Owner', admin_email: 'owner@hard.test', admin_password: PW });
   assert.equal(r.status, 201, r.text);
   const l = await call(H, 'POST', '/api/auth/login', { identifier: 'owner@hard.test', password: PW });
   ownerCookie = l.cookie; owner = as(l.cookie);

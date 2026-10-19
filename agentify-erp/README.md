@@ -1,6 +1,11 @@
-# Expert Marketing & Developers ERP
+# Agentify ERP
 
-One integrated Real-Estate ERP: CRM → sales → properties/projects → installments → receipts → accounting → development → customer portal → website API.
+A multi-tenant SaaS platform with two products: **Real Estate Brokerage Management** (CRM → sales → properties/projects → installments → receipts → accounting → customer portal → website) and **Construction Management** (projects, sites, BOQs, estimates, budgets, procurement, materials, labour, subcontracts, change orders, payment certificates, site reports, client portal). Each company gets its own workspace and database.
+
+* **Operating the SaaS** (setup, tenancy, jobs, deployment): [docs/SAAS_OPERATIONS.md](docs/SAAS_OPERATIONS.md)
+* **Plans, trials, billing and revenue formulas**: [docs/BILLING.md](docs/BILLING.md)
+* **What was built in the SaaS conversion**: [docs/IMPLEMENTATION_REPORT.md](docs/IMPLEMENTATION_REPORT.md)
+
 Architecture and data model: see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 **Stack:** Node 22+ (uses built-in `node:sqlite`) · Express API · SQLite · React + Vite SPA. No external services required.
@@ -17,7 +22,7 @@ npm start               # http://localhost:4000  (API + app)
 Development with hot reload: `npm run dev:server` and `npm run dev:client` (client on :5173 proxies to :4000).
 First start with an empty database auto-loads the demo data (set `ERP_DEMO=0` to skip it and get only the base configuration + one Super Admin; use `ADMIN_EMAIL` / `ADMIN_PASSWORD` to choose its credentials).
 
-### Demo logins (password `Demo@12345`)
+### Demo logins (single-company demo data only; password `Demo@12345`; never use on a real server)
 | Role | Login |
 |---|---|
 | Super Admin | admin@expertdevelopers.pk |

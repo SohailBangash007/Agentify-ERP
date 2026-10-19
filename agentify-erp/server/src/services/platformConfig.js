@@ -71,7 +71,8 @@ export function audit(admin, action, detail, { outcome = 'success' } = {}) {
 // ---- Stripe settings ------------------------------------------------------------------------------------------
 export const STRIPE_MODES = ['test', 'live'];
 /** One Stripe price per plan and interval; follows the plans defined in the console. */
-export const priceSlots = () => Object.keys(PLANS).flatMap((p) => ['month', 'year'].map((i) => `${p}_${i}`));
+// a plan with a setup fee also gets a one-time Stripe price slot (<plan>_setup) charged with the first checkout
+export const priceSlots = () => Object.keys(PLANS).flatMap((p) => [...['month', 'year'].map((i) => `${p}_${i}`), ...(Object.keys(PLANS[p].setup_fee || {}).length ? [`${p}_setup`] : [])]);
 const KEY_RULES = {
   secret_key: { re: /^(sk|rk)_(test|live)_[A-Za-z0-9]+$/, label: 'Secret key (starts with sk_ or rk_)' },
   publishable_key: { re: /^pk_(test|live)_[A-Za-z0-9]+$/, label: 'Publishable key (starts with pk_)' },

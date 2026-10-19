@@ -52,11 +52,14 @@ function Hero({ user, d, range, setRange, today }) {
 function QuickActions() {
   const { can } = useAuth();
   const nav = useNavigate();
+  const products = useFetch('/api/billing/status').data?.products;
+  const re = !products || products.includes('real_estate'), con = !!products?.includes('construction');
   const items = [
     ['New lead', 'plus', 'blue', '/contacts?new=1', can('crm', 'create')], ['Receive payment', 'receipt', 'green', '/receipts/new', can('payments', 'create')],
-    ['New voucher', 'wallet', 'teal', '/expenses/new', can('accounting', 'create')], ['Book a plot', 'badge', 'violet', '/sales/new', can('sales', 'create')],
+    ['New voucher', 'wallet', 'teal', '/expenses/new', can('accounting', 'create')], ['Book a plot', 'badge', 'violet', '/sales/new', re && can('sales', 'create')], ['Construction projects', 'hardhat', 'violet', '/construction', con && can('construction', 'view')],
+    ['Site report', 'file', 'blue', '/construction', con && can('construction', 'create')],
     ['Mark attendance', 'clock', 'orange', '/hrm/attendance', can('hrm', 'create')], ['Leave requests', 'calendar', 'violet', '/hrm/leave', can('hrm', 'edit')],
-    ['Plot map', 'grid', 'orange', '/projects/map', can('properties', 'view')], ['Asset library', 'layers', 'slate', '/assets', can('hrm', 'view') || can('accounting', 'view')], ['My tasks', 'check', 'rose', '/my/tasks', true],
+    ['Plot map', 'grid', 'orange', '/projects/map', re && can('properties', 'view')], ['Asset library', 'layers', 'slate', '/assets', can('hrm', 'view') || can('accounting', 'view')], ['My tasks', 'check', 'rose', '/my/tasks', true],
   ].filter((x) => x[4]);
   return (
     <div className="quick" aria-label="Quick actions">

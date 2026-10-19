@@ -39,12 +39,12 @@ async function api(path, body) {
 }
 
 /** Hosted Stripe Checkout for a subscription. The tenant id travels with the session and the subscription. */
-export async function createCheckout(tenant, { plan, interval, email, origin }) {
+export async function createCheckout(tenant, { plan, interval, email, origin, firstPayment = false }) {
   const price = priceId(plan, interval);
   if (!price) throw new HttpError(503, 'Card payment is not configured for this plan yet');
   const meta = { tenant_id: String(tenant.id), plan, interval };
   const s = await api('checkout/sessions', {
-    mode: 'subscription', 'line_items': { 0: { price, quantity: 1 } }, client_reference_id: String(tenant.id),
+    mode: 'subscription', 'line_items': { 0: { price, quantity: 1 }, ...(firstPayment && priceId(plan, 'setup') ? { 1: { price: priceId(plan, 'setup'), quantity: 1 } } : {}) }, client_reference_id: String(tenant.id),
     ...(tenant.provider_customer_id && tenant.billing_provider === 'stripe' ? { customer: tenant.provider_customer_id } : { customer_email: email }),
     success_url: `${origin}/settings/billing?paid=1`, cancel_url: `${origin}/settings/billing`,
     metadata: meta, subscription_data: { metadata: meta }, allow_promotion_codes: 'true',
@@ -122,6 +122,13 @@ export function mapEvent(ev, lookup = () => null) {
     case 'invoice.payment_succeeded':
       return { ...base, type: 'invoice.paid', tenant_id: o.subscription_details?.metadata?.tenant_id || lookup(o.customer, o.subscription), customer_id: o.customer, subscription_id: o.subscription,
         invoice: { id: o.id, amount: Math.round((o.amount_paid || 0) / 100), currency: o.currency, status: 'paid', url: o.hosted_invoice_url, period_start: day(o.period_start), period_end: day(o.period_end) } };
+    case 'charge.refunded': {
+      // the newest refund on the charge; the invoice it paid identifies what is being refunded
+      const rf = o.refunds?.data?.[0];
+      if (!o.invoice) return null;
+      return { ...base, type: 'payment.refunded', tenant_id: o.metadata?.tenant_id || lookup(o.customer, null), customer_id: o.customer,
+        refund: { id: rf?.id || `${o.id}:${o.amount_refunded}`, amount: Math.round((rf?.amount ?? o.amount_refunded ?? 0) / 100), invoice: o.invoice, reason: rf?.reason || null } };
+    }
     case 'invoice.payment_failed':
       return { ...base, type: 'payment.failed', tenant_id: o.subscription_details?.metadata?.tenant_id || lookup(o.customer, o.subscription), customer_id: o.customer, subscription_id: o.subscription };
     default: return null;
