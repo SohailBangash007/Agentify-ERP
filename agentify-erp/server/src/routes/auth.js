@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
-import { get, run, getSetting } from '../db.js';
+import { all, get, run, getSetting, currentDb } from '../db.js';
 import { signToken, signMfaToken, readMfaToken, loadUser, requireAuth } from '../rbac.js';
 import { encrypt, decrypt } from '../services/platformConfig.js';
 import { newSecret, verifyCode, otpauthUrl, qrDataUrl, newRecoveryCodes, useRecoveryCode } from '../services/totp.js';
@@ -130,7 +130,22 @@ r.post('/logout', requireAuth, asyncH((req, res) => {
 }));
 
 /** Public: the workspace's display name, so sign-in pages and the portals show the right company. */
-r.get('/brand', (_req, res) => res.json({ name: getSetting('company_name', '') || 'Agentify ERP' }));
+/**
+ * Demo sign-in shortcuts for this workspace: only the accounts that really exist here, are flagged as demo data and still
+ * use the published demo password. Never offered in production.
+ */
+const demoCache = new WeakMap();
+function demoLogins() {
+  if (process.env.NODE_ENV === 'production') return [];
+  const key = currentDb();
+  const cached = demoCache.get(key);
+  if (cached && Date.now() - cached.at < 60_000) return cached.list;
+  const list = all("SELECT u.email, r.name role, u.password_hash FROM users u JOIN roles r ON r.id=u.role_id WHERE u.is_demo=1 AND u.active=1 AND r.portal=0 AND u.email IS NOT NULL ORDER BY u.id")
+    .filter((u) => bcrypt.compareSync('Demo@12345', u.password_hash)).map((u) => ({ role: u.role, email: u.email }));
+  demoCache.set(key, { at: Date.now(), list });
+  return list;
+}
+r.get('/brand', (_req, res) => res.json({ name: getSetting('company_name', '') || 'Agentify ERP', demo_logins: demoLogins() }));
 
 r.get('/me', requireAuth, (req, res) => res.json(sessionPayload(req.user)));
 
