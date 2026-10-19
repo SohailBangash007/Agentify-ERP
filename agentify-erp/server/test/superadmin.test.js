@@ -232,7 +232,7 @@ test('workspace profile, status reasons and notes', async () => {
 
 test('roles: each console role can only do what it is allowed; denials are audited', async () => {
   for (const [email, role] of [['fin@agentify.test', 'finance_admin'], ['ro@agentify.test', 'read_only'], ['cs@agentify.test', 'customer_success']]) {
-    assert.equal((await adm('POST', '/admins', { email, name: role, password: 'Role@123456', role })).status, 201);
+    const made = await adm('POST', '/admins', { email, name: role, password: 'Role@123456', role }); assert.equal(made.status, 201, JSON.stringify(made.data));
   }
   assert.equal((await adm('POST', '/admins', { email: 'x@agentify.test', password: 'Role@123456', role: 'god' })).status, 400);
   const fin = await signIn('fin@agentify.test', 'Role@123456'), ro = await signIn('ro@agentify.test', 'Role@123456'), cs = await signIn('cs@agentify.test', 'Role@123456');
@@ -264,7 +264,7 @@ test('audit log: records role, IP and request id; cannot be edited or deleted', 
   const r = await adm('POST', `/workspaces/${acme.id}/notes`, { body: 'Audit check' });
   assert.equal(r.status, 201);
   const row = (await adm('GET', '/audit/search?action=note-added')).data.rows[0];
-  assert.equal(row.actor_role, 'super_admin'); assert.ok(row.ip); assert.ok(row.request_id); assert.equal(row.outcome, 'success'); assert.equal(row.target, `workspace#${acme.id}`);
+  assert.equal(row.actor_role, 'platform_owner', 'the first account is the Platform Owner'); assert.ok(row.ip); assert.ok(row.request_id); assert.equal(row.outcome, 'success'); assert.equal(row.target, `workspace#${acme.id}`);
   assert.throws(() => platformDb().prepare("UPDATE platform_audit SET action='x' WHERE id=?").run(row.id), /append-only/);
   assert.throws(() => platformDb().prepare('DELETE FROM platform_audit WHERE id=?').run(row.id), /append-only/);
 });

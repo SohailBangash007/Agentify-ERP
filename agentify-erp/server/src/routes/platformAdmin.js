@@ -19,6 +19,7 @@ import { listPlans, savePlan, savePlanSettings } from '../services/plansStore.js
 import { PLAN_SETTINGS, MODULES } from '../services/plans.js';
 import { setSubscription } from '../services/billing.js';
 import { subscriptionHistory } from '../services/subscriptions.js';
+import { setupNeeded, completeSetup, inviteAdmin, inviteInfo, acceptInvite } from '../services/platformStaff.js';
 
 const r = Router();
 // every console request gets a request id and its IP / browser recorded with any audit row it writes
@@ -43,6 +44,25 @@ r.post('/login/mfa', limiter, asyncH((req, res) => {
   res.cookie(COOKIE, token, cookieOpts);
   audit(admin.email, 'login (2fa)');
   res.json(admin);
+}));
+// ---- First-run owner setup (open only while no console account exists) and console invitations
+const platformOnly = (req, write = false) => {
+  if (!onPlatformHost(req)) throw new HttpError(404, 'Not found');
+  if (write && req.headers['x-requested-with'] !== 'ERP') throw new HttpError(403, 'CSRF check failed');
+};
+r.get('/setup/status', (req, res) => { platformOnly(req); res.json({ needed: setupNeeded() }); });
+r.post('/setup', limiter, asyncH((req, res) => {
+  platformOnly(req, true);
+  const out = completeSetup(req.body || {});
+  audit(out.email, 'platform-owner-created', { via: 'setup-token' });
+  res.status(201).json({ ok: true, email: out.email });
+}));
+r.get('/invite/:token', limiter, asyncH((req, res) => { platformOnly(req); res.json(inviteInfo(req.params.token)); }));
+r.post('/invite/accept', limiter, asyncH((req, res) => {
+  platformOnly(req, true);
+  const out = acceptInvite(req.body || {});
+  audit(out.email, 'invitation-accepted');
+  res.json({ ok: true, email: out.email });
 }));
 const adminOnly = (req) => { if (req.operator.via !== 'session') throw bad('Sign in as an admin to manage two-factor sign-in'); };
 r.get('/2fa', requireOperator, need('self'), (req, res) => { adminOnly(req); res.json(twofaStatus(req.operator.id)); });
@@ -127,7 +147,7 @@ r.post('/workspaces', requireOperator, need('workspaces.create'), asyncH((req, r
   res.status(201).json(t);
 }));
 r.get('/workspaces/:id', requireOperator, need('workspaces.view'), asyncH((req, res) => res.json(tenantDetail(req.params.id, req))));
-r.post('/workspaces/:id/trial', requireOperator, need('workspaces.edit'), asyncH((req, res) => {
+r.post('/workspaces/:id/trial', requireOperator, need('trials.manage'), asyncH((req, res) => {
   const t = extendTrial(req.params.id, req.body || {}, req.operator.email);
   audit(req.operator.email, 'trial-extended', { slug: t.slug, until: t.trial_ends_at, reason: req.body?.reason });
   res.json(tenantDetail(t.id, req));
@@ -292,19 +312,25 @@ r.get('/reconciliation', requireOperator, need('billing.view'), (_req, res) => r
 r.get('/admins', requireOperator, need('admins.manage'), (req, res) => res.json({ me: req.operator.id ?? null, admins: listAdmins(), roles: Object.fromEntries(Object.entries(ROLES).map(([k, v]) => [k, { label: v.label, perms: v.perms }])), permissions: PERMISSIONS }));
 r.patch('/admins/:id', requireOperator, need('admins.manage'), asyncH((req, res) => {
   adminOnly(req);
-  const out = updateAdmin(req.params.id, req.body || {}, req.operator.id);
+  const out = updateAdmin(req.params.id, req.body || {}, req.operator.id, req.operator);
   if (out.changed.length) audit(req.operator.email, 'admin-changed', { email: out.admin.email, from: out.before, to: { role: out.admin.role, active: out.admin.active }, reason: req.body?.reason });
   res.json(out.admin);
 }));
-r.post('/admins', requireOperator, need('admins.manage'), limiter, asyncH((req, res) => {
+r.post('/admins', requireOperator, need('admins.manage'), limiter, asyncH(async (req, res) => {
   adminOnly(req);
-  const a = addAdmin(req.body || {});
+  // without a password the person is invited by email and chooses their own (recommended); with one, the account is ready at once
+  if (!req.body?.password) {
+    const inv = await inviteAdmin(req.body || {}, req.operator, `${req.protocol}://${req.get('host')}`);
+    audit(req.operator.email, 'admin-invited', { email: inv.email, role: inv.role, emailed: inv.emailed });
+    return res.status(201).json(inv);
+  }
+  const a = addAdmin(req.body || {}, req.operator);
   audit(req.operator.email, 'admin-added', { email: a.email, role: a.role });
   res.status(201).json(a);
 }));
 r.delete('/admins/:id', requireOperator, need('admins.manage'), asyncH((req, res) => {
   adminOnly(req);
-  const gone = removeAdmin(req.params.id, req.operator.id);
+  const gone = removeAdmin(req.params.id, req.operator.id, req.operator);
   audit(req.operator.email, 'admin-removed', { email: gone.email, id: gone.id });
   res.json({ ok: true });
 }));

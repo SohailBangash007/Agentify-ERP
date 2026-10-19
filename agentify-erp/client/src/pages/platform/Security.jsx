@@ -37,13 +37,14 @@ export function AdminsPage() {
   const [sec, setSec] = useState(null);
   useEffect(() => { api.get(`${A}/security-settings`).then(setSec).catch(() => {}); }, []);
   const patch = async (a, body, msg) => { try { await api.patch(`${A}/admins/${a.id}`, body); toast(msg); load(); } catch (e) { toast(e.message, 'err'); } };
-  const save = async () => { try { await api.post(`${A}/admins`, add); setAdd(null); toast('Console user added'); load(); } catch (e) { toast(e.message, 'err'); } };
+  const [link, setLink] = useState(null);
+  const save = async () => { try { const out = await api.post(`${A}/admins`, { name: add.name, email: add.email, role: add.role }); setAdd(null); if (out.link) setLink(out); else toast(`Invitation emailed to ${out.email}`); load(); } catch (e) { toast(e.message, 'err'); } };
   const setRequire = async (v) => { try { setSec(await api.put(`${A}/security-settings`, { require_2fa: v })); toast(v ? 'Two-factor is now required for every console user' : 'Two-factor is now optional'); } catch (e) { toast(e.message, 'err'); } };
   return (
     <>
       <PageTitle title="Console users & roles" sub="People who can sign in to this super admin console. Each role allows a fixed set of actions; every action is checked on the server.">
         <button className="btn sm" onClick={() => setRoles(true)}>What each role can do</button>
-        <button className="btn primary sm" onClick={() => setAdd({ name: '', email: '', password: '', role: 'read_only' })}>Add console user</button>
+        <button className="btn primary sm" onClick={() => setAdd({ name: '', email: '', role: 'read_only' })}>Invite console user</button>
       </PageTitle>
       <ErrorBox error={err} />
       {sec && <Card title="Security rules">
@@ -55,7 +56,7 @@ export function AdminsPage() {
           <div className="table-wrap"><table className="t"><thead><tr><th>User</th><th>Role</th><th>Two-factor</th><th>Last sign-in</th><th>Access</th><th /></tr></thead><tbody>
             {d.admins.map((a) => (
               <tr key={a.id}>
-                <td><b>{a.name}</b>{a.id === d.me && <span className="muted"> (you)</span>}<div className="muted">{a.email}</div></td>
+                <td><b>{a.name}</b>{a.id === d.me && <span className="muted"> (you)</span>}<div className="muted">{a.email}</div>{a.status === 'invited' && <StatusBadge status="pending" label="Invitation sent" />}{a.status === 'invite_expired' && <StatusBadge status="overdue" label="Invitation expired" />}</td>
                 <td>{a.id === d.me ? a.role_label : <select className="input" style={{ width: 230 }} value={a.role} aria-label={`Role of ${a.email}`} onChange={(e) => patch(a, { role: e.target.value }, 'Role changed. Their sessions were signed out.')}>{Object.entries(d.roles).map(([k, r]) => <option key={k} value={k}>{r.label}</option>)}</select>}</td>
                 <td><StatusBadge status={a.totp_enabled ? 'active' : 'inactive'} label={a.totp_enabled ? 'On' : 'Off'} /></td>
                 <td className="nowrap">{ago(a.last_login)}</td>
@@ -67,11 +68,18 @@ export function AdminsPage() {
         </Card>
       )}
       {add && d && (
-        <Modal title="Add console user" onClose={() => setAdd(null)} footer={<><button className="btn" onClick={() => setAdd(null)}>Cancel</button><button className="btn primary" onClick={save}>Add</button></>}>
+        <Modal title="Invite console user" onClose={() => setAdd(null)} footer={<><button className="btn" onClick={() => setAdd(null)}>Cancel</button><button className="btn primary" onClick={save}>Send invitation</button></>}>
+          <p className="muted">They get a one-time link (valid 72 hours) to choose their own password. Nobody else ever knows it.</p>
           <Field label="Name"><TextInput value={add.name} onChange={(v) => setAdd({ ...add, name: v })} /></Field>
           <Field label="Email" required><TextInput type="email" value={add.email} onChange={(v) => setAdd({ ...add, email: v })} /></Field>
           <Field label="Role" hint="Give the smallest role that lets them do their job."><select className="input" value={add.role} onChange={(e) => setAdd({ ...add, role: e.target.value })}>{Object.entries(d.roles).map(([k, r]) => <option key={k} value={k}>{r.label}</option>)}</select></Field>
-          <Field label="Temporary password" required hint="At least 10 characters. Ask them to change it and turn on two-factor sign-in."><TextInput type="text" autoComplete="off" value={add.password} onChange={(v) => setAdd({ ...add, password: v })} /></Field>
+        </Modal>
+      )}
+      {link && (
+        <Modal title="Share the invitation link" onClose={() => setLink(null)} footer={<button className="btn primary" onClick={() => setLink(null)}>Done</button>}>
+          <p>Email is not configured on this server, so the invitation for <b>{link.email}</b> was not sent. Pass this one-time link to them privately:</p>
+          <p className="mono" style={{ wordBreak: 'break-all' }}>{link.link}</p>
+          <button className="btn sm" onClick={() => { navigator.clipboard?.writeText(link.link); toast('Link copied'); }}>Copy link</button>
         </Modal>
       )}
       {roles && d && (

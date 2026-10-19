@@ -10,7 +10,8 @@ import { cleanModules } from './plansStore.js';
 import { recordSubscriptionChange, subscriptionHistory } from './subscriptions.js';
 import { approveSubmission, LOCAL_METHODS } from './billing.js';
 import path from 'node:path';
-import { ROLES } from './platformAccess.js';
+import { ROLES, TOP_ROLES, isOwner } from './platformAccess.js';
+import { checkPassword } from './platformStaff.js';
 import { adminResetLink, issueVerification } from './accessLinks.js';
 import { sendMail, layout } from './mailer.js';
 import { stripeView } from './platformConfig.js';
@@ -320,20 +321,25 @@ export function setupChecklist(operator) {
 }
 
 // ---------------------------------------------------------------- platform admins
-export const listAdmins = () => platformDb().prepare('SELECT id, email, name, role, active, totp_enabled, last_login, created_at FROM platform_admins ORDER BY id').all()
-  .map((a) => ({ ...a, totp_enabled: !!a.totp_enabled, active: !!a.active, role_label: ROLES[a.role]?.label || a.role }));
-const activeSupers = (exceptId = null) => platformDb().prepare("SELECT COUNT(*) n FROM platform_admins WHERE role='super_admin' AND active=1 AND id<>?").get(exceptId ?? -1).n;
-export function addAdmin({ email, name, password, role = 'super_admin' }) {
+export const listAdmins = () => platformDb().prepare('SELECT id, email, name, role, active, totp_enabled, last_login, created_at, invited_by, invite_expires_at, activated_at FROM platform_admins ORDER BY id').all()
+  .map((a) => ({ ...a, totp_enabled: !!a.totp_enabled, active: !!a.active, role_label: ROLES[a.role]?.label || a.role,
+    status: !a.active ? 'disabled' : a.invite_expires_at && !a.activated_at ? (Date.parse(a.invite_expires_at) > Date.now() ? 'invited' : 'invite_expired') : 'active' }));
+/** Active accounts holding every permission (Platform Owner / Super Admin) other than `exceptId`. */
+const activeTop = (exceptId = null) => platformDb().prepare(`SELECT COUNT(*) n FROM platform_admins WHERE role IN (${TOP_ROLES.map(() => '?').join(',')}) AND active=1 AND (invite_expires_at IS NULL OR activated_at IS NOT NULL) AND id<>?`).get(...TOP_ROLES, exceptId ?? -1).n;
+/** Only a Platform Owner can create, change or remove a Platform Owner. */
+const guardOwnerRole = (operator, ...roles) => { if (roles.includes('platform_owner') && !isOwner(operator)) throw new HttpError(403, 'Only a Platform Owner can grant, change or remove the Platform Owner role'); };
+export function addAdmin({ email, name, password, role = 'read_only' }, operator = null) {
   const e = String(email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) throw bad('A valid email is required');
-  if (String(password || '').length < 10) throw bad('Password must be at least 10 characters');
+  checkPassword(password);
   if (!ROLES[role]) throw bad(`Role must be one of: ${Object.keys(ROLES).join(', ')}`);
+  guardOwnerRole(operator, role);
   if (platformDb().prepare('SELECT 1 FROM platform_admins WHERE email=?').get(e)) throw new HttpError(409, 'A console user with this email already exists');
-  const id = Number(platformDb().prepare('INSERT INTO platform_admins(email,name,password_hash,role) VALUES(?,?,?,?)').run(e, String(name || '').trim() || 'Console user', bcrypt.hashSync(String(password), 10), role).lastInsertRowid);
+  const id = Number(platformDb().prepare("INSERT INTO platform_admins(email,name,password_hash,role,activated_at) VALUES(?,?,?,?,datetime('now'))").run(e, String(name || '').trim() || 'Console user', bcrypt.hashSync(String(password), 10), role).lastInsertRowid);
   return listAdmins().find((a) => a.id === id);
 }
-/** Change a console user's role or switch their access off. At least one active Super Admin always remains. */
-export function updateAdmin(id, { role, active, name }, selfId) {
+/** Change a console user's role or switch their access off. At least one active Platform Owner / Super Admin always remains. */
+export function updateAdmin(id, { role, active, name }, selfId, operator = null) {
   const a = platformDb().prepare('SELECT * FROM platform_admins WHERE id=?').get(Number(id));
   if (!a) throw new HttpError(404, 'Admin not found');
   const out = {};
@@ -341,18 +347,20 @@ export function updateAdmin(id, { role, active, name }, selfId) {
   if (active !== undefined) out.active = active ? 1 : 0;
   if (name !== undefined) { const n = String(name || '').trim(); if (!n) throw bad('Name is required'); out.name = n.slice(0, 80); }
   if (a.id === selfId && ((out.role && out.role !== a.role) || out.active === 0)) throw bad('You cannot change your own role or switch off your own access');
-  const losesSuper = a.role === 'super_admin' && a.active && ((out.role && out.role !== 'super_admin') || out.active === 0);
-  if (losesSuper && !activeSupers(a.id)) throw bad('At least one active Super Admin must remain');
+  if ((out.role && out.role !== a.role) || out.active === 0) guardOwnerRole(operator, a.role, out.role);
+  const losesTop = TOP_ROLES.includes(a.role) && a.active && ((out.role && !TOP_ROLES.includes(out.role)) || out.active === 0);
+  if (losesTop && !activeTop(a.id)) throw bad('At least one active Platform Owner or Super Admin must remain');
   const keys = Object.keys(out);
   if (keys.length) platformDb().prepare(`UPDATE platform_admins SET ${keys.map((k) => `${k}=?`).join(',')} WHERE id=?`).run(...keys.map((k) => out[k]), a.id);
   if (out.active === 0 || (out.role && out.role !== a.role)) platformDb().prepare("UPDATE platform_sessions SET revoked_at=datetime('now'), revoked_by='access-changed' WHERE admin_id=? AND revoked_at IS NULL").run(a.id);
   return { admin: listAdmins().find((x) => x.id === a.id), before: { role: a.role, active: !!a.active }, changed: keys };
 }
-export function removeAdmin(id, selfId) {
+export function removeAdmin(id, selfId, operator = null) {
   if (Number(id) === selfId) throw bad('You cannot remove yourself');
   const a = platformDb().prepare('SELECT * FROM platform_admins WHERE id=?').get(Number(id));
   if (!a) throw new HttpError(404, 'Admin not found');
-  if (a.role === 'super_admin' && a.active && !activeSupers(a.id)) throw bad('At least one active Super Admin must remain');
+  guardOwnerRole(operator, a.role);
+  if (TOP_ROLES.includes(a.role) && a.active && !activeTop(a.id)) throw bad('At least one active Platform Owner or Super Admin must remain');
   platformDb().prepare('DELETE FROM platform_admins WHERE id=?').run(a.id);
   return a;
 }

@@ -11,6 +11,7 @@ import { secretsKey, encrypt, decrypt } from './platformConfig.js';
 import { newSecret, verifyCode, otpauthUrl, qrDataUrl, newRecoveryCodes, useRecoveryCode } from './totp.js';
 import { HttpError, bad } from '../util.js';
 import { setMfaRule } from './platformAccess.js';
+import { checkPassword, ensureSetupToken } from './platformStaff.js';
 
 const SESSION_HOURS = 8;
 const setting = (k) => platformDb().prepare('SELECT value FROM platform_settings WHERE key=?').get(k)?.value;
@@ -36,13 +37,24 @@ function recordLogin(a, email, outcome, meta = {}) {
 export const COOKIE = 'platform_token';
 const jwtSecret = () => crypto.createHmac('sha256', secretsKey()).update('platform-session').digest();
 
-/** Create the first admin from the environment, once, when none exists yet. */
+/**
+ * First console account. Preferred: the one-time setup token (services/platformStaff.js, /platform/first-run).
+ * Kept for existing deployments and automated tests: PLATFORM_ADMIN_EMAIL / PLATFORM_ADMIN_PASSWORD create the Platform
+ * Owner once when no console account exists; remove them from the environment afterwards.
+ */
 export function ensureFirstAdmin() {
   const email = process.env.PLATFORM_ADMIN_EMAIL, pw = process.env.PLATFORM_ADMIN_PASSWORD;
   const db = platformDb();
-  if (!email || !pw || db.prepare('SELECT 1 FROM platform_admins LIMIT 1').get()) return;
-  if (pw.length < 10) { console.error('PLATFORM_ADMIN_PASSWORD must be at least 10 characters; no platform admin was created'); return; }
-  db.prepare('INSERT INTO platform_admins(email,name,password_hash) VALUES(?,?,?)').run(email.toLowerCase(), process.env.PLATFORM_ADMIN_NAME || 'Platform admin', bcrypt.hashSync(pw, 10));
+  if (db.prepare('SELECT 1 FROM platform_admins LIMIT 1').get()) return;
+  if (email && pw) {
+    if (pw.length < 10) { console.error('PLATFORM_ADMIN_PASSWORD must be at least 10 characters; no platform admin was created'); }
+    else {
+      db.prepare("INSERT INTO platform_admins(email,name,password_hash,role,activated_at) VALUES(?,?,?,'platform_owner',datetime('now'))").run(email.toLowerCase(), process.env.PLATFORM_ADMIN_NAME || 'Platform owner', bcrypt.hashSync(pw, 10));
+      if (process.env.NODE_ENV !== 'test') console.warn('[setup] Platform Owner created from PLATFORM_ADMIN_EMAIL/PASSWORD. Remove these variables now and change the password in the console.');
+      return;
+    }
+  }
+  ensureSetupToken();
 }
 
 /** The console lives on the platform domain only (or anywhere in single-tenant mode). */
@@ -119,7 +131,7 @@ export function twofaDisable(id, password, code) {
 export function changePassword(adminId, current, next, meta = {}) {
   const a = platformDb().prepare('SELECT * FROM platform_admins WHERE id=?').get(adminId);
   if (!bcrypt.compareSync(String(current || ''), a.password_hash)) throw bad('Current password is incorrect');
-  if (String(next || '').length < 10) throw bad('New password must be at least 10 characters');
+  checkPassword(next, a.email);
   platformDb().prepare('UPDATE platform_admins SET password_hash=?, token_version=token_version+1 WHERE id=?').run(bcrypt.hashSync(String(next), 10), a.id);
   platformDb().prepare("UPDATE platform_sessions SET revoked_at=datetime('now'), revoked_by='password-change' WHERE admin_id=? AND revoked_at IS NULL").run(a.id);
   return issueSession(platformDb().prepare('SELECT * FROM platform_admins WHERE id=?').get(a.id), meta);

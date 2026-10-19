@@ -6,33 +6,49 @@ import { HttpError } from '../util.js';
 
 export const PERMISSIONS = {
   'dashboard.view': 'See the dashboard, alerts and search',
+  'finance.view': 'See revenue figures (MRR, ARR, collections, refunds) and financial reports',
+  'analytics.view': 'See website analytics and conversion reports',
   'workspaces.view': 'See workspaces, their users and activity',
   'workspaces.create': 'Create workspaces',
-  'workspaces.edit': 'Edit workspace profile, owner, notes, limits and trials',
+  'workspaces.edit': 'Edit workspace profile, owner, notes and limits',
+  'trials.manage': 'Extend, shorten, end or revoke free trials and activate workspaces by hand',
   'workspaces.suspend': 'Suspend, cancel or reactivate workspaces',
   'workspaces.support': 'Help workspace users sign in (reset links, 2FA, confirmations)',
   'workspaces.export': 'Export workspace and transaction lists',
   'billing.view': 'See payments, invoices, plans and subscription history',
-  'billing.manage': 'Approve or record payments and change subscriptions',
-  'billing.configure': 'Edit plans, prices, Stripe keys and payment accounts',
+  'billing.manage': 'Approve or record payments, refunds and change subscriptions',
+  'billing.configure': 'Edit plans, prices, add-ons, coupons, Stripe keys and payment accounts',
+  'content.manage': 'Edit the public website content, legal pages, announcements and release notes',
+  'integrations.manage': 'Configure and test integrations (email, analytics, payments)',
   'system.view': 'See system health, setup, backups and errors',
-  'system.manage': 'Run backups and switch maintenance mode',
+  'system.manage': 'Run backups, switch maintenance mode and change platform settings',
   'audit.view': 'See the audit log, sign-in history and sessions',
-  'admins.manage': 'Add, change and remove super admin users and security rules',
+  'admins.manage': 'Invite, change and remove console users and security rules',
 };
 const ALL = Object.keys(PERMISSIONS);
-const VIEW = ['dashboard.view', 'workspaces.view', 'billing.view', 'system.view'];
+const VIEW = ['dashboard.view', 'finance.view', 'workspaces.view', 'billing.view', 'system.view'];
+/**
+ * Fixed roles (least privilege: give people the smallest role that fits). Platform Owner and Super Admin can do
+ * everything; only a Platform Owner can make or remove another Platform Owner.
+ */
 export const ROLES = {
+  platform_owner: { label: 'Platform Owner', perms: ALL },
   super_admin: { label: 'Super Admin', perms: ALL },
   platform_admin: { label: 'Platform Administrator', perms: ALL.filter((p) => p !== 'admins.manage') },
-  finance_admin: { label: 'Finance Administrator', perms: [...VIEW, 'billing.manage', 'billing.configure', 'workspaces.export'] },
-  customer_success: { label: 'Customer Success Manager', perms: [...VIEW, 'workspaces.create', 'workspaces.edit', 'workspaces.support', 'workspaces.export'] },
-  technical_admin: { label: 'Technical Administrator', perms: [...VIEW, 'system.manage', 'workspaces.support', 'audit.view'] },
+  billing_manager: { label: 'Billing Manager', perms: [...VIEW, 'billing.manage', 'trials.manage', 'workspaces.export'] },
+  finance_admin: { label: 'Finance Administrator', perms: [...VIEW, 'billing.manage', 'billing.configure', 'trials.manage', 'workspaces.export'] },
+  support_manager: { label: 'Support Manager', perms: ['dashboard.view', 'workspaces.view', 'billing.view', 'system.view', 'workspaces.create', 'workspaces.edit', 'trials.manage', 'workspaces.support'] },
+  customer_success: { label: 'Customer Success Manager', perms: [...VIEW, 'workspaces.create', 'workspaces.edit', 'trials.manage', 'workspaces.support', 'workspaces.export'] },
+  technical_admin: { label: 'Technical Administrator', perms: [...VIEW, 'system.manage', 'integrations.manage', 'workspaces.support', 'audit.view'] },
   security_auditor: { label: 'Security Auditor', perms: [...VIEW, 'audit.view', 'workspaces.export'] },
+  analytics_viewer: { label: 'Analytics Viewer', perms: ['dashboard.view', 'finance.view', 'analytics.view'] },
   read_only: { label: 'Read-Only Analyst', perms: VIEW },
 };
+/** Roles that hold every permission; at least one active account with one of them must always remain. */
+export const TOP_ROLES = ['platform_owner', 'super_admin'];
 export const permsOf = (role) => ROLES[role]?.perms || [];
 export const can = (operator, perm) => operator?.via === 'token' || permsOf(operator?.role).includes(perm);
+export const isOwner = (operator) => operator?.via === 'token' || operator?.role === 'platform_owner';
 
 // ---------------------------------------------------------------- request context for the audit log
 export const auditCtx = new AsyncLocalStorage();
