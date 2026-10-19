@@ -57,7 +57,7 @@ if have nginx && [ ! -f /etc/nginx/sites-available/agentify-erp ]; then
 server {
     listen 80;
     listen [::]:80;
-    server_name __DOMAIN__;
+    server_name __SERVER_NAMES__;
 
     client_max_body_size 50M;
 
@@ -74,7 +74,10 @@ server {
     }
 }
 NGINXCONF
-  sed -i "s/__DOMAIN__/$DOMAIN/g" /etc/nginx/sites-available/agentify-erp
+  # in multi-tenant mode customer workspaces live on <slug>.<base domain>, so nginx must answer for the wildcard too
+  NAMES="$DOMAIN"
+  if [ -n "${ERP_BASE_DOMAIN:-}" ]; then NAMES="$DOMAIN *.$DOMAIN"; fi
+  sed -i "s/__SERVER_NAMES__/$NAMES/g" /etc/nginx/sites-available/agentify-erp
   ln -sf /etc/nginx/sites-available/agentify-erp /etc/nginx/sites-enabled/agentify-erp
   if nginx -t; then
     systemctl reload nginx
@@ -89,4 +92,7 @@ if have certbot && [ -f /etc/nginx/sites-available/agentify-erp ] && [ ! -d "/et
   certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email --redirect || echo "certbot failed (HTTP still works)"
 fi
 
+if [ -n "${ERP_BASE_DOMAIN:-}" ]; then
+  echo "NOTE: workspaces at https://<slug>.$DOMAIN need a wildcard certificate (certbot --manual --preferred-challenges dns -d '*.$DOMAIN'); until then they work over http only."
+fi
 echo "bootstrap ok"
