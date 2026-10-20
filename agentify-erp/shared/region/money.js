@@ -43,7 +43,7 @@ export function createMoney({ currency = 'PKR', scale = 0, locale = 'en-PK', sty
     /** Same text as the old inline `PKR ${n.toLocaleString('en-PK')}` (no rounding, sign after the code). */
     text(n) { return `${currency} ${scale === 0 ? Number(n || 0).toLocaleString(locale) : group(Number(n || 0))}`; },
     /** Number without the currency: "1,234" / "1,234.56". */
-    number: (n) => (blank(n) ? DASH : group(Number(n))),
+    number: (n) => (n === null || n === undefined ? DASH : group(Number(n))),
     /** 1.2M, 450K (compact, major units). */
     short(n) {
       const v = Number(n || 0) / unit, a = Math.abs(v);

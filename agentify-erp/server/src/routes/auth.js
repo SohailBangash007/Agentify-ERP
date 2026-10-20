@@ -7,6 +7,8 @@ import { encrypt, decrypt } from '../services/platformConfig.js';
 import { newSecret, verifyCode, otpauthUrl, qrDataUrl, newRecoveryCodes, useRecoveryCode } from '../services/totp.js';
 import { audit } from '../audit.js';
 import { asyncH, bad, HttpError, now } from '../util.js';
+import { clientConfig } from '../regions/runtime.js';
+import { currentTenant } from '../context.js';
 import { requestPasswordReset, resetPassword, inviteInfo, acceptInvite, sendVerification, verifyEmail } from '../services/accessLinks.js';
 
 const r = Router();
@@ -145,6 +147,8 @@ function demoLogins() {
   demoCache.set(key, { at: Date.now(), list });
   return list;
 }
+// region settings of this workspace (formats, units, terms, flags); the browser applies them before it renders any amount
+r.get('/region', (_req, res) => res.json(clientConfig(currentTenant())));
 r.get('/brand', (_req, res) => res.json({ name: getSetting('company_name', '') || 'Agentify ERP', demo_logins: demoLogins() }));
 
 r.get('/me', requireAuth, (req, res) => res.json(sessionPayload(req.user)));

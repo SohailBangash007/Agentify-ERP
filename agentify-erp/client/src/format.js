@@ -1,49 +1,41 @@
-// All display formatting lives here so dates/currency are consistent app-wide (PKR, Asia/Karachi).
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// All display formatting lives here so dates/currency are consistent app-wide. It follows the workspace's region
+// (set once after sign-in with setRegion); until then, and for Pakistan, the output is exactly what it always was.
+import { buildRegion } from '../../shared/region/index.js';
 
-export function money(n, { sign = false } = {}) {
-  if (n === null || n === undefined || n === '') return '—';
-  const v = Math.round(Number(n));
-  const s = Math.abs(v).toLocaleString('en-PK');
-  return `${v < 0 ? '-' : sign && v > 0 ? '+' : ''}PKR ${s}`;
-}
-export const num = (n) => (n === null || n === undefined ? '—' : Number(n).toLocaleString('en-PK'));
+let R = buildRegion({});
+/** Apply a workspace's region configuration (from /api/auth/region). */
+export function setRegion(cfg) { R = buildRegion(cfg || {}); }
+export const getRegion = () => R;
 
+export const money = (n, opts) => R.money.format(n, opts);
+export const num = (n) => R.money.number(n);
 /** Compact money for tight spaces: 1.2M, 450K */
-export function moneyShort(n) {
-  const v = Number(n || 0), a = Math.abs(v);
-  const t = a >= 1e9 ? `${(a / 1e9).toFixed(a >= 1e10 ? 0 : 1)}B` : a >= 1e6 ? `${(a / 1e6).toFixed(a >= 1e7 ? 0 : 1)}M` : a >= 1e3 ? `${(a / 1e3).toFixed(0)}K` : String(Math.round(a));
-  return `${v < 0 ? '-' : ''}${t}`;
-}
+export const moneyShort = (n) => R.money.short(n);
 
-/** 'YYYY-MM-DD' (or timestamp) -> '07-Oct-2026' */
-export function date(s) {
-  if (!s) return '—';
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
-  return m ? `${m[3]}-${MONTHS[Number(m[2]) - 1]}-${m[1]}` : s;
-}
-export function dateTime(s) {
-  if (!s) return '—';
-  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(s);
-  if (!m) return date(s);
-  const h = Number(m[4]);
-  return `${m[3]}-${MONTHS[Number(m[2]) - 1]}-${m[1]} ${String(h % 12 || 12).padStart(2, '0')}:${m[5]} ${h >= 12 ? 'PM' : 'AM'}`;
-}
-export const month = (s) => { const m = /^(\d{4})-(\d{2})/.exec(s || ''); return m ? `${MONTHS[Number(m[2]) - 1]} ${m[1].slice(2)}` : s; };
+/** 'YYYY-MM-DD' (or timestamp) -> '07-Oct-2026' in Pakistan, other styles elsewhere */
+export const date = (s) => R.fmt.date(s);
+export const dateTime = (s) => R.fmt.dateTime(s);
+export const month = (s) => R.fmt.month(s);
 
-/** Today in Asia/Karachi as YYYY-MM-DD */
-export const todayPK = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' });
+/** Today in the workspace's timezone as YYYY-MM-DD (Pakistan: Asia/Karachi) */
+export const today = () => R.fmt.today();
+export const todayPK = today;
 
 export const titleCase = (s) => String(s || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 export function ago(s) {
   if (!s) return '—';
-  const t = new Date(s.replace(' ', 'T') + '+05:00').getTime();
-  const d = (Date.now() - t) / 1000;
-  if (d < 60) return 'just now';
-  if (d < 3600) return `${Math.floor(d / 60)}m ago`;
-  if (d < 86400) return `${Math.floor(d / 3600)}h ago`;
-  if (d < 86400 * 30) return `${Math.floor(d / 86400)}d ago`;
+  const [y, mo, d, h, mi, se] = (s.match(/\d+/g) || []).map(Number);
+  // the stored text is wall-clock time in the workspace's zone; find that zone's offset at that moment
+  const wall = Date.UTC(y, mo - 1, d, h || 0, mi || 0, se || 0);
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: R.config.timezone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    .formatToParts(new Date(wall)).map((p) => [p.type, p.value]));
+  const offset = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - wall;
+  const diff = (Date.now() - (wall - offset)) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 86400 * 30) return `${Math.floor(diff / 86400)}d ago`;
   return date(s);
 }
 
