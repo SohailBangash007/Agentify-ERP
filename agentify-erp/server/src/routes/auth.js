@@ -151,8 +151,9 @@ function demoLogins() {
 }
 // region settings of this workspace (formats, units, terms, flags); the browser applies them before it renders any amount
 r.get('/region', (_req, res) => res.json(clientConfig(currentTenant())));
-r.get('/brand', (_req, res) => res.json({ name: getSetting('company_name', '') || 'Agentify ERP', demo_logins: demoLogins(), sso: configuredProviders().filter((p) => ['google', 'apple'].includes(p)) }));
+r.get('/brand', (_req, res) => res.json({ name: getSetting('company_name', '') || 'Agentify ERP', demo_logins: demoLogins(), ...(ssoList().length ? { sso: ssoList() } : {}) }));
 
+const ssoList = () => configuredProviders().filter((p) => ['google', 'apple'].includes(p));
 // Sign in with Google / Apple: existing staff accounts only (no account is created here), and two-step sign-in still applies.
 r.get('/sso/:provider/start', asyncH((req, res) => {
   const p = req.params.provider;

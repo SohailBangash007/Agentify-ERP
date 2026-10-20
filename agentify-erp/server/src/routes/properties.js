@@ -10,6 +10,7 @@ import { getSetting } from '../db.js';
 import { websiteState, fireWebhook } from '../services/website.js';
 import { saleSummary } from '../services/sales.js';
 import { notifyReviewers } from '../services/listings.js';
+import { currentRegion } from '../regions/runtime.js';
 
 const r = Router();
 r.use(requireStaff);
@@ -210,6 +211,7 @@ r.post('/:id(\\d+)/publish', canPublish, asyncH((req, res) => {
   const a = setState(req, res, (p) => {
     needNotSold(p);
     if (!p.title || !p.net_price) throw bad('A listing needs a title and a price before it can be published');
+    if (currentRegion().config.permit_required && !get("SELECT 1 FROM region_ext_values WHERE entity='property' AND entity_id=? AND key='rera_permit_no' AND value<>''", p.id)) throw bad('A listing in the UAE needs its advertising permit number before it can be published. Add it under the UAE details.');
     if (!['approved', 'published'].includes(p.review_state)) run("UPDATE properties SET review_state='approved' WHERE id=?", p.id);
     run("UPDATE properties SET published=1, review_state='published', status=CASE WHEN status IN ('draft','on_hold') THEN 'available' ELSE status END, updated_at=? WHERE id=?", now(), p.id);
   });

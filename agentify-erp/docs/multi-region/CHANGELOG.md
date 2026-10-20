@@ -15,3 +15,12 @@ Added (all additive; Pakistan output verified unchanged by snapshot tests):
 - Demo data for each non-Pakistani region.
 
 Not yet done: translations of most screens (sign-in and the sidebar groups are done), Arabic PDF output (needs an embedded Arabic font and right-to-left layout), tax and fee rules content (needs legal input), construction and rentals/off-plan rules, FX conversion in reports.
+
+## Integrations (see docs/integrations.md)
+
+- Twilio calling and texting with a ranked "Call next" dialer, call outcomes that schedule follow-ups, do-not-call handling and signed web hooks; a generic HTTPS voice provider for Pakistan.
+- Google sign-in and sign-in with Apple (existing staff only), Google Calendar sync for a new Appointments page.
+- Custom domains with DNS verification and an on-demand-certificate check for the web server.
+- Property portal feeds per country with readiness checks and the UAE advertising-permit rule; RESO API push for MLS boards.
+- Facebook, Instagram, LinkedIn and TikTok connections, scheduled posts and reports.
+- Landing page: call-next section, "included website" message, per-country integration list; testimonials only from real quotes entered in the console.

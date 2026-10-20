@@ -23,7 +23,7 @@ test('only Pakistan is selectable until another region is switched on', () => {
   assert.deepEqual([...selectableRegions(pdb).keys()], ['PK']);
   admin.setRegionStatus(pdb, 'US', 'active', 'tester');
   assert.deepEqual([...selectableRegions(pdb).keys()].sort(), ['PK', 'US']);
-  assert.equal(regionFor({ region: 'US', money_scale: 2 }).config.pack_version, 3);
+  assert.equal(regionFor({ region: 'US', money_scale: 2 }).config.pack_version, 4);
   admin.setRegionStatus(pdb, 'US', 'draft', 'tester');
   assert.deepEqual([...selectableRegions(pdb).keys()], ['PK']);
   assert.throws(() => admin.setRegionStatus(pdb, 'PK', 'draft', 'tester'), /stays active/);

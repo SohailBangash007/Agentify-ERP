@@ -10,5 +10,5 @@ const load = () => (pending ||= api.get('/api/auth/brand').then((b) => { cached 
 export function useBrand() {
   const [brand, setBrand] = useState(cached);
   useEffect(() => { if (!cached) load().then((b) => b && setBrand(b)); }, []);
-  return { name: brand?.name || 'Agentify ERP', demo_logins: brand?.demo_logins || [] };
+  return { name: brand?.name || 'Agentify ERP', demo_logins: brand?.demo_logins || [], sso: brand?.sso || [] };
 }

@@ -22,7 +22,7 @@ const NAV = [
   { label: 'Content Calendar', icon: 'calendar', to: '/content', module: 'content' },
   { label: 'CRM', icon: 'users', module: 'crm', children: [
     ['Contacts', '/contacts'], ['Leads', '/leads'], ['Smart Lists', '/smart-lists'], ['Sales Pipeline', '/pipeline'], ['Tasks', '/tasks'], ['Notes', '/notes'],
-    ['Goals & Rewards', '/goals'], ['Sales Agents', '/agents'], ['Commissions', '/commissions', 'commissions'] ] },
+    ['Dialer', '/dialer'], ['Appointments', '/appointments'], ['Goals & Rewards', '/goals'], ['Sales Agents', '/agents'], ['Commissions', '/commissions', 'commissions'] ] },
   { label: 'Mortgage', icon: 'card', to: '/mortgage', module: 'crm', flag: 'mortgage' },
   { label: 'Documents', icon: 'file', to: '/documents', module: 'crm', flag: 'templates' },
   { label: 'Construction', icon: 'hardhat', module: 'construction', product: 'construction', children: [
@@ -51,7 +51,7 @@ const NAV = [
     ['Sales Reports', '/reports/Sales'], ['CRM Reports', '/reports/CRM'], ['Property Reports', '/reports/Property'], ['Project Reports', '/reports/Project'],
     ['Financial Reports', '/reports/Financial', 'accounting'], ['Vendor Reports', '/reports/Vendor', 'vendors'], ['Employee Reports', '/reports/Employee', 'hrm'], ['Commission Reports', '/reports/Sales'] ] },
   { label: 'Settings', icon: 'settings', module: 'settings', children: [
-    ['Users', '/settings/users'], ['Plan & Billing', '/settings/billing'], ['Roles & Permissions', '/settings/roles'], ['Custom Fields', '/settings/custom-fields'], ['Property Settings', '/settings/property'],
+    ['Users', '/settings/users'], ['Integrations', '/settings/integrations'], ['Plan & Billing', '/settings/billing'], ['Roles & Permissions', '/settings/roles'], ['Custom Fields', '/settings/custom-fields'], ['Property Settings', '/settings/property'],
     ['Payment Methods', '/settings/payment-methods'], ['Lead Stages', '/settings/lead-stages'], ['Categories & Lists', '/settings/categories'], ['Commission Rules', '/settings/commission-rules'], ['Receipts & Branding', '/settings/branding'], ['Notifications', '/settings/notifications'], ['System Settings', '/settings/system'], ['Audit Log', '/settings/audit'] ] },
 ];
 

@@ -3,6 +3,8 @@
 export const COUNTRY_COPY = {
   US: {
     slug: 'us', flag: '🇺🇸',
+    works_with: ['Listing feeds for Zillow and Trulia', 'MLS (RESO Web API)', 'Realtor.com', 'Twilio calling and texting', 'Google Calendar', 'Facebook, Instagram, LinkedIn and TikTok', 'Your own domain'],
+    calls: 'Calls and texts run through your own Twilio account.',
     hero_title: 'Run your brokerage and your builds from one system',
     hero_subtitle: 'Leads, listings, transactions and commission splits for agents and brokers, plus estimates, change orders and subcontractor tracking for builders. Priced in US dollars, measured in square feet.',
     chips: ['Transaction checklists', 'Commission splits', 'Mortgage referral tracking', 'Sq ft and acres', 'Two-factor sign-in'],
@@ -11,6 +13,8 @@ export const COUNTRY_COPY = {
   },
   UK: {
     slug: 'uk', flag: '🇬🇧',
+    works_with: ['Listing feeds for Rightmove and Zoopla', 'OnTheMarket', 'Twilio calling and texting', 'Google Calendar', 'Facebook, Instagram, LinkedIn and TikTok', 'Your own domain'],
+    calls: 'Calls and texts run through your own Twilio account.',
     hero_title: 'Sales, lettings and construction in one system',
     hero_subtitle: 'Manage vendors, buyers and landlords, track every sale from offer to completion, and see Stamp Duty and mortgage costs on your website. Priced in pounds, measured in square feet and square metres.',
     chips: ['Sales and lettings', 'Stamp Duty calculator', 'Tenure, EPC and council tax band', 'Mortgage referral tracking', 'UK GDPR tools'],
@@ -19,6 +23,8 @@ export const COUNTRY_COPY = {
   },
   AE: {
     slug: 'ae', flag: '🇦🇪',
+    works_with: ['Listing feeds for Bayut and dubizzle', 'Property Finder listing feed', 'Twilio calling and texting', 'Google Calendar', 'Facebook, Instagram, LinkedIn and TikTok', 'Your own domain'],
+    calls: 'Calls and texts run through your own Twilio account.',
     hero_title: 'Property brokerage and construction for the UAE',
     hero_subtitle: 'Ready and off-plan listings, payment plans, mortgage tracking and Dubai Land Department fee estimates, in dirhams and square feet with an Arabic option.',
     chips: ['Ready and off-plan', 'DLD fee calculator', 'Payment plans', 'Arabic and English', 'Permit number on listings'],
@@ -27,6 +33,8 @@ export const COUNTRY_COPY = {
   },
   PK: {
     slug: 'pk', flag: '🇵🇰',
+    works_with: ['Listing feeds for Zameen and Lamudi', 'Your robocall voice provider', 'Google Calendar', 'Facebook, Instagram, LinkedIn and TikTok', 'Your own domain'],
+    calls: 'Calls run through your Pakistani voice provider (robocall service) with your own API key.',
     hero_title: null, hero_subtitle: null,
     chips: ['Plot files and installment plans', 'Marla and Kanal', 'Balloon payments', 'Customer portal', 'Two-factor sign-in'],
     calc_title: 'Try the numbers for Pakistan', calc_sub: 'Convert between Marla, Kanal, square feet and square yards.',
@@ -34,6 +42,8 @@ export const COUNTRY_COPY = {
   },
   CA: {
     slug: 'ca', flag: '🇨🇦',
+    works_with: ['MLS (RESO Web API)', 'REALTOR.ca listing feed', 'Twilio calling and texting', 'Google Calendar', 'Facebook, Instagram, LinkedIn and TikTok', 'Your own domain'],
+    calls: 'Calls and texts run through your own Twilio account.',
     hero_title: 'Brokerage and construction management for Canada',
     hero_subtitle: 'Listings, clients, offers and commissions, with mortgage estimates that follow Canadian compounding. Priced in Canadian dollars, in English and French.',
     chips: ['Mortgage calculator', 'English and French', 'Sq ft and sq m', 'Mortgage referral tracking', 'Privacy tools'],

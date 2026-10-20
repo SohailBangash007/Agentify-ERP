@@ -46,6 +46,9 @@ import MarketingSite from './marketing/Marketing.jsx';
 import { VerifyEmail } from './pages/AuthPages.jsx';
 import Mortgage from './pages/Mortgage.jsx';
 import Documents from './pages/Documents.jsx';
+import Integrations from './pages/Integrations.jsx';
+import Dialer from './pages/Dialer.jsx';
+import Appointments from './pages/Appointments.jsx';
 import { ConstructionOverview, ConstructionProject, EstimatesPage, MaterialsPage, PurchaseOrdersPage, SubcontractsPage } from './pages/Construction.jsx';
 
 /**
@@ -163,6 +166,9 @@ export default function App() {
         <Route path="projects/:id" element={G('projects', <ProjectWorkspace />)} />
         <Route path="mortgage" element={G('crm', <Mortgage />)} />
         <Route path="documents" element={G('crm', <Documents />)} />
+        <Route path="dialer" element={G('crm', <Dialer />)} />
+        <Route path="appointments" element={G('crm', <Appointments />)} />
+        <Route path="settings/integrations" element={G('crm', <Integrations />)} />
         {/* Construction */}
         <Route path="construction" element={G('construction', <ConstructionOverview />)} />
         <Route path="construction/projects/:id" element={G('construction', <ConstructionProject />)} />

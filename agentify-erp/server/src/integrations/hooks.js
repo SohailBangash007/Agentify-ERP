@@ -6,6 +6,8 @@ import { get, run } from '../db.js';
 import { now } from '../util.js';
 import { integrationConfig } from './store.js';
 import { bridgeTwiml, verifyTwilioSignature } from './twilio.js';
+import { PORTALS, feedToken, publishedListings, feedXml, feedCsv } from './portals.js';
+import crypto from 'node:crypto';
 
 const r = Router();
 r.use(express.urlencoded({ extended: false, limit: '100kb' }));
@@ -35,5 +37,17 @@ r.post('/twilio/status', (req, res) => {
     run('UPDATE calls SET status=?, duration=COALESCE(?, duration), ended_at=CASE WHEN ? THEN ? ELSE ended_at END WHERE id=?', status, req.body?.CallDuration ? Number(req.body.CallDuration) : null, done ? 1 : 0, now(), id);
   }
   res.sendStatus(204);
+});
+/** Listing feeds for portals: /api/hooks/feeds/<portal>.<xml|csv|json>?token=... */
+r.get('/feeds/:portal.:fmt', (req, res) => {
+  const pt = PORTALS.find((p) => p.id === req.params.portal);
+  const given = Buffer.from(String(req.query.token || '')), want = Buffer.from(feedToken());
+  if (!pt || given.length !== want.length || !crypto.timingSafeEqual(given, want)) return res.status(404).type('text/plain').send('Not found');
+  const base = `${req.protocol}://${req.get('host')}`;
+  const list = publishedListings(pt.id, base);
+  if (req.params.fmt === 'xml') return res.type('application/xml').send(feedXml(pt.id, list));
+  if (req.params.fmt === 'csv') return res.type('text/csv').send(feedCsv(list));
+  if (req.params.fmt === 'json') return res.json({ portal: pt.id, listings: list });
+  return res.status(404).type('text/plain').send('Not found');
 });
 export default r;

@@ -2,7 +2,7 @@
   "code": "AE",
   "name": "United Arab Emirates",
   "status": "draft",
-  "version": 3,
+  "version": 4,
   "locale": "en-AE",
   "language": "en",
   "languages": [ "en", "ar" ],
@@ -277,5 +277,6 @@
     "payment_steps": [ "Pay by bank transfer, cheque or card", "Use your reference", "We confirm and issue a receipt" ]
   },
   "lead_sources": [ "Walk-in", "Website", "Bayut", "Property Finder", "Dubizzle", "Referral", "Social media", "Phone call", "WhatsApp" ],
-  "amenities": [ "Balcony", "Maid's room", "Private pool", "Shared pool", "Gym", "Concierge", "Covered parking", "Sea view", "Private garden", "Central A/C", "Built-in wardrobes", "Kitchen appliances" ]
+  "amenities": [ "Balcony", "Maid's room", "Private pool", "Shared pool", "Gym", "Concierge", "Covered parking", "Sea view", "Private garden", "Central A/C", "Built-in wardrobes", "Kitchen appliances" ],
+  "permit_required": true
 }

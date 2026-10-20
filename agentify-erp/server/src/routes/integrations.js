@@ -20,6 +20,8 @@ import { currentTenant } from '../context.js';
 import { records as domainRecords, requestDomain, verifyDomain, removeDomain } from '../integrations/domains.js';
 import { getTenant } from '../platform.js';
 import { PROVIDERS, appCreds, authorizeUrl, redirectUri, signState } from '../services/oauthApps.js';
+import { portalsFor, PORTALS, feedToken, rotateFeedToken, listingFor, readiness, setPublication, publicationsFor } from '../integrations/portals.js';
+import { assertPublicHttps } from '../services/integrations.js';
 import { listAccounts, removeAccount, createPost, runDuePosts, refreshMetrics, socialReport } from '../integrations/social.js';
 
 const r = Router();
@@ -231,6 +233,56 @@ r.post('/social/posts', can('content', 'edit'), asyncH(async (req, res) => {
 r.post('/social/posts/:id/cancel', can('content', 'edit'), asyncH((req, res) => { run("UPDATE social_posts SET status='canceled' WHERE id=? AND status IN ('scheduled','failed')", Number(req.params.id)); res.json({ ok: true }); }));
 r.post('/social/posts/:id/retry', can('content', 'edit'), asyncH(async (req, res) => { run("UPDATE social_posts SET status='scheduled', error=NULL, scheduled_at=NULL WHERE id=? AND status='failed'", Number(req.params.id)); await runDuePosts(); res.json(get('SELECT * FROM social_posts WHERE id=?', Number(req.params.id))); }));
 r.get('/social/report', can('crm', 'view'), asyncH(async (req, res) => { if (req.query.refresh === '1') await refreshMetrics(); res.json(socialReport()); }));
+
+// ---- property portals and MLS
+const portalInfo = (p, req) => ({ ...p, feed: { xml: `${webBase(req)}/api/hooks/feeds/${p.id}.xml?token=${feedToken()}`, csv: `${webBase(req)}/api/hooks/feeds/${p.id}.csv?token=${feedToken()}`, json: `${webBase(req)}/api/hooks/feeds/${p.id}.json?token=${feedToken()}` },
+  published: get("SELECT COUNT(*) n FROM portal_publications WHERE portal=? AND status='published'", p.id).n, api_connected: p.api ? integrationRow(`portal:${p.id}`)?.status === 'connected' : undefined });
+r.get('/portals', can('crm', 'view'), (req, res) => res.json({ portals: portalsFor(region().region).map((p) => portalInfo(p, req)) }));
+r.post('/portals/rotate-token', can('settings', 'edit'), asyncH((req, res) => { rotateFeedToken(); audit(req, 'Changed portal feed address', 'integration', 'portals'); res.json({ ok: true }); }));
+r.get('/portals/readiness/:propertyId', can('properties', 'view'), asyncH((req, res) => {
+  const p = get('SELECT * FROM properties WHERE id=?', Number(req.params.propertyId));
+  if (!p) throw notFound('Property not found');
+  const l = listingFor(p, webBase(req));
+  const pubs = Object.fromEntries(publicationsFor(p.id).map((x) => [x.portal, x]));
+  res.json(portalsFor(region().region).map((pt) => ({ id: pt.id, name: pt.name, missing: readiness(l, pt), publication: pubs[pt.id] || null })));
+}));
+r.post('/portals/publish', can('properties', 'edit'), asyncH(async (req, res) => {
+  const p = get('SELECT * FROM properties WHERE id=?', Number(req.body?.property_id));
+  if (!p) throw notFound('Property not found');
+  if (!p.published) throw bad('Publish the listing on your website first; portals only receive published listings.');
+  const l = listingFor(p, webBase(req));
+  const out = [];
+  for (const id of [].concat(req.body?.portals || [])) {
+    const pt = portalsFor(region().region).find((x) => x.id === id);
+    if (!pt) { out.push({ portal: id, ok: false, error: 'Not available in this country' }); continue; }
+    const missing = readiness(l, pt);
+    if (missing.length) { out.push({ portal: id, ok: false, error: `Add ${missing.join(', ')} first` }); continue; }
+    try {
+      const cfg = pt.api ? integrationConfig(`portal:${id}`) : null;
+      if (cfg) {
+        await assertPublicHttps(cfg.endpoint);
+        const resp = await fetch(cfg.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.token}` }, body: JSON.stringify(l), redirect: 'error', signal: AbortSignal.timeout(20_000) });
+        if (!resp.ok) throw new Error(`The portal answered ${resp.status}`);
+      }
+      setPublication(p.id, id, 'published');
+      out.push({ portal: id, ok: true, via: cfg ? 'api' : 'feed' });
+    } catch (e) { setPublication(p.id, id, 'failed', e.message); out.push({ portal: id, ok: false, error: e.message }); }
+  }
+  audit(req, 'Published to portals', 'property', p.id, out.filter((x) => x.ok).map((x) => x.portal).join(', '));
+  res.json({ results: out });
+}));
+r.post('/portals/unpublish', can('properties', 'edit'), asyncH((req, res) => { for (const id of [].concat(req.body?.portals || [])) setPublication(Number(req.body.property_id), id, 'withdrawn'); res.json({ ok: true }); }));
+r.put('/portals/:id/api', can('settings', 'edit'), asyncH(async (req, res) => {
+  const pt = PORTALS.find((x) => x.id === req.params.id && x.api);
+  if (!pt) throw notFound('This portal has no API settings');
+  const endpoint = await assertPublicHttps(req.body?.endpoint);
+  const prev = integrationConfig(`portal:${pt.id}`);
+  const token = !req.body?.token || /^•/.test(req.body.token) ? prev?.token : String(req.body.token).trim();
+  if (!token) throw bad('Enter the token your board issued.');
+  saveIntegration(`portal:${pt.id}`, { endpoint, token }, { publicInfo: { endpoint_host: new URL(endpoint).host }, status: 'connected', userId: req.user.id });
+  res.json({ ok: true });
+}));
+r.delete('/portals/:id/api', can('settings', 'edit'), asyncH((req, res) => { removeIntegration(`portal:${req.params.id}`); res.json({ ok: true }); }));
 
 // ---- your own web address
 const freshTenant = () => getTenant(currentTenant().id);

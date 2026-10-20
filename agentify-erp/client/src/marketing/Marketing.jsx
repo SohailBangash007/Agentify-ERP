@@ -232,9 +232,10 @@ function Home({ info }) {
           {[['Choose your product', 'Real Estate Brokerage or Construction Management. A bundle gives you both.'], ['Create your workspace', 'Your company gets its own address and its own private database straight away.'], ['Invite your team', 'Email invitations with the right role for each person.'], ['Pick a plan when ready', `Use the full ${info.trial_days}-day trial first. Pay by card or local transfer.`]].map(([t, d], i) => <div className="lcard" key={t}><div className="lnum">{i + 1}</div><h3>{t}</h3><p>{d}</p></div>)}
         </div>
       </div></section>
+      <CallNextSection />
       <CalcStrip />
       <Screens product={null} />
-      {!!c.testimonials.length && <section><div className="lwrap"><div className="lsh"><h2>What customers say</h2></div><div className="lgrid">{c.testimonials.map((t, i) => <blockquote key={i} className="lcard lquote" style={{ margin: 0 }}>“{t.quote}”<footer>{t.name}{t.role ? `, ${t.role}` : ''} · {t.company}</footer></blockquote>)}</div></div></section>}
+      {!!(c.testimonials || []).filter((t) => !t.country || t.country === country.code).length && <section><div className="lwrap"><div className="lsh"><h2>What customers say</h2></div><div className="lgrid">{c.testimonials.filter((t) => !t.country || t.country === country.code).map((t, i) => <blockquote key={i} className="lcard lquote" style={{ margin: 0 }}>“{t.quote}”<footer>{t.name}{t.role ? `, ${t.role}` : ''} · {t.company}</footer></blockquote>)}</div></div></section>}
       <Faq faqs={[...(c.faqs || []), ...(cc.faqs || [])]} />
       <Band info={info} />
     </>
@@ -246,6 +247,41 @@ const COUNTRY_SCREENS = (code) => ({
   real_estate: [[`re-dashboard-${code}.png`, 'Dashboard with sales, collections and follow-ups'], [`re-sale-${code}.png`, 'A sale with its payment schedule']],
   construction: [],
 });
+/** What the CRM does for every lead, and the free website. No customer quotes or numbers are made up here. */
+function CallNextSection() {
+  const { country } = useCountry();
+  const cc = country.copy || {};
+  const rows = [['Priya Shah', 'Follow-up was due 2 days ago', 'High priority'], ['Daniel Brooks', 'New lead, not called yet', ''], ['Omar Haddad', 'No contact for 9 days', '']];
+  return (
+    <>
+      <section><div className="lwrap lsplit" style={{ alignItems: 'center' }}>
+        <div>
+          <span className="ltag2">Never lose a lead</span>
+          <h2 style={{ fontSize: 34, margin: '10px 0' }}>No lead goes cold. Every buyer gets a follow-up.</h2>
+          <p>A real estate CRM with a call-next assistant: it ranks the people who most need a phone call right now and tells you why, so the first call goes to the lead that matters most.</p>
+          <ul className="lcheck">
+            <li>New inquiries from your website, portals and WhatsApp land in one list</li>
+            <li>Call from the CRM in one press; every call and outcome is logged</li>
+            <li>The outcome sets the next follow-up, so nothing slips through</li>
+            <li>Appointments and viewings go to your Google Calendar</li>
+          </ul>
+          <p className="lfine">{cc.calls}</p>
+        </div>
+        <div className="lcard" aria-label="Example of the call-next list">
+          <div className="lfine" style={{ marginBottom: 8 }}>Example: Call next</div>
+          {rows.map(([n, why, tag]) => <div key={n} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '10px 0', borderTop: '1px solid #eef0f3' }}><div><b>{n}</b><div className="lfine">{why}</div></div>{tag ? <span className="ltag">{tag}</span> : <span className="lbtn sm" aria-hidden>Call</span>}</div>)}
+        </div>
+      </div></section>
+      <section className="alt"><div className="lwrap" style={{ textAlign: 'center' }}>
+        <h2 style={{ fontSize: 30 }}>You pay for the CRM. Your property website is included.</h2>
+        <p style={{ maxWidth: 640, margin: '8px auto 18px' }}>Every plan comes with a public website for your listings, your own domain, and the calculators your buyers expect. No separate website bill.</p>
+        <div className="lchips" style={{ justifyContent: 'center' }}>{(cc.works_with || []).map((x) => <span key={x}>{x}</span>)}</div>
+        <p className="lfine" style={{ marginTop: 12 }}>Sign in with email, Google or Apple.</p>
+      </div></section>
+    </>
+  );
+}
+
 function Screens({ product }) {
   const { country } = useCountry();
   const set = country.code === 'PK' ? SCREENS : COUNTRY_SCREENS(country.code.toLowerCase());

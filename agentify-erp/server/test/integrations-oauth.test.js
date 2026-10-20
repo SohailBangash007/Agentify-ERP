@@ -66,7 +66,7 @@ test('Google sign-in: only existing staff, verified email, one-time code, signed
   const su = await call('erp.test', 'POST', '/api/platform/signup', { accept_terms: true, slug: 'sso', company_name: 'Sso Realty', admin_name: 'Owner', admin_email: 'owner@sso.test', admin_password: 'Tenant@12345', region: 'US', sub_region: 'Texas' });
   assert.equal(su.status, 201, JSON.stringify(su.data));
 
-  assert.deepEqual((await call(HOST, 'GET', '/api/auth/brand')).data.sso, [], 'no buttons until the platform app is set up');
+  assert.equal((await call(HOST, 'GET', '/api/auth/brand')).data.sso, undefined, 'no buttons until the platform app is set up');
   assert.equal((await call(HOST, 'GET', '/api/auth/sso/google/start')).status, 400);
   oauth.saveAppCreds('google', { client_id: 'cid.apps.googleusercontent.com', client_secret: 'csecret' }, 'tester');
   assert.deepEqual((await call(HOST, 'GET', '/api/auth/brand')).data.sso, ['google']);
