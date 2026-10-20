@@ -8,3 +8,7 @@ French (`fr`, used for Canada/Quebec) and Arabic (`ar`, UAE) strings in `client/
 | `client/src/locales/ar.json` | العربية (UAE) | — | — | needs review |
 
 Coverage today: sign-in and shared buttons. More screens move to `t('key', 'English default')` phase by phase; any missing key falls back to English, so a partial translation never breaks a screen.
+
+## Arabic PDF text
+
+`server/src/services/rtlPdf.js` draws Arabic-script text right to left in PDFs using Noto Naskh Arabic (SIL Open Font License, `server/assets/fonts/`). It is **not yet used** by the receipt, voucher or statement PDFs: a sample (`arabic-pdf-sample.pdf`) must first be checked by a native reader for joined letters, reading direction and mixed Arabic/English/number lines.
