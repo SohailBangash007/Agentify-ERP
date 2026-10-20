@@ -8,6 +8,8 @@ import { newSecret, verifyCode, otpauthUrl, qrDataUrl, newRecoveryCodes, useReco
 import { audit } from '../audit.js';
 import { asyncH, bad, HttpError, now } from '../util.js';
 import { clientConfig } from '../regions/runtime.js';
+import { PROVIDERS as OAUTH, authorizeUrl, redirectUri, signState, configuredProviders } from '../services/oauthApps.js';
+import { redeemLoginCode } from '../services/oauthFlow.js';
 import { currentTenant } from '../context.js';
 import { requestPasswordReset, resetPassword, inviteInfo, acceptInvite, sendVerification, verifyEmail } from '../services/accessLinks.js';
 
@@ -149,7 +151,24 @@ function demoLogins() {
 }
 // region settings of this workspace (formats, units, terms, flags); the browser applies them before it renders any amount
 r.get('/region', (_req, res) => res.json(clientConfig(currentTenant())));
-r.get('/brand', (_req, res) => res.json({ name: getSetting('company_name', '') || 'Agentify ERP', demo_logins: demoLogins() }));
+r.get('/brand', (_req, res) => res.json({ name: getSetting('company_name', '') || 'Agentify ERP', demo_logins: demoLogins(), sso: configuredProviders().filter((p) => ['google', 'apple'].includes(p)) }));
+
+// Sign in with Google / Apple: existing staff accounts only (no account is created here), and two-step sign-in still applies.
+r.get('/sso/:provider/start', asyncH((req, res) => {
+  const p = req.params.provider;
+  if (!['google', 'apple'].includes(p) || !currentTenant()) throw bad('Unknown sign-in method');
+  const state = signState({ purpose: 'login', tid: currentTenant().id, origin: `${req.protocol}://${req.get('host')}` });
+  res.redirect(303, authorizeUrl(p, 'login', { state, redirect: redirectUri(p, req) }));
+}));
+r.post('/sso/exchange', loginLimiter, asyncH((req, res) => {
+  const row = redeemLoginCode(req.body?.code, currentTenant()?.id);
+  if (!row) throw new HttpError(401, 'This sign-in expired. Try again.');
+  const u = loadUser(row.user_id);
+  if (!u || u.portal) throw new HttpError(401, 'This account cannot sign in this way.');
+  if (u.totp_enabled) return res.json({ mfa_required: true, mfa_token: signMfaToken(u) });
+  audit(req, 'Signed in with ' + row.provider, 'user', u.id, u.email);
+  finishLogin(req, res, u);
+}));
 
 r.get('/me', requireAuth, (req, res) => res.json(sessionPayload(req.user)));
 

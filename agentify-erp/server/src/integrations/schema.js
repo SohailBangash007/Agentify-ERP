@@ -1,0 +1,27 @@
+// Workspace-database tables for integrations, calls and text messages (see store.js). No imports: db.js loads this.
+export const INTEGRATIONS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS tenant_integrations(
+  provider TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'configured', config_enc TEXT, public_info TEXT, connected_by INTEGER, connected_at TEXT, last_test_at TEXT, last_error TEXT);
+CREATE TABLE IF NOT EXISTS integration_log(
+  id INTEGER PRIMARY KEY, provider TEXT NOT NULL, action TEXT NOT NULL, outcome TEXT NOT NULL, detail TEXT, user_id INTEGER, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS calls(
+  id INTEGER PRIMARY KEY, contact_id INTEGER, user_id INTEGER, direction TEXT NOT NULL DEFAULT 'outbound', to_number TEXT, from_number TEXT, agent_number TEXT,
+  provider TEXT NOT NULL, provider_sid TEXT, status TEXT NOT NULL DEFAULT 'queued', duration INTEGER, outcome TEXT, notes TEXT, started_at TEXT NOT NULL, ended_at TEXT);
+CREATE INDEX IF NOT EXISTS idx_calls_contact ON calls(contact_id);
+CREATE TABLE IF NOT EXISTS sms_log(
+  id INTEGER PRIMARY KEY, contact_id INTEGER, user_id INTEGER, to_number TEXT, body TEXT, provider TEXT NOT NULL, provider_sid TEXT, status TEXT NOT NULL, error TEXT, created_at TEXT NOT NULL);
+
+CREATE TABLE IF NOT EXISTS appointments(
+  id INTEGER PRIMARY KEY, contact_id INTEGER, property_id INTEGER, user_id INTEGER NOT NULL, title TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'viewing', starts_at TEXT NOT NULL, ends_at TEXT NOT NULL,
+  location TEXT, notes TEXT, status TEXT NOT NULL DEFAULT 'scheduled', google_event_id TEXT, sync_error TEXT, created_by INTEGER, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_appointments_user ON appointments(user_id, starts_at);
+CREATE TABLE IF NOT EXISTS social_connections(
+  id INTEGER PRIMARY KEY, provider TEXT NOT NULL, external_id TEXT NOT NULL, name TEXT, token_enc TEXT NOT NULL, meta TEXT, connected_by INTEGER, connected_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'connected', UNIQUE(provider, external_id));
+CREATE TABLE IF NOT EXISTS social_posts(
+  id INTEGER PRIMARY KEY, account_id INTEGER NOT NULL, message TEXT NOT NULL, media_url TEXT, link TEXT, property_id INTEGER, scheduled_at TEXT, status TEXT NOT NULL DEFAULT 'scheduled', external_post_id TEXT, error TEXT, published_at TEXT, created_by INTEGER, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_social_posts_due ON social_posts(status, scheduled_at);
+CREATE TABLE IF NOT EXISTS social_metrics(
+  post_id INTEGER PRIMARY KEY, fetched_at TEXT NOT NULL, impressions INTEGER, reach INTEGER, likes INTEGER, comments INTEGER, shares INTEGER, clicks INTEGER);
+CREATE TABLE IF NOT EXISTS portal_publications(
+  id INTEGER PRIMARY KEY, property_id INTEGER NOT NULL, portal TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued', external_id TEXT, error TEXT, published_at TEXT, updated_at TEXT NOT NULL, UNIQUE(property_id, portal));
+`;

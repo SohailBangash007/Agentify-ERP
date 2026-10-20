@@ -1,5 +1,5 @@
 // Control-plane API (not tenant-scoped): self-serve signup and the platform operator's tenant administration.
-import { Router } from 'express';
+import express, { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { asyncH, bad, HttpError } from '../util.js';
 import { sendMail, layout } from '../services/mailer.js';
@@ -18,6 +18,9 @@ import { verifySignature, applyBillingEvent, setSubscription, listSubmissions, a
 import * as stripe from '../services/stripe.js';
 import { stripeConfig, getSetting } from '../services/platformConfig.js';
 import { selectableRegions, listCountries } from '../regions/index.js';
+import { mayIssueCertificate } from '../integrations/domains.js';
+import { handleCallback } from '../services/oauthFlow.js';
+import { PROVIDERS } from '../services/oauthApps.js';
 import { BASE_DOMAIN, platformDb, withTenant, isMultiTenant, createTenant, validateSlug, listTenants, getTenant, setTenantStatus, RESERVED_SLUGS } from '../platform.js';
 
 const r = Router();
@@ -43,6 +46,22 @@ r.get('/slug-available/:slug', asyncH((req, res) => {
   try { validateSlug(req.params.slug); res.json({ available: true }); }
   catch (e) { if (e instanceof HttpError) return res.json({ available: false, reason: e.message }); throw e; }
 }));
+
+/** Every provider sends the browser back here (the one address registered in their consoles); we forward it to the workspace. */
+const oauthDone = asyncH(async (req, res) => {
+  const provider = req.params.provider;
+  if (!PROVIDERS[provider]) return res.status(404).send('Unknown provider');
+  const params = { ...req.query, ...(req.body || {}) };
+  const out = await handleCallback(provider, params, req);
+  if (out.detail) console.warn(`[oauth ${provider}]`, out.detail);
+  if (!out.redirect) return res.status(400).type('text/plain').send(out.error || 'This sign-in could not be completed.');
+  res.redirect(303, out.redirect);
+});
+r.get('/oauth/:provider/callback', oauthDone);
+r.post('/oauth/:provider/callback', express.urlencoded({ extended: false, limit: '100kb' }), oauthDone);
+
+/** The web server asks this before it issues an HTTPS certificate for a host name (Caddy on-demand TLS "ask"). */
+r.get('/domain-check', (req, res) => res.sendStatus(mayIssueCertificate(req.query.domain) ? 200 : 404));
 
 /** Self-serve signup: creates the workspace (own database + uploads), its base configuration and the first admin. */
 r.post('/signup', signupLimiter, asyncH(async (req, res) => {

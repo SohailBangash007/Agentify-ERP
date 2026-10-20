@@ -7,7 +7,8 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { uploadDir, get } from './db.js';
 import { scheduleBackups } from './services/backup.js';
-import { tenantContext, bootstrapTenants, forEachTenant, isMultiTenant, resolveTenant } from './platform.js';
+import { tenantContext, bootstrapTenants, forEachTenant, forEachTenantAsync, isMultiTenant, resolveTenant } from './platform.js';
+import { runDuePosts } from './integrations/social.js';
 import { injectMeta, platformSitemap, platformRobots, MARKETING_ROUTES } from './services/marketing.js';
 import { ensureFirstAdmin } from './services/platformAuth.js';
 import { markJob, snapshot, generateNotifications } from './services/platformMetrics.js';
@@ -39,6 +40,9 @@ import regionRoutes from './routes/region.js';
 import mortgageRoutes from './regions/mortgage.js';
 import documentRoutes from './regions/documents.js';
 import privacyRoutes from './regions/privacy.js';
+import integrationRoutes from './routes/integrations.js';
+import appointmentRoutes from './routes/appointments.js';
+import integrationHooks from './integrations/hooks.js';
 import { sendAlert } from './services/integrations.js';
 
 import auth from './routes/auth.js';
@@ -95,6 +99,9 @@ export function createApp() {
     next();
   }, apiAccessGuard, pub);
 
+  // provider call-backs (signed by the provider; no sign-in)
+  app.use('/api/hooks', rateLimit({ windowMs: 60_000, limit: 600, standardHeaders: true, legacyHeaders: false }), integrationHooks);
+
   app.use('/api', rateLimit({ windowMs: 60_000, limit: 900, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many requests' } }));
   app.use('/api', authenticate, csrfGuard);
   app.use('/api', billingGuard);
@@ -128,6 +135,8 @@ export function createApp() {
   app.use('/api/mortgage', mortgageRoutes);
   app.use('/api/documents', documentRoutes);
   app.use('/api/privacy', privacyRoutes);
+  app.use('/api/integrations', integrationRoutes);
+  app.use('/api/appointments', appointmentRoutes);
   app.use('/api/push', push);
   app.use('/api/assistant', assistant);
   app.use('/api/portal', portal);
@@ -184,6 +193,9 @@ if (isMain) {
   tick();
   scheduleBackups();
   setInterval(tick, 30 * 60 * 1000).unref(); // goal nudges are once-per-day via dedupe keys
+  // scheduled social posts go out within a minute of their time
+  const socialTick = () => forEachTenantAsync(() => runDuePosts()).then(() => markJob('social-posts')).catch((e) => markJob('social-posts', e));
+  setInterval(socialTick, 60 * 1000).unref();
   // platform-wide: daily metric snapshot (for period comparisons) and super-admin alerts
   const platformTick = () => { try { snapshot(); generateNotifications(null, true); markJob('platform-jobs'); } catch (e) { console.error('[platform jobs]', e); markJob('platform-jobs', e); }
     // trial expiry, reminders and renewals (idempotent; safe to run as often as you like)

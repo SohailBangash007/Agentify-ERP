@@ -1,0 +1,39 @@
+// Public web hooks that providers call (no sign-in): Twilio asks what to do when the agent picks up, and reports call
+// progress. Every request is checked against Twilio's signature using the workspace's own Auth Token, so a stranger who
+// guesses the address cannot start calls or change records.
+import express, { Router } from 'express';
+import { get, run } from '../db.js';
+import { now } from '../util.js';
+import { integrationConfig } from './store.js';
+import { bridgeTwiml, verifyTwilioSignature } from './twilio.js';
+
+const r = Router();
+r.use(express.urlencoded({ extended: false, limit: '100kb' }));
+
+function verified(req) {
+  const cfg = integrationConfig('twilio');
+  if (!cfg) return null;
+  const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+  return verifyTwilioSignature(cfg.auth_token, url, req.body || {}, req.get('X-Twilio-Signature')) ? cfg : null;
+}
+
+r.post('/twilio/bridge', (req, res) => {
+  const cfg = verified(req);
+  if (!cfg) return res.status(403).type('text/plain').send('Invalid signature');
+  const call = get('SELECT * FROM calls WHERE id=?', Number(req.query.call));
+  if (!call || call.provider !== 'twilio') return res.status(404).type('text/plain').send('Unknown call');
+  res.type('text/xml').send(bridgeTwiml({ leadNumber: call.to_number, callerId: cfg.phone_number }));
+});
+
+const MAP = { queued: 'queued', initiated: 'queued', ringing: 'ringing', 'in-progress': 'in_progress', completed: 'completed', busy: 'busy', failed: 'failed', 'no-answer': 'no_answer', canceled: 'canceled' };
+r.post('/twilio/status', (req, res) => {
+  if (!verified(req)) return res.status(403).type('text/plain').send('Invalid signature');
+  const id = Number(req.query.call);
+  const status = MAP[String(req.body?.CallStatus || '')] || null;
+  if (get('SELECT 1 FROM calls WHERE id=?', id) && status) {
+    const done = ['completed', 'busy', 'failed', 'no_answer', 'canceled'].includes(status);
+    run('UPDATE calls SET status=?, duration=COALESCE(?, duration), ended_at=CASE WHEN ? THEN ? ELSE ended_at END WHERE id=?', status, req.body?.CallDuration ? Number(req.body.CallDuration) : null, done ? 1 : 0, now(), id);
+  }
+  res.sendStatus(204);
+});
+export default r;

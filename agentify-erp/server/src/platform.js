@@ -217,6 +217,13 @@ export function withTenant(tenant, fn) {
 }
 
 /** Run a background job once per active tenant; one tenant's failure never stops the others. */
+/** Like forEachTenant for jobs that wait on the network (posting to social accounts); one failing workspace never stops the rest. */
+export async function forEachTenantAsync(fn) {
+  for (const t of listTenants().filter((x) => x.status === 'active')) {
+    try { await withTenant(t, () => fn(t)); } catch (e) { console.error(`[tenant ${t.slug}]`, e); }
+  }
+}
+
 export function forEachTenant(fn) {
   for (const t of listTenants().filter((x) => x.status === 'active')) {
     try { withTenant(t, () => fn(t)); } catch (e) { console.error(`[tenant ${t.slug}]`, e); }

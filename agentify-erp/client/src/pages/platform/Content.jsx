@@ -275,6 +275,7 @@ export function IntegrationsPage() {
   const FORMS = {
     email: [['api_key', 'Resend API key', 'password', 'Starts with re_. Leave blank to keep the saved key.'], ['from', 'From address', 'text', 'Agentify ERP <no-reply@yourdomain.com> (domain verified in Resend)']],
     ga4: [['measurement_id', 'GA4 measurement ID', 'text', 'G-XXXXXXXXXX']],
+    ...Object.fromEntries(['google', 'apple', 'meta', 'linkedin', 'tiktok'].map((p) => [`oauth_${p}`, p === 'apple' ? [['client_id', 'Services ID', 'text', 'The Services ID from your Apple developer account'], ['team_id', 'Team ID', 'text', ''], ['key_id', 'Key ID', 'text', ''], ['private_key', 'Private key (.p8)', 'password', 'Paste the whole file. Leave blank to keep the saved key.']] : [['client_id', p === 'meta' ? 'App ID' : p === 'tiktok' ? 'Client key' : 'Client ID', 'text', ''], ['client_secret', p === 'meta' ? 'App secret' : 'Client secret', 'password', 'Leave blank to keep the saved secret.']]])),
     alerts: [['url', 'Incoming webhook URL', 'password', 'https:// only. Slack, Microsoft Teams or any service accepting {"text": "..."}']],
   };
   return (
@@ -289,11 +290,12 @@ export function IntegrationsPage() {
             {i.note && <p className="muted">{i.note}</p>}
             {i.test && <p>Last check {when(i.test.created_at)}: <b>{i.test.outcome === 'success' ? 'passed' : 'failed'}</b>{i.test.detail ? ` · ${i.test.detail}` : ''}</p>}
             {i.id === 'email' && i.settings.env_key && <p className="muted">Using the key from the server environment (RESEND_API_KEY).</p>}
+            {i.id.startsWith('oauth_') && <p className="muted">Redirect address to register: <span className="mono">{`${window.location.origin}/api/platform/oauth/${i.id.slice(6)}/callback`}</span>{i.settings.developer_console ? <> · <a href={i.settings.developer_console} target="_blank" rel="noreferrer">Open the developer console</a></> : null}</p>}
             {i.id === 'ga4' && i.settings.measurement_id && <p>Measurement ID <span className="mono">{i.settings.measurement_id}</span></p>}
             {(i.settings.api_key?.set || i.settings.url?.set) && <p className="muted">Saved credential ends {i.settings.api_key?.hint || i.settings.url?.hint}</p>}
             {can('integrations.manage') && <div className="row wrap" style={{ gap: 8 }}>
               {FORMS[i.id] && <button className="btn sm" onClick={() => setEdit({ id: i.id, name: i.name, values: Object.fromEntries(FORMS[i.id].map(([k]) => [k, k === 'from' ? i.settings.from || '' : k === 'measurement_id' ? i.settings.measurement_id || '' : ''])) })}>Configure</button>}
-              {['email', 'stripe', 'alerts'].includes(i.id) && i.configured && <button className="btn sm primary" disabled={busy === i.id} onClick={() => testIt(i)}>{busy === i.id ? 'Testing…' : 'Send test'}</button>}
+              {(['email', 'stripe', 'alerts'].includes(i.id) || i.id.startsWith('oauth_')) && i.configured && <button className="btn sm primary" disabled={busy === i.id} onClick={() => testIt(i)}>{busy === i.id ? 'Testing…' : 'Send test'}</button>}
               {i.manage && <a className="btn sm" href={i.manage}>Open settings</a>}
               {FORMS[i.id] && i.configured && !i.settings.env_key && <button className="btn sm danger" onClick={() => off(i)}>Disconnect</button>}
             </div>}

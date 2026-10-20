@@ -9,6 +9,7 @@ import { IDENTITY_SCHEMA } from './regions/identitySchema.js';
 import { MORTGAGE_SCHEMA } from './regions/mortgageSchema.js';
 import { DOCUMENTS_SCHEMA } from './regions/documentsSchema.js';
 import { syncRegionLookups } from './regions/lookups.js';
+import { INTEGRATIONS_SCHEMA } from './integrations/schema.js';
 import { now } from './util.js';
 import { als, currentContext, currentTenant } from './context.js';
 
@@ -33,7 +34,7 @@ export function openDb(file, tenant = null) {
   h.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
   handles.set(abs, h);
   try {
-    als.run({ tenant, db: h }, () => { db.exec(SCHEMA); db.exec(CONSTRUCTION_SCHEMA); db.exec(IDENTITY_SCHEMA); db.exec(MORTGAGE_SCHEMA); db.exec(DOCUMENTS_SCHEMA); migrate(); backfillIds(); try { syncRegionLookups(); } catch { /* lists are a convenience; never block opening the workspace */ } });
+    als.run({ tenant, db: h }, () => { db.exec(SCHEMA); db.exec(CONSTRUCTION_SCHEMA); db.exec(IDENTITY_SCHEMA); db.exec(MORTGAGE_SCHEMA); db.exec(DOCUMENTS_SCHEMA); db.exec(INTEGRATIONS_SCHEMA); migrate(); backfillIds(); try { syncRegionLookups(); } catch { /* lists are a convenience; never block opening the workspace */ } });
   } catch (e) { handles.delete(abs); h.close(); throw e; }
   return h;
 }
