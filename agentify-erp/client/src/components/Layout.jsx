@@ -12,6 +12,7 @@ import { useAuth, useFetch, useMeta } from '../context.jsx';
 import { useBrand } from '../brand.js';
 import { BillingBanner, VerifyBanner } from '../pages/Billing.jsx';
 import Announcements from './Announcements.jsx';
+import { getRegion } from '../format.js';
 
 // [label, path, perm module (view)]
 const NAV = [
@@ -21,6 +22,7 @@ const NAV = [
   { label: 'CRM', icon: 'users', module: 'crm', children: [
     ['Contacts', '/contacts'], ['Leads', '/leads'], ['Smart Lists', '/smart-lists'], ['Sales Pipeline', '/pipeline'], ['Tasks', '/tasks'], ['Notes', '/notes'],
     ['Goals & Rewards', '/goals'], ['Sales Agents', '/agents'], ['Commissions', '/commissions', 'commissions'] ] },
+  { label: 'Mortgage', icon: 'card', to: '/mortgage', module: 'crm', flag: 'mortgage' },
   { label: 'Construction', icon: 'hardhat', module: 'construction', product: 'construction', children: [
     ['Overview & projects', '/construction'], ['Estimates', '/construction/estimates'], ['Purchase orders', '/construction/purchase-orders'], ['Materials & stock', '/construction/materials'], ['Subcontracts', '/construction/subcontracts'] ] },
   { label: 'Properties', icon: 'building', module: 'properties', product: 'real_estate', children: [
@@ -84,6 +86,7 @@ function Sidebar({ collapsed, setCollapsed, mobileOpen, closeMobile }) {
   const groups = NAV.map((g) => {
     if (!g.always && !ok(null, g.module)) return null;
     if (!hasProduct(g.product)) return null;
+    if (g.flag && !getRegion().config.flags?.[g.flag]) return null;
     if (!g.children) return g;
     const kids = (g.always ? g.children : g.children.filter((c) => ok(c[2], g.module))).filter((c) => hasProduct(PRODUCT_PATHS[c[1]]));
     return kids.length ? { ...g, children: kids } : null;

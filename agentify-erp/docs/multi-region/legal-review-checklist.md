@@ -68,3 +68,10 @@ Status legend: `open` (not yet implemented), `draft` (implemented as editable da
 |---|---|---|
 | Existing receipt, voucher and statement wording and terms (unchanged; customer-editable) | open | |
 | Any future tax feature (none exists today) | n/a | |
+
+## Mortgage and financing module (Phase 3)
+
+- [ ] **Referral fees.** The app only records a referral fee after the user ticks that it was disclosed to the customer, and only marks it received once the loan is funded. Whether a fee may be taken at all, and what disclosure is required, differs by country and state (for example US RESPA/Section 8, UK FCA mortgage-intermediary rules, Canadian provincial brokerage law, UAE Central Bank rules). A lawyer must confirm the rule for each region before the `mortgage` switch is turned on there.
+- [ ] **Calculators are estimates.** Payment, amortisation and affordability results are illustrative. Canadian fixed-rate mortgages use semi-annual compounding (set `mortgage_compounding` in the pack); other regions use monthly. Confirm each region's quoting conventions and required wording.
+- [ ] **Financial advice.** Screens say the figures are estimates and that a lender decides. Confirm the wording is acceptable and that the product does not need a licence in any region.
+- [ ] **Personal financial data.** Finance profiles hold income, debts and credit band. Confirm retention and access rules per region (the privacy tooling phase covers deletion and export).

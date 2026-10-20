@@ -106,3 +106,40 @@ test('US workspace: region fields, identity number and non-Pakistani contact dat
   assert.equal(JSON.stringify((await get(`/api/region/identity/${id}`)).data).includes('123456789'), false);
   assert.equal((await post(`/api/region/identity/${id}/reveal`)).data.number, '123456789');
 });
+
+test('mortgage tools stay off until the region switch is on, then run an application through its stages', async () => {
+  const host = 'lonestar.erp.test';
+  const l = await call(host, 'POST', '/api/auth/login', { identifier: 'owner@lonestar.test', password: 'Tenant@12345' });
+  const c = l.cookie;
+  const get = (u) => call(host, 'GET', u, null, { cookie: c });
+  const post = (u, b) => call(host, 'POST', u, b || {}, { cookie: c });
+  const put = (u, b) => call(host, 'PUT', u, b || {}, { cookie: c });
+  assert.equal((await get('/api/mortgage/lenders')).status, 404);
+  const { setRegionFlag } = await import('../src/regions/admin.js');
+  setRegionFlag(platformDb(), 'US', 'mortgage', true, 'tester');
+  { const t = await get('/api/mortgage/lenders'); assert.equal(t.status, 200, JSON.stringify(t.data)); }
+
+  const calc = await post('/api/mortgage/calc', { principal: 20000000, rate_bp: 650, term_months: 360 });
+  assert.equal(calc.status, 200); assert.equal(calc.data.schedule.at(-1).balance, 0);
+  assert.equal((await post('/api/mortgage/calc', { principal: 1.5, rate_bp: 650, term_months: 360 })).status, 400);
+
+  const lender = await post('/api/mortgage/lenders', { name: 'First Texas Bank' });
+  assert.equal(lender.status, 201);
+  const contactId = 1;
+  assert.equal((await put(`/api/mortgage/profile/${contactId}`, { gross_monthly_income: 900000, monthly_debts: 50000, down_payment: 5000000, first_time_buyer: true })).status, 200);
+
+  const noDisclosure = await post('/api/mortgage/applications', { contact_id: contactId, lender_id: lender.data.id, price: 25000000, down_payment: 5000000, term_months: 360, rate_bp: 650, referral_fee_type: 'flat', referral_fee_value: 50000 });
+  assert.equal(noDisclosure.status, 400);
+  const app = await post('/api/mortgage/applications', { contact_id: contactId, lender_id: lender.data.id, price: 25000000, down_payment: 5000000, term_months: 360, rate_bp: 650, referral_fee_type: 'flat', referral_fee_value: 50000, referral_fee_disclosed: true });
+  assert.equal(app.status, 201, JSON.stringify(app.data));
+  assert.equal(app.data.amount, 20000000); assert.equal(app.data.referral_fee_status, 'pending');
+  const id = app.data.id;
+  assert.equal((await post(`/api/mortgage/applications/${id}/stage`, { stage: 'funded' })).status, 400);
+  for (const s of ['pre_qualified', 'documents', 'submitted', 'approved']) assert.equal((await post(`/api/mortgage/applications/${id}/stage`, { stage: s })).status, 200, s);
+  assert.equal((await post(`/api/mortgage/applications/${id}/referral-received`)).status, 400, 'not funded yet');
+  assert.equal((await post(`/api/mortgage/applications/${id}/stage`, { stage: 'funded' })).status, 200);
+  assert.equal((await post(`/api/mortgage/applications/${id}/referral-received`)).data.referral_fee_status, 'received');
+  const list = (await get('/api/mortgage/applications')).data;
+  assert.equal(list[0].payment, 126414); // $200,000 at 6.5% over 30 years = $1,264.14
+  assert.equal((await get(`/api/mortgage/applications/${id}/schedule`)).data.schedule.length, 360);
+});

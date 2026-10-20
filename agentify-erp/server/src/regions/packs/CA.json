@@ -68,5 +68,6 @@
       "label": "Year built",
       "type": "number"
     }
-  ]
+  ],
+  "mortgage_compounding": "semiannual"
 }

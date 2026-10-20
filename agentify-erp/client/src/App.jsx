@@ -44,6 +44,7 @@ import Customer360 from './pages/Customer360.jsx';
 import PlatformConsole from './pages/PlatformConsole.jsx';
 import MarketingSite from './marketing/Marketing.jsx';
 import { VerifyEmail } from './pages/AuthPages.jsx';
+import Mortgage from './pages/Mortgage.jsx';
 import { ConstructionOverview, ConstructionProject, EstimatesPage, MaterialsPage, PurchaseOrdersPage, SubcontractsPage } from './pages/Construction.jsx';
 
 /**
@@ -159,6 +160,7 @@ export default function App() {
         <Route path="projects/financials" element={G('accounting', <ProjectFinancials />)} />
         <Route path="projects/map" element={G('properties', <PlotMap />)} />
         <Route path="projects/:id" element={G('projects', <ProjectWorkspace />)} />
+        <Route path="mortgage" element={G('crm', <Mortgage />)} />
         {/* Construction */}
         <Route path="construction" element={G('construction', <ConstructionOverview />)} />
         <Route path="construction/projects/:id" element={G('construction', <ConstructionProject />)} />

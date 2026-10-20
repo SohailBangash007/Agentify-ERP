@@ -85,3 +85,23 @@ test('formatting honours the 24-hour style', () => {
   assert.equal(f.dateTime('2026-10-07 15:04:00'), '07/10/2026 15:04');
   assert.ok(buildRegion({ region: 'UK', currency: 'GBP', money_scale: 2, currency_style: 'intl', locale: 'en-GB' }).money.format(100000).includes('1,000.00'));
 });
+
+import { payment, schedule, totals, affordability, loanToValue, canMove } from '../../shared/region/mortgage.js';
+test('mortgage maths: known payment, schedule ends at zero, interest adds up', () => {
+  // $300,000 at 6% for 30 years -> $1,798.65 per month
+  assert.equal(payment({ principal: 30000000, annual_bp: 600, term_months: 360 }), 179865);
+  const rows = schedule({ principal: 30000000, annual_bp: 600, term_months: 360 });
+  assert.equal(rows.length, 360);
+  assert.equal(rows.at(-1).balance, 0);
+  const t = totals(rows);
+  assert.equal(t.paid - t.interest, 30000000);
+  assert.equal(payment({ principal: 120000, annual_bp: 0, term_months: 12 }), 10000);
+  assert.ok(schedule({ principal: 30000000, annual_bp: 600, term_months: 360, extra_monthly: 50000 }).length < 360);
+  assert.equal(loanToValue({ price: 40000000, down: 8000000 }), 8000);
+  const a = affordability({ gross_monthly_income: 800000, monthly_debts: 100000, max_dti_bp: 4300, annual_bp: 600, term_months: 360, down: 4000000 });
+  assert.equal(a.max_payment, 244000);
+  assert.ok(Math.abs(payment({ principal: a.max_loan, annual_bp: 600, term_months: 360 }) - a.max_payment) <= 1);
+  assert.ok(canMove('enquiry', 'pre_qualified')); assert.ok(!canMove('enquiry', 'funded'));
+  // Canadian semi-annual compounding gives a slightly lower payment than monthly at the same quoted rate
+  assert.ok(payment({ principal: 30000000, annual_bp: 600, term_months: 300, compounding: 'semiannual' }) < payment({ principal: 30000000, annual_bp: 600, term_months: 300 }));
+});

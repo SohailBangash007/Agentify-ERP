@@ -36,6 +36,7 @@ import promos from './routes/promos.js';
 import announcements from './routes/announcements.js';
 import construction from './routes/construction.js';
 import regionRoutes from './routes/region.js';
+import mortgageRoutes from './regions/mortgage.js';
 import { sendAlert } from './services/integrations.js';
 
 import auth from './routes/auth.js';
@@ -122,6 +123,7 @@ export function createApp() {
   app.use('/api/announcements', announcements);
   app.use('/api/construction', construction);
   app.use('/api/region', regionRoutes);
+  app.use('/api/mortgage', mortgageRoutes);
   app.use('/api/push', push);
   app.use('/api/assistant', assistant);
   app.use('/api/portal', portal);
