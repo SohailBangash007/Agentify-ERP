@@ -20,7 +20,7 @@ import { validateVoiceHttp, testVoiceHttp, startVoiceCall } from '../integration
 import { hubExtras } from '../integrations/hub.js';
 import { currentTenant } from '../context.js';
 import { callSettings, saveCallSettings, listScripts, ensureStarterScript, renderScript, callStats, recordingFile, transcribeRecording } from '../integrations/calls.js';
-import { AI_PROVIDERS, connectAi, aiStatus, aiConfig, activeProvider } from '../integrations/ai.js';
+import { AI_PROVIDERS, connectAi, aiStatus, aiConfig, activeProvider, canTranscribe } from '../integrations/ai.js';
 import { getSetting, setSetting, uploadDir } from '../db.js';
 import { runWithTools, completeJson } from '../integrations/ai.js';
 import { toolsFor, systemPrompt } from '../integrations/aiTools.js';
@@ -51,7 +51,7 @@ r.get('/', can('crm', 'view'), asyncH((req, res) => {
   res.json({
     region: reg.region, base: webBase(req),
     items: catalogFor(reg.region).map((c) => {
-      const row = c.id === 'ai' ? (rows.ai_anthropic || rows.ai_openai) : rows[c.id];
+      const row = c.id === 'ai' ? (rows.ai_anthropic || rows.ai_openai || rows.ai_gemini) : rows[c.id];
       const info = parseJson(row?.public_info) || {};
       return { ...c, status: row?.status || 'not_connected', connected_at: row?.connected_at || null, last_test_at: row?.last_test_at || null, error: row?.last_error || null, info };
     }),
@@ -133,7 +133,7 @@ r.get('/dialer/queue', can('crm', 'view'), asyncH((req, res) => {
 }));
 
 // ---- call settings, scripts, statistics, recordings
-r.get('/calls-settings', can('crm', 'view'), (_req, res) => res.json({ ...callSettings(), ai_transcripts: !!aiConfig('openai') }));
+r.get('/calls-settings', can('crm', 'view'), (_req, res) => res.json({ ...callSettings(), ai_transcripts: canTranscribe() }));
 r.put('/calls-settings', can('settings', 'edit'), asyncH((req, res) => {
   const b = req.body || {};
   // a blank notice falls back to the default wording: recording never starts without one
@@ -179,7 +179,7 @@ r.post('/recordings/calls/:id/transcribe', can('crm', 'edit'), asyncH(async (req
 r.get('/ai', can('crm', 'view'), (_req, res) => res.json({ providers: Object.entries(AI_PROVIDERS).map(([id, p]) => ({ id, label: p.label, key_url: p.key_url, key_hint: p.key_hint, default_model: p.default_model, status: aiStatus(id) })), default: getSetting('ai_default', null), share_names: getSetting('ai_share_names', '0') === '1', active: activeProvider(getSetting('ai_default', null)) }));
 r.put('/ai/:provider', can('settings', 'edit'), asyncH(async (req, res) => { await connectAi(req.params.provider, req.body || {}, req.user.id); audit(req, 'Connected AI provider', 'integration', req.params.provider); res.json({ ok: true }); }));
 r.delete('/ai/:provider', can('settings', 'edit'), asyncH((req, res) => { removeIntegration(`ai_${req.params.provider}`); audit(req, 'Disconnected AI provider', 'integration', req.params.provider); res.json({ ok: true }); }));
-r.put('/ai-settings', can('settings', 'edit'), asyncH((req, res) => { if (req.body?.default !== undefined) setSetting('ai_default', ['anthropic', 'openai'].includes(req.body.default) ? req.body.default : null); if (req.body?.share_names !== undefined) setSetting('ai_share_names', req.body.share_names ? '1' : '0'); res.json({ ok: true }); }));
+r.put('/ai-settings', can('settings', 'edit'), asyncH((req, res) => { if (req.body?.default !== undefined) setSetting('ai_default', Object.keys(AI_PROVIDERS).includes(req.body.default) ? req.body.default : null); if (req.body?.share_names !== undefined) setSetting('ai_share_names', req.body.share_names ? '1' : '0'); res.json({ ok: true }); }));
 
 // ---- ask the AI about your own data; write promotional video scripts; keep the rendered videos
 r.post('/ai/ask', can('crm', 'view'), asyncH(async (req, res) => {

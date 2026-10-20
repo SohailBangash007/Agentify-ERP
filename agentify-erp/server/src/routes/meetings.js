@@ -12,7 +12,7 @@ import { sendMail, layout } from '../services/mailer.js';
 import { integrationConfig, integrationRow } from '../integrations/store.js';
 import { sendSms } from '../integrations/twilio.js';
 import { listScripts, renderScript, ensureStarterScript } from '../integrations/calls.js';
-import { aiConfig } from '../integrations/ai.js';
+import { canTranscribe } from '../integrations/ai.js';
 import * as M from '../integrations/meetings.js';
 
 const r = Router();
@@ -63,7 +63,7 @@ async function sendInvites(req, m, inviteIds, via) {
 const shape = (m, req, extra = {}) => ({ id: m.id, code: m.code, title: m.title, description: m.description, starts_at: m.starts_at, ends_at: m.ends_at, max_minutes: m.max_minutes, status: m.status, record: !!m.record, transcribe: !!m.transcribe, script_id: m.script_id, contact_id: m.contact_id, host_user_id: m.host_user_id, started_at: m.started_at, ended_at: m.ended_at, join_url: M.joinUrl(origin(req), m.code), ...extra });
 
 // ------------------------------------------------------------------ staff API
-r.get('/settings', can('crm', 'view'), (_req, res) => { ensureStarterScript(null); res.json({ caps: M.caps(), defaults: M.workspaceDefaults(), openai: !!aiConfig('openai'), scripts: listScripts().filter((s) => s.kind === 'meeting' || s.kind === 'call') }); });
+r.get('/settings', can('crm', 'view'), (_req, res) => { ensureStarterScript(null); res.json({ caps: M.caps(), defaults: M.workspaceDefaults(), openai: canTranscribe(), scripts: listScripts().filter((s) => s.kind === 'meeting' || s.kind === 'call') }); });
 r.put('/settings', can('settings', 'edit'), asyncH((req, res) => {
   const c = M.caps(); const mins = Math.round(Number(req.body?.default_minutes));
   if (req.body?.default_minutes !== undefined) { if (!(mins >= 5)) throw bad('Enter at least 5 minutes.'); if (mins > c.max_minutes) throw bad(`The platform allows at most ${c.max_minutes} minutes per meeting.`); setSetting('meet_default_minutes', String(mins)); }

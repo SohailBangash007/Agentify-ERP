@@ -164,3 +164,31 @@ test('call recording: notice, signed hook, download, transcript with OpenAI, aud
   assert.match(rendered.text, /Hello Buyer One, this is .* from AI Realty/);
   assert.equal((await post('/api/integrations/scripts', { name: 'Follow-up', body: 'Hi {{contact.name}}, following up.' })).status, 201);
 });
+
+test('Gemini connects with a real test, answers with data tools and transcribes', async () => {
+  const { connectAi, runWithTools, transcribe, canTranscribe } = await import('../src/integrations/ai.js');
+  const { run } = await import('../src/db.js');
+  const calls = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    calls.push({ url: String(url), headers: opts.headers, body: opts.body ? JSON.parse(opts.body) : null });
+    const ok = (b) => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    if (String(url).includes('/models?')) return ok({ models: [{ name: 'models/gemini-2.5-flash' }] });
+    const n = calls.filter((c) => c.url.includes(':generateContent')).length;
+    if (calls.at(-1).body?.contents?.[0]?.parts?.[1]?.inline_data) return ok({ candidates: [{ content: { parts: [{ text: 'Speaker 1: hello' }] } }] });
+    if (n === 1) return ok({ candidates: [{ content: { role: 'model', parts: [{ functionCall: { name: 'ping', args: { x: 1 } } }] } }] });
+    return ok({ candidates: [{ content: { role: 'model', parts: [{ text: 'pong answer' }] } }] });
+  };
+  try {
+    await assert.rejects(connectAi('gemini', { api_key: 'nope' }, 1), /AIza/);
+    await connectAi('gemini', { api_key: 'AIza' + 'a'.repeat(35) }, 1);
+    assert.equal(canTranscribe(), true);
+    const out = await runWithTools('gemini', { system: 's', question: 'q', tools: [{ name: 'ping', description: 'd', parameters: { type: 'object', additionalProperties: false, properties: {} }, run: async () => ({ ok: true }) }] });
+    assert.equal(out.answer, 'pong answer');
+    assert.deepEqual(out.tools_used, ['ping']);
+    const sent = calls.find((c) => c.body?.tools);
+    assert.equal(sent.headers['x-goog-api-key'].startsWith('AIza'), true);
+    assert.equal(JSON.stringify(sent.body.tools).includes('additionalProperties'), false);
+    assert.equal(await transcribe(Buffer.from('abc'), 'a.mp3'), 'Speaker 1: hello');
+  } finally { globalThis.fetch = realFetch; }
+});

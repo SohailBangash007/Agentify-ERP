@@ -13,7 +13,7 @@ import { all, get, run, getSetting, uploadDir } from '../db.js';
 import { getSetting as platformSetting } from '../services/platformConfig.js';
 import { currentTenant } from '../context.js';
 import { currentRegion } from '../regions/runtime.js';
-import { aiConfig, transcribe } from './ai.js';
+import { aiConfig, canTranscribe, transcribe } from './ai.js';
 import { now, bad, HttpError } from '../util.js';
 
 // ---- limits set by the platform owner (the backend), inside which each workspace chooses its own
@@ -200,7 +200,7 @@ export async function finishRecording(m, { mime, duration, uploadedBy }) {
   const rel = path.join('recordings', 'meetings', `${m.id}-${id}.${ext}`);
   fs.renameSync(part, path.join(uploadDir(), rel));
   run('UPDATE meeting_recordings SET path=? WHERE id=?', rel.split(path.sep).join('/'), id);
-  if (m.transcribe && aiConfig('openai')) transcribeMeetingRecording(id).catch(() => {});
+  if (m.transcribe && canTranscribe()) transcribeMeetingRecording(id).catch(() => {});
   return id;
 }
 export async function transcribeMeetingRecording(recId) {

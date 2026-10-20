@@ -31,7 +31,7 @@ function Viewer({ kind, id, onClose, onChanged }) {
             {can('crm', 'edit') && d.transcript_status !== 'pending' && <button className="btn sm" disabled={busy} onClick={transcribe}>{busy ? 'Transcribing…' : d.transcript ? 'Transcribe again' : 'Generate transcript'}</button>}
           </div>
           {d.error && <div className="alert err">{d.error}</div>}
-          {text ? <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', background: 'var(--surface-2, #f6f7f9)', padding: 12, borderRadius: 8, maxHeight: 320, overflow: 'auto' }}>{text}</pre> : <p className="muted">No transcript yet. Generating one needs an OpenAI key under Integrations. Live captions from the meeting appear here automatically.</p>}
+          {text ? <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', background: 'var(--surface-2, #f6f7f9)', padding: 12, borderRadius: 8, maxHeight: 320, overflow: 'auto' }}>{text}</pre> : <p className="muted">No transcript yet. Generating one needs an OpenAI or Gemini key under Integrations. Live captions from the meeting appear here automatically.</p>}
         </>)}
     </Modal>);
 }

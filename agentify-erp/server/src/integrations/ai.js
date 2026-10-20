@@ -9,8 +9,13 @@ import { saveIntegration, integrationConfig, integrationRow, markTested, mask } 
 export const AI_PROVIDERS = {
   anthropic: { label: 'Claude (Anthropic)', key_url: 'https://console.anthropic.com/settings/keys', default_model: 'claude-sonnet-5-5', key_hint: 'Starts with sk-ant-' },
   openai: { label: 'ChatGPT (OpenAI)', key_url: 'https://platform.openai.com/api-keys', default_model: 'gpt-4o', key_hint: 'Starts with sk-' },
+  gemini: { label: 'Gemini (Google)', key_url: 'https://aistudio.google.com/apikey', default_model: 'gemini-2.5-flash', key_hint: 'Starts with AIza' },
 };
-const KEY_RE = { anthropic: /^sk-ant-[A-Za-z0-9_-]{20,}$/, openai: /^sk-[A-Za-z0-9_-]{20,}$/ };
+const KEY_RE = { anthropic: /^sk-ant-[A-Za-z0-9_-]{20,}$/, openai: /^sk-[A-Za-z0-9_-]{20,}$/, gemini: /^AIza[A-Za-z0-9_-]{30,}$/ };
+const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
+const gHeaders = (key) => ({ 'x-goog-api-key': key, 'Content-Type': 'application/json' });
+/** Gemini accepts a subset of JSON Schema: drop the keywords it rejects. */
+const gSchema = (s) => (Array.isArray(s) ? s.map(gSchema) : s && typeof s === 'object' ? Object.fromEntries(Object.entries(s).filter(([k]) => !['additionalProperties', '$schema'].includes(k)).map(([k, v]) => [k, gSchema(v)])) : s);
 const slot = (p) => `ai_${p}`;
 
 async function http(url, opts = {}) {
@@ -22,6 +27,7 @@ async function http(url, opts = {}) {
 
 export async function testAi(provider, key) {
   if (provider === 'openai') { const d = await http('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${key}` }, timeout: 15_000 }); return { models: (d.data || []).length }; }
+  if (provider === 'gemini') { const d = await http(`${GEMINI}/models?pageSize=5`, { headers: { 'x-goog-api-key': key }, timeout: 15_000 }); return { models: (d.models || []).length }; }
   const d = await http('https://api.anthropic.com/v1/models', { headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, timeout: 15_000 });
   return { models: (d.data || []).length };
 }
@@ -39,9 +45,11 @@ export const aiStatus = (provider) => { const r = integrationRow(slot(provider))
 export const aiConfig = (provider) => integrationConfig(slot(provider));
 /** The provider to use: the one the owner picked as default, else whichever is connected (Claude first). */
 export function activeProvider(preferred) {
-  const order = preferred && aiConfig(preferred) ? [preferred, 'anthropic', 'openai'] : ['anthropic', 'openai'];
+  const order = preferred && aiConfig(preferred) ? [preferred, 'anthropic', 'openai', 'gemini'] : ['anthropic', 'openai', 'gemini'];
   return order.find((p) => aiConfig(p)) || null;
 }
+/** Speech to text works with an OpenAI or a Gemini key (Claude has no audio input). */
+export const canTranscribe = () => !!(aiConfig('openai') || aiConfig('gemini'));
 
 // ---- chat with tools (one loop for both providers)
 /** tools: [{ name, description, parameters (JSON schema), run: async (args) => object }] */
@@ -65,6 +73,27 @@ export async function runWithTools(provider, { system, question, history = [], t
         results.push({ type: 'tool_result', tool_use_id: u.id, content: JSON.stringify(out).slice(0, 12_000) });
       }
       messages.push({ role: 'user', content: results });
+    }
+    return { answer: 'I could not finish that analysis in a few steps. Try a narrower question.', tools_used: called };
+  }
+  if (provider === 'gemini') {
+    const contents = [...history.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })), { role: 'user', parts: [{ text: question }] }];
+    for (let round = 0; round < maxRounds; round += 1) {
+      const d = await http(`${GEMINI}/models/${encodeURIComponent(cfg.model)}:generateContent`, { method: 'POST', headers: gHeaders(cfg.api_key),
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, tools: tools.length ? [{ functionDeclarations: tools.map((t) => ({ name: t.name, description: t.description, parameters: gSchema(t.parameters) })) }] : undefined }) });
+      const content = d.candidates?.[0]?.content;
+      const calls = (content?.parts || []).filter((p) => p.functionCall);
+      if (!calls.length) return { answer: (content?.parts || []).map((p) => p.text || '').join('').trim(), tools_used: called };
+      contents.push(content);
+      const responses = [];
+      for (const { functionCall: fc } of calls) {
+        const tool = tools.find((t) => t.name === fc.name);
+        called.push(fc.name);
+        let out; try { out = tool ? await tool.run(fc.args || {}) : { error: 'Unknown tool' }; } catch (e) { out = { error: e.message }; }
+        const s = JSON.stringify(out);
+        responses.push({ functionResponse: { name: fc.name, response: { result: s.length > 12_000 ? { truncated: s.slice(0, 12_000) } : out } } });
+      }
+      contents.push({ role: 'user', parts: responses });
     }
     return { answer: 'I could not finish that analysis in a few steps. Try a narrower question.', tools_used: called };
   }
@@ -93,6 +122,9 @@ export async function completeJson(provider, { system, prompt }) {
   if (provider === 'anthropic') {
     const d = await http('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': cfg.api_key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: cfg.model, max_tokens: 1800, system, messages: [{ role: 'user', content: prompt }] }) });
     text = (d.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
+  } else if (provider === 'gemini') {
+    const d = await http(`${GEMINI}/models/${encodeURIComponent(cfg.model)}:generateContent`, { method: 'POST', headers: gHeaders(cfg.api_key), body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } }) });
+    text = (d.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
   } else {
     const d = await http('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${cfg.api_key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: cfg.model, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] }) });
     text = d.choices?.[0]?.message?.content || '';
@@ -105,7 +137,8 @@ export async function completeJson(provider, { system, prompt }) {
 /** Speech to text (OpenAI). Claude has no audio input, so transcripts need an OpenAI key. */
 export async function transcribe(buffer, filename = 'audio.mp3', language) {
   const cfg = aiConfig('openai');
-  if (!cfg) throw new Error('Transcripts need a connected OpenAI (ChatGPT) key.');
+  if (!cfg && aiConfig('gemini')) return transcribeGemini(buffer, filename, language);
+  if (!cfg) throw new Error('Transcripts need a connected OpenAI (ChatGPT) or Gemini key.');
   const form = new FormData();
   form.append('file', new Blob([buffer]), filename);
   form.append('model', 'whisper-1');
@@ -115,4 +148,17 @@ export async function transcribe(buffer, filename = 'audio.mp3', language) {
   const text = await res.text();
   if (!res.ok) { let m = text; try { m = JSON.parse(text).error.message; } catch { /* plain */ } throw new Error(m || `OpenAI answered ${res.status}`); }
   return text.trim();
+}
+
+const AUDIO_MIME = { mp3: 'audio/mp3', wav: 'audio/wav', webm: 'audio/webm', ogg: 'audio/ogg', m4a: 'audio/mp4', mp4: 'video/mp4' };
+/** Speech to text with Gemini: the audio goes inline, so it is limited to about 18 MB. */
+async function transcribeGemini(buffer, filename, language) {
+  const cfg = aiConfig('gemini');
+  if (buffer.length > 18 * 1024 * 1024) throw new Error('This recording is too large to transcribe with Gemini (18 MB limit).');
+  const mime = AUDIO_MIME[String(filename).split('.').pop().toLowerCase()] || 'audio/mp3';
+  const d = await http(`${GEMINI}/models/${encodeURIComponent(cfg.model)}:generateContent`, { method: 'POST', headers: gHeaders(cfg.api_key), timeout: 180_000,
+    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: `Transcribe this recording word for word${language ? ` in language code ${language}` : ''}. Label speakers as Speaker 1, Speaker 2 when you can tell them apart. Return only the transcript.` }, { inline_data: { mime_type: mime, data: buffer.toString('base64') } }] }] }) });
+  const text = (d.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim();
+  if (!text) throw new Error('Gemini returned no transcript.');
+  return text;
 }

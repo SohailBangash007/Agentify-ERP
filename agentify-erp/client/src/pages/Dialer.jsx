@@ -108,7 +108,7 @@ export default function Dialer() {
           {settings && (
             <Card title="Recording">
               <label className="row"><input type="checkbox" checked={!!settings.record} disabled={!can('settings', 'edit')} onChange={(e) => saveSettings({ record: e.target.checked })} /> Record calls</label>
-              <label className="row"><input type="checkbox" checked={!!settings.transcribe} disabled={!can('settings', 'edit') || !settings.ai_transcripts} onChange={(e) => saveSettings({ transcribe: e.target.checked })} /> Write a transcript {!settings.ai_transcripts && <span className="muted">(needs an OpenAI key)</span>}</label>
+              <label className="row"><input type="checkbox" checked={!!settings.transcribe} disabled={!can('settings', 'edit') || !settings.ai_transcripts} onChange={(e) => saveSettings({ transcribe: e.target.checked })} /> Write a transcript {!settings.ai_transcripts && <span className="muted">(needs an OpenAI or Gemini key)</span>}</label>
               <p className="muted">Many countries require telling people a call is recorded. The announcement is played to both people at the start.</p>
             </Card>)}
         </div>

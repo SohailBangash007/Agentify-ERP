@@ -117,7 +117,7 @@ export default function Meetings() {
       </PageHead>
       <ErrorBox error={err} />
       {settings && !settings.caps.enabled && <div className="alert warn">Video meetings are switched off for this platform.</div>}
-      {settings && <div className="alert info">Each meeting can last up to <b>{settings.caps.max_minutes} minutes</b> and hold up to <b>{settings.caps.max_participants} people</b>. Rooms open {settings.caps.early_join_minutes} minutes early and close automatically when time is up.{!settings.openai && ' Add an OpenAI key under Integrations to transcribe recordings. Live captions work without it.'}</div>}
+      {settings && <div className="alert info">Each meeting can last up to <b>{settings.caps.max_minutes} minutes</b> and hold up to <b>{settings.caps.max_participants} people</b>. Rooms open {settings.caps.early_join_minutes} minutes early and close automatically when time is up.{!settings.openai && ' Add an OpenAI or Gemini key under Integrations to transcribe recordings. Live captions work without it.'}</div>}
       <Tabs tabs={[{ key: 'upcoming', label: 'Upcoming' }, { key: 'past', label: 'Past' }]} value={scope} onChange={setScope} />
       <Card flush>
         {!rows ? <Loading /> : !rows.length ? <Empty icon="calendar" title={scope === 'upcoming' ? 'No meetings scheduled' : 'No past meetings'} hint="Schedule one and send the link on email, text or WhatsApp." /> : (

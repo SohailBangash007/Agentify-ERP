@@ -70,11 +70,11 @@ Facebook Pages and Instagram business accounts (publish and read likes, comments
 
 Testimonials are shown only when real quotes are entered in the console (the marketing content `testimonials` list; an optional `country` field limits a quote to one country). The site does not contain invented reviews. The "Example: Call next" panel on the landing page is labelled as an example.
 
-## AI (Claude and ChatGPT)
+## AI (Claude, ChatGPT and Gemini)
 - Workspace owners paste their own API key under Integrations → Claude and ChatGPT. The key is tested against the provider, stored encrypted and never returned to the browser.
 - **Ask your data** (AI Studio): the model calls read-only tools (sales, leads, calls, listings summaries) limited to what the signed-in user may see. Customer names are hidden unless the owner switches that on.
 - **Promo videos**: the model writes the script and captions from the listing's real facts. Language models do not produce video, so the browser draws the video from the listing photos (canvas and MediaRecorder) and uploads it to the workspace.
-- Speech-to-text for recordings uses OpenAI Whisper (an OpenAI key is needed; files over 25 MB are not transcribed).
+- Speech-to-text uses OpenAI Whisper (files over 25 MB are not transcribed) or, with only a Gemini key, Gemini (18 MB limit). Gemini keys come from aistudio.google.com/apikey.
 
 ## Call recording, scripts and statistics
 - Recording is off until a workspace turns it on in the Dialer. Every recorded call opens with a spoken notice. Recording laws differ by country and state; the workspace owner is responsible for consent.

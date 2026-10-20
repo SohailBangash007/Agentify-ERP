@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { all, get, run, getSetting, setSetting, uploadDir } from '../db.js';
 import { integrationConfig } from './store.js';
-import { aiConfig, transcribe } from './ai.js';
+import { aiConfig, canTranscribe, transcribe } from './ai.js';
 import { render } from '../../../shared/region/templates.js';
 import { currentRegion } from '../regions/runtime.js';
 import { now, today, addDays } from '../util.js';
@@ -80,7 +80,7 @@ export async function fetchRecording(recId) {
     const rel = path.join('recordings', 'calls', `${rec.call_id}-${rec.id}.mp3`);
     fs.writeFileSync(path.join(uploadDir(), rel), buf);
     run('UPDATE call_recordings SET path=?, size=?, error=NULL WHERE id=?', rel, buf.length, rec.id);
-    if (callSettings().transcribe && aiConfig('openai')) await transcribeRecording(rec.id);
+    if (callSettings().transcribe && canTranscribe()) await transcribeRecording(rec.id);
   } catch (e) { run('UPDATE call_recordings SET error=? WHERE id=?', String(e.message).slice(0, 250), rec.id); }
 }
 export async function transcribeRecording(recId) {

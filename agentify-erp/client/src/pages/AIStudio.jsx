@@ -35,7 +35,7 @@ export function AiConnect({ can }) {
           <label>Use first: <select className="input" style={{ display: 'inline-block', width: 'auto' }} value={d.default || ''} onChange={(e) => settings({ default: e.target.value })}><option value="">Whichever is connected</option>{d.providers.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
           <label><input type="checkbox" checked={d.share_names} onChange={(e) => settings({ share_names: e.target.checked })} /> Let the AI see customer names (off by default)</label>
         </div>)}
-      <p className="muted" style={{ marginTop: 10 }}>Speech-to-text for recordings uses an OpenAI key. Claude and ChatGPT write scripts and answer questions; neither makes video, so videos are built from your listing photos.</p>
+      <p className="muted" style={{ marginTop: 10 }}>Speech-to-text for recordings uses an OpenAI or Gemini key. Claude, ChatGPT and Gemini write scripts and answer questions; none of them makes video, so videos are built from your listing photos.</p>
     </>
   );
 }
@@ -52,7 +52,7 @@ function Ask() {
   useEffect(() => { api.get('/api/integrations/ai').then(setD); }, []);
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [msgs, busy]);
   if (!d) return <Loading />;
-  if (!d.active) return <div className="alert warn">Connect Claude or ChatGPT on the <b>Connect</b> tab to ask questions about your data.</div>;
+  if (!d.active) return <div className="alert warn">Connect Claude, ChatGPT or Gemini on the <b>Connect</b> tab to ask questions about your data.</div>;
   const ask = async (text) => {
     const question = (text ?? q).trim(); if (!question || busy) return;
     const history = msgs.map((m) => ({ role: m.role, content: m.text }));
@@ -60,7 +60,7 @@ function Ask() {
     try { const r = await api.post('/api/integrations/ai/ask', { question, history }); setMsgs((m) => [...m, { role: 'assistant', text: r.answer, tools: r.tools_used }]); } catch (e) { toast(e.message, 'err'); } finally { setBusy(false); }
   };
   return (
-    <Card title={`Ask ${d.active === 'anthropic' ? 'Claude' : 'ChatGPT'} about your business`}>
+    <Card title={`Ask ${{ anthropic: 'Claude', openai: 'ChatGPT', gemini: 'Gemini' }[d.active]} about your business`}>
       <div style={{ minHeight: 220, maxHeight: 460, overflow: 'auto', display: 'grid', gap: 10, alignContent: 'start' }}>
         {!msgs.length && <div className="row wrap" style={{ gap: 8 }}>{SUGGESTIONS.map((s) => <button key={s} className="btn sm" onClick={() => ask(s)}>{s}</button>)}</div>}
         {msgs.map((m, i) => <div key={i} style={{ justifySelf: m.role === 'user' ? 'end' : 'start', maxWidth: '85%', background: m.role === 'user' ? 'var(--primary, #0f766e)' : 'var(--surface-2, #f1f5f9)', color: m.role === 'user' ? '#fff' : 'inherit', padding: '8px 12px', borderRadius: 12, whiteSpace: 'pre-wrap' }}>{m.text}{m.tools?.length > 0 && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Looked at: {[...new Set(m.tools.map((t) => t.name || t))].join(', ').replace(/_/g, ' ')}</div>}</div>)}
@@ -145,7 +145,7 @@ function Promo() {
     } catch (e) { setErr(e.message); } finally { setBusy(''); }
   };
   const upd = (i, k, v) => setPlan({ ...plan, scenes: plan.scenes.map((s, j) => (j === i ? { ...s, [k]: v } : s)) });
-  if (ai && !ai.active) return <div className="alert warn">Connect Claude or ChatGPT on the <b>Connect</b> tab first. They write the script and captions for your video.</div>;
+  if (ai && !ai.active) return <div className="alert warn">Connect Claude, ChatGPT or Gemini on the <b>Connect</b> tab first. They write the script and captions for your video.</div>;
   return (
     <>
       <Card title="Make a promotional video">
@@ -187,10 +187,10 @@ export default function AIStudio() {
   const [tab, setTab] = useState('ask');
   return (
     <>
-      <PageHead title="AI Studio" sub="Ask Claude or ChatGPT about your numbers, and turn a listing into a short promotional video." />
+      <PageHead title="AI Studio" sub="Ask Claude, ChatGPT or Gemini about your numbers, and turn a listing into a short promotional video." />
       <Tabs tabs={[{ key: 'ask', label: 'Ask your data' }, { key: 'promo', label: 'Promo videos' }, { key: 'connect', label: 'Connect' }]} value={tab} onChange={setTab} />
       {tab === 'ask' && <Ask />}
       {tab === 'promo' && <Promo />}
-      {tab === 'connect' && <Card title="Claude and ChatGPT"><AiConnect can={can('settings', 'edit')} /></Card>}
+      {tab === 'connect' && <Card title="Claude, ChatGPT and Gemini"><AiConnect can={can('settings', 'edit')} /></Card>}
     </>);
 }
