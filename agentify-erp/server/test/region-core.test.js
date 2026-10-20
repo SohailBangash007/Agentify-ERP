@@ -105,3 +105,16 @@ test('mortgage maths: known payment, schedule ends at zero, interest adds up', (
   // Canadian semi-annual compounding gives a slightly lower payment than monthly at the same quoted rate
   assert.ok(payment({ principal: 30000000, annual_bp: 600, term_months: 300, compounding: 'semiannual' }) < payment({ principal: 30000000, annual_bp: 600, term_months: 300 }));
 });
+
+import { render as renderTpl, placeholders, unknownVariables, checklistStatus } from '../../shared/region/templates.js';
+test('templates fill placeholders safely and report what is missing', () => {
+  const body = 'Hi {{client.name}}, pay {{amount|money}} by {{due|date}} {{nope}}';
+  assert.deepEqual(placeholders(body), ['client.name', 'amount', 'due', 'nope']);
+  const out = renderTpl(body, { client: { name: '<b>Ann</b>' }, amount: 123456, due: '2026-10-07' }, { fmt: { money: (v) => `$${v / 100}`, date: (v) => v } });
+  assert.equal(out.text, 'Hi &lt;b&gt;Ann&lt;/b&gt;, pay $1234.56 by 2026-10-07 [nope]');
+  assert.deepEqual(out.missing, ['nope']);
+  assert.deepEqual(unknownVariables('receipt_note', 'x {{client.name}} {{evil}}'), ['evil']);
+  const items = [{ key: 'a', required: true }, { key: 'b', required: false }];
+  assert.equal(checklistStatus(items, {}).complete, false);
+  assert.equal(checklistStatus(items, { a: { done: true } }).complete, true);
+});

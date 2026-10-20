@@ -40,7 +40,8 @@
   "flags": {
     "mortgage": false,
     "transactions": false,
-    "compliance": false
+    "compliance": false,
+    "templates": false
   },
   "rules": [],
   "notes": "Phase 1 manifest only (formats, units, terms). Rules, pipelines, templates and checklists arrive in the US phase; all legal values will be editable data marked needs_legal_review.",
@@ -69,6 +70,69 @@
       "key": "year_built",
       "label": "Year built",
       "type": "number"
+    }
+  ],
+  "templates": [
+    {
+      "kind": "offer",
+      "name": "Offer to purchase (sample)",
+      "language": "en",
+      "needs_legal_review": true,
+      "body": "SAMPLE WORDING. This template is a starting point only and is not legal advice. Have it reviewed by a licensed professional in your jurisdiction before use.\n\nOFFER TO PURCHASE\n\nDate: {{today|date}}\n{{company.name}} presents this offer on behalf of {{buyer.name}} (the Buyer) to {{seller.name}} (the Seller).\n\nProperty: {{property.title}}, {{property.address}}\nOffered price: {{price|money}}\nDeposit: {{deposit|money}}\nProposed closing date: {{closing_date|date}}\n\nThis offer is subject to the conditions agreed in writing between the parties.\n"
+    },
+    {
+      "kind": "agency_agreement",
+      "name": "Agency agreement (sample)",
+      "language": "en",
+      "needs_legal_review": true,
+      "body": "SAMPLE WORDING. This template is a starting point only and is not legal advice. Have it reviewed by a licensed professional in your jurisdiction before use.\n\nAGENCY AGREEMENT\n\n{{company.name}} is appointed by {{client.name}} (the Seller) to market {{property.title}}, {{property.address}}.\nCommission: {{commission_percent}}% of the sale price.\nTerm: {{start_date|date}} to {{end_date|date}}.\n\nSigned on {{today|date}}.\n"
+    },
+    {
+      "kind": "receipt_note",
+      "name": "Payment receipt note",
+      "language": "en",
+      "needs_legal_review": false,
+      "body": "Received from {{client.name}} the sum of {{amount|money}} by {{method}} (reference {{reference}}) on {{today|date}}.\n{{company.name}}\n"
+    }
+  ],
+  "checklists": [
+    {
+      "key": "us_purchase",
+      "name": "Purchase checklist",
+      "applies_to": "sale",
+      "needs_legal_review": true,
+      "items": [
+        {
+          "key": "id_verified",
+          "label": "Buyer and seller identity verified",
+          "required": true
+        },
+        {
+          "key": "agreement_signed",
+          "label": "Purchase agreement signed by all parties",
+          "required": true
+        },
+        {
+          "key": "earnest_money",
+          "label": "Earnest money deposit received and recorded",
+          "required": true
+        },
+        {
+          "key": "inspection",
+          "label": "Inspection completed or waived in writing",
+          "required": false
+        },
+        {
+          "key": "title_search",
+          "label": "Title search ordered",
+          "required": true
+        },
+        {
+          "key": "closing_disclosure",
+          "label": "Closing figures reviewed with the buyer",
+          "required": true
+        }
+      ]
     }
   ]
 }

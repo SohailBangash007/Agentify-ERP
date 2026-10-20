@@ -143,3 +143,40 @@ test('mortgage tools stay off until the region switch is on, then run an applica
   assert.equal(list[0].payment, 126414); // $200,000 at 6.5% over 30 years = $1,264.14
   assert.equal((await get(`/api/mortgage/applications/${id}/schedule`)).data.schedule.length, 360);
 });
+
+test('templates and compliance checklists: off by default, versioned templates, checklist cannot complete with required items open', async () => {
+  const host = 'lonestar.erp.test';
+  const l = await call(host, 'POST', '/api/auth/login', { identifier: 'owner@lonestar.test', password: 'Tenant@12345' });
+  const c = l.cookie;
+  const get = (u) => call(host, 'GET', u, null, { cookie: c });
+  const post = (u, b) => call(host, 'POST', u, b || {}, { cookie: c });
+  const put = (u, b) => call(host, 'PUT', u, b || {}, { cookie: c });
+  assert.equal((await get('/api/documents/templates')).status, 404);
+  assert.equal((await get('/api/documents/checklists')).status, 404);
+  const { setRegionFlag } = await import('../src/regions/admin.js');
+  setRegionFlag(platformDb(), 'US', 'templates', true, 'tester');
+  setRegionFlag(platformDb(), 'US', 'compliance', true, 'tester');
+
+  const list = (await get('/api/documents/templates')).data;
+  const offer = list.find((t) => t.kind === 'offer');
+  assert.ok(offer && offer.needs_legal_review === 1 && offer.source === 'pack');
+  const rendered = await post(`/api/documents/templates/${offer.id}/render`, { context: { buyer: { name: 'Jane Buyer' }, seller: { name: 'Sam Seller' }, price: 25000000, deposit: 500000, 'company': { name: 'Lone Star Realty' } } });
+  assert.match(rendered.data.text, /\$250,000\.00/); assert.match(rendered.data.text, /Jane Buyer/);
+  assert.ok(rendered.data.missing.includes('property.title')); assert.match(rendered.data.notice, /reviewed/);
+
+  assert.equal((await post('/api/documents/templates', { kind: 'letter', name: 'Bad', body: 'Hello {{secret.token}}' })).status, 400);
+  const mine = await post('/api/documents/templates', { kind: 'letter', name: 'Welcome letter', body: 'Welcome {{client.name}} from {{company.name}}' });
+  assert.equal(mine.status, 201);
+  const v2 = await put(`/api/documents/templates/${mine.data.id}`, { body: 'Welcome aboard, {{client.name}}' });
+  assert.equal(v2.data.version, 2);
+  assert.equal((await get('/api/documents/templates')).data.filter((t) => t.name === 'Welcome letter').length, 1, 'only the latest version is listed');
+
+  const runs = (await get('/api/documents/checklists/run?entity=sale&id=1')).data;
+  assert.equal(runs.length, 1);
+  const rid = runs[0].run_id;
+  assert.equal((await post(`/api/documents/checklists/run/${rid}/complete`)).status, 400);
+  for (const it of runs[0].items.filter((i) => i.required)) assert.equal((await post(`/api/documents/checklists/run/${rid}/item`, { key: it.key, done: true })).status, 200);
+  assert.equal((await post(`/api/documents/checklists/run/${rid}/item`, { key: 'made_up', done: true })).status, 400);
+  assert.equal((await post(`/api/documents/checklists/run/${rid}/complete`)).data.completed, true);
+  assert.equal((await post(`/api/documents/checklists/run/${rid}/item`, { key: 'inspection', done: true })).status, 400, 'locked once completed');
+});

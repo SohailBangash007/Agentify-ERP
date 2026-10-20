@@ -13,6 +13,7 @@ import { celebrate } from '../celebrate.js';
 import { PaymentFields, emptyPayment } from './Receipts.jsx';
 import CustomerPicker from '../components/CustomerPicker.jsx';
 import PropertyPicker from '../components/PropertyPicker.jsx';
+import ChecklistCard from '../components/ChecklistCard.jsx';
 
 export const KindBadge = ({ kind }) => (kind === 'construction' ? <span className="pill purple">Construction</span> : <span className="pill blue">Property</span>);
 
@@ -290,6 +291,7 @@ export function SaleDetail() {
       )}
       <div style={{ height: 12 }} />
       <Card><SaleLedgerSummary s={s} /></Card>
+      <ChecklistCard entity="sale" id={s.id} />
       {construction && data.schedule && data.schedule.tasks > 0 && (
         <div className="card" style={{ marginTop: 12, padding: 14 }}>
           <div className="row between"><b>Build progress</b><span className={`pill ${data.schedule.health === 'on_track' ? 'green' : data.schedule.health === 'at_risk' ? 'amber' : 'red'}`}>{data.schedule.health.replace('_', ' ')}{data.schedule.projected_delay_days > 0 ? ` · +${data.schedule.projected_delay_days}d` : ''}</span></div>

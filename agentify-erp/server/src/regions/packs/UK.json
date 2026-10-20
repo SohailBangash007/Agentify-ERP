@@ -42,7 +42,8 @@
     "mortgage": false,
     "transactions": false,
     "compliance": false,
-    "lettings": false
+    "lettings": false,
+    "templates": false
   },
   "rules": [],
   "notes": "Phase 1 manifest only. Law differs by nation, so sub_region drives the rules.",
@@ -80,6 +81,64 @@
       "label": "Council tax band",
       "type": "select",
       "options": [ "A", "B", "C", "D", "E", "F", "G", "H" ]
+    }
+  ],
+  "templates": [
+    {
+      "kind": "offer",
+      "name": "Offer to purchase (sample)",
+      "language": "en",
+      "needs_legal_review": true,
+      "body": "SAMPLE WORDING. This template is a starting point only and is not legal advice. Have it reviewed by a licensed professional in your jurisdiction before use.\n\nOFFER TO PURCHASE\n\nDate: {{today|date}}\n{{company.name}} presents this offer on behalf of {{buyer.name}} (the Purchaser) to {{seller.name}} (the Vendor).\n\nProperty: {{property.title}}, {{property.address}}\nOffered price: {{price|money}}\nDeposit: {{deposit|money}}\nProposed closing date: {{closing_date|date}}\n\nThis offer is subject to the conditions agreed in writing between the parties.\n"
+    },
+    {
+      "kind": "agency_agreement",
+      "name": "Agency agreement (sample)",
+      "language": "en",
+      "needs_legal_review": true,
+      "body": "SAMPLE WORDING. This template is a starting point only and is not legal advice. Have it reviewed by a licensed professional in your jurisdiction before use.\n\nAGENCY AGREEMENT\n\n{{company.name}} is appointed by {{client.name}} (the Vendor) to market {{property.title}}, {{property.address}}.\nCommission: {{commission_percent}}% of the sale price.\nTerm: {{start_date|date}} to {{end_date|date}}.\n\nSigned on {{today|date}}.\n"
+    },
+    {
+      "kind": "receipt_note",
+      "name": "Payment receipt note",
+      "language": "en",
+      "needs_legal_review": false,
+      "body": "Received from {{client.name}} the sum of {{amount|money}} by {{method}} (reference {{reference}}) on {{today|date}}.\n{{company.name}}\n"
+    }
+  ],
+  "checklists": [
+    {
+      "key": "uk_sale",
+      "name": "Sale progression checklist",
+      "applies_to": "sale",
+      "needs_legal_review": true,
+      "items": [
+        {
+          "key": "aml_id",
+          "label": "Anti-money-laundering identity checks completed",
+          "required": true
+        },
+        {
+          "key": "terms_signed",
+          "label": "Terms of business signed by the vendor",
+          "required": true
+        },
+        {
+          "key": "epc",
+          "label": "EPC available",
+          "required": true
+        },
+        {
+          "key": "memo_of_sale",
+          "label": "Memorandum of sale issued to both parties",
+          "required": true
+        },
+        {
+          "key": "conveyancer",
+          "label": "Conveyancers instructed on both sides",
+          "required": true
+        }
+      ]
     }
   ]
 }

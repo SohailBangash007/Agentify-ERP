@@ -75,3 +75,9 @@ Status legend: `open` (not yet implemented), `draft` (implemented as editable da
 - [ ] **Calculators are estimates.** Payment, amortisation and affordability results are illustrative. Canadian fixed-rate mortgages use semi-annual compounding (set `mortgage_compounding` in the pack); other regions use monthly. Confirm each region's quoting conventions and required wording.
 - [ ] **Financial advice.** Screens say the figures are estimates and that a lender decides. Confirm the wording is acceptable and that the product does not need a licence in any region.
 - [ ] **Personal financial data.** Finance profiles hold income, debts and credit band. Confirm retention and access rules per region (the privacy tooling phase covers deletion and export).
+
+## Document templates and compliance checklists (Phase 4)
+
+- [ ] **Starter templates** (offer, agency agreement) in each pack are generic sample wording, flagged `needs_legal_review`, and every render shows a notice to that effect. A licensed professional per region must review or replace them before the `templates` switch is turned on.
+- [ ] **Starter checklists** (US purchase, UK sale progression, Canada purchase, UAE sale) are prompts for a broker's own process, not a statement of what the law requires. Confirm each item list, and which items must be required, per region and sub-region.
+- [ ] Edits to a template create a new version and reset it to "needs review".
