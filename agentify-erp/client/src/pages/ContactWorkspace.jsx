@@ -8,6 +8,8 @@ import { api } from '../api.js';
 import { useAuth, useFetch, useLookups, useToast, useUndoDelete } from '../context.jsx';
 import { ago, date, dateTime, money, todayPK } from '../format.js';
 import ContactForm from './ContactForm.jsx';
+import RegionFields from '../components/RegionFields.jsx';
+import { getRegion } from '../format.js';
 import { leadMessage, useCompanyName, waLink } from '../components/WhatsApp.jsx';
 
 const TOOLS = [
@@ -221,8 +223,9 @@ export default function ContactWorkspace() {
               </Field>
             </div>
           </Card>
+          <RegionFields entity="contact" id={c.id} />
           <Accordion title="Contact" open>
-            <KV items={[['Phone', c.phone], ['Alt phone', c.alt_phone], ['WhatsApp', c.whatsapp], ['Email', c.email], ['CNIC', c.cnic], ['Father/husband', c.father_name], ['DOB', c.dob && date(c.dob)], ['Gender', c.gender]]} />
+            <KV items={[['Phone', c.phone], ['Alt phone', c.alt_phone], ['WhatsApp', c.whatsapp], ['Email', c.email], ...(getRegion().config.region === 'PK' ? [['CNIC', c.cnic]] : []), ['Father/husband', c.father_name], ['DOB', c.dob && date(c.dob)], ['Gender', c.gender]]} />
           </Accordion>
           <Accordion title="General info">
             <KV items={[['Source', c.lead_source], ['Type', c.lead_type], ['Priority', c.priority], ['Sales agent', c.agent_name], ['Sales manager', c.manager_name], ['Created', dateTime(c.created_at)], ['Last activity', ago(c.last_activity_at)]]} />

@@ -5,7 +5,7 @@
   "version": 1,
   "locale": "en-US",
   "language": "en",
-  "languages": ["en"],
+  "languages": [ "en" ],
   "currency": "USD",
   "money_scale": 2,
   "currency_style": "intl",
@@ -13,14 +13,62 @@
   "time_style": "12h",
   "timezone": "America/New_York",
   "units_system": "imperial",
-  "area_units": ["sqft", "acre", "sqm"],
+  "area_units": [ "sqft", "acre", "sqm" ],
   "default_area_unit": "sqft",
-  "phone": { "calling_code": "1", "trunk": "1", "match_tail": 0, "national_length": [10] },
+  "phone": {
+    "calling_code": "1",
+    "trunk": "1",
+    "match_tail": 0,
+    "national_length": [
+      10
+    ]
+  },
   "sub_region_label": "State",
-  "sub_regions": ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "District of Columbia", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"],
-  "terminology": { "agent": "Realtor", "customer": "Client", "sales_agent": "Agent" },
-  "identity": { "national_id": { "label": "SSN (last 4 shown)", "pattern": "^\\d{3}-?\\d{2}-?\\d{4}$", "encrypted": true } },
-  "flags": { "mortgage": false, "transactions": false, "compliance": false },
+  "sub_regions": [ "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "District of Columbia", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming" ],
+  "terminology": {
+    "agent": "Realtor",
+    "customer": "Client",
+    "sales_agent": "Agent"
+  },
+  "identity": {
+    "national_id": {
+      "label": "SSN (last 4 shown)",
+      "pattern": "^\\d{3}-?\\d{2}-?\\d{4}$",
+      "encrypted": true
+    }
+  },
+  "flags": {
+    "mortgage": false,
+    "transactions": false,
+    "compliance": false
+  },
   "rules": [],
-  "notes": "Phase 1 manifest only (formats, units, terms). Rules, pipelines, templates and checklists arrive in the US phase; all legal values will be editable data marked needs_legal_review."
+  "notes": "Phase 1 manifest only (formats, units, terms). Rules, pipelines, templates and checklists arrive in the US phase; all legal values will be editable data marked needs_legal_review.",
+  "ext_fields": [
+    {
+      "entity": "contact",
+      "key": "residency_state",
+      "label": "State of residence",
+      "type": "select",
+      "options": "sub_regions"
+    },
+    {
+      "entity": "property",
+      "key": "parcel_number",
+      "label": "Parcel / APN number",
+      "type": "text"
+    },
+    {
+      "entity": "property",
+      "key": "hoa_monthly",
+      "label": "HOA fee (monthly)",
+      "type": "money"
+    },
+    {
+      "entity": "property",
+      "key": "year_built",
+      "label": "Year built",
+      "type": "number"
+    }
+  ]
 }

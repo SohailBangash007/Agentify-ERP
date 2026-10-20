@@ -74,3 +74,35 @@ test('a US workspace runs a sale and a payment in cents', async () => {
   assert.equal(detail.paid_amount, 5000000);
   assert.equal(detail.net_price - detail.paid_amount, 20000001);
 });
+
+test('US workspace: region fields, identity number and non-Pakistani contact data', async () => {
+  const host = 'lonestar.erp.test';
+  const l = await call(host, 'POST', '/api/auth/login', { identifier: 'owner@lonestar.test', password: 'Tenant@12345' });
+  const c = l.cookie;
+  const get = (u) => call(host, 'GET', u, null, { cookie: c });
+  const post = (u, b) => call(host, 'POST', u, b || {}, { cookie: c });
+  const put = (u, b) => call(host, 'PUT', u, b || {}, { cookie: c });
+
+  const contact = await post('/api/contacts', { full_name: 'Sam Seller', phone: '+1 212 555 0123', cnic: 'not-a-pk-number' });
+  assert.equal(contact.status, 201, JSON.stringify(contact.data));
+  const id = contact.data.id;
+
+  const defs = (await get(`/api/region/ext/contact/${id}`)).data;
+  assert.deepEqual(defs.fields.map((f) => f.key), ['residency_state']);
+  assert.ok(defs.fields[0].options.includes('Texas'));
+  assert.equal((await put(`/api/region/ext/contact/${id}`, { values: { residency_state: 'Atlantis' } })).status, 400);
+  assert.equal((await put(`/api/region/ext/contact/${id}`, { values: { nope: 'x' } })).status, 400);
+  const saved = await put(`/api/region/ext/contact/${id}`, { values: { residency_state: 'Texas' } });
+  assert.equal(saved.data.values.residency_state, 'Texas');
+
+  const prop = await get('/api/properties');
+  const pid = (Array.isArray(prop.data) ? prop.data : prop.data.items || prop.data.rows)[0].id;
+  assert.equal((await put(`/api/region/ext/property/${pid}`, { values: { hoa_monthly: 12550, year_built: 1998 } })).data.values.hoa_monthly, '12550');
+  assert.equal((await put(`/api/region/ext/property/${pid}`, { values: { hoa_monthly: 12.5 } })).status, 400);
+
+  assert.equal((await put(`/api/region/identity/${id}`, { number: '123' })).status, 400);
+  const idr = await put(`/api/region/identity/${id}`, { number: '123-45-6789' });
+  assert.equal(idr.data.masked, '•••• 6789');
+  assert.equal(JSON.stringify((await get(`/api/region/identity/${id}`)).data).includes('123456789'), false);
+  assert.equal((await post(`/api/region/identity/${id}/reveal`)).data.number, '123456789');
+});

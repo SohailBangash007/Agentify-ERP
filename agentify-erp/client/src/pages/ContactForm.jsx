@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Check, CurrencyInput, Drawer, Field, Select, TagInput } from '../components/ui.jsx';
 import { api } from '../api.js';
 import { useAuth, useLookups, useToast } from '../context.jsx';
+import { getRegion } from '../format.js';
 
 const GENDERS = ['Male', 'Female', 'Other'];
 const PRIORITIES = ['Low', 'Medium', 'High'];
@@ -72,7 +73,7 @@ export default function ContactForm({ initial, onClose, onSaved }) {
           <Field label="Last name"><input className="input" value={f.last_name ?? ''} onChange={(e) => setF((x) => ({ ...x, last_name: e.target.value, full_name: `${x.first_name || ''} ${e.target.value}`.trim() }))} /></Field>
           <Field label="Full name" className="full"><input className="input" value={f.full_name ?? ''} onChange={(e) => set('full_name', e.target.value)} /></Field>
           <Field label="Father / husband name"><input className="input" value={f.father_name ?? ''} onChange={(e) => set('father_name', e.target.value)} /></Field>
-          <Field label="CNIC" hint="Format 12345-1234567-1"><input className="input" value={f.cnic ?? ''} onChange={(e) => set('cnic', e.target.value)} onBlur={checkDup} placeholder="35202-1234567-1" /></Field>
+          {getRegion().config.region === 'PK' && <Field label="CNIC" hint="Format 12345-1234567-1"><input className="input" value={f.cnic ?? ''} onChange={(e) => set('cnic', e.target.value)} onBlur={checkDup} placeholder="35202-1234567-1" /></Field>}
           <Field label="Date of birth"><input className="input" type="date" value={f.dob ?? ''} onChange={(e) => set('dob', e.target.value)} /></Field>
           <Field label="Gender"><Select value={f.gender} onChange={(v) => set('gender', v)} options={GENDERS} /></Field>
           <Field label="Phone"><input className="input" value={f.phone ?? ''} onChange={(e) => set('phone', e.target.value)} onBlur={checkDup} placeholder="+92 3xx xxxxxxx" /></Field>

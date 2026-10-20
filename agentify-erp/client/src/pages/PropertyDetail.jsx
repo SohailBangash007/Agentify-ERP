@@ -7,6 +7,7 @@ import { BackLink, Card, Empty, KV, Loading, PageHead, ProgressBar, StatusBadge,
 import { useAuth, useFetch } from '../context.jsx';
 import { date, money } from '../format.js';
 import { PropertyActions, WebsiteBadge } from './Properties.jsx';
+import RegionFields from '../components/RegionFields.jsx';
 
 const KIND_OPTS = [['cover', 'Cover image'], ['gallery', 'Gallery'], ['siteplan', 'Site plan'], ['map', 'Map'], ['dev', 'Development picture'], ['document', 'Document (PDF)']];
 const FEATURE_LABEL = { bedrooms: 'Bedrooms', bathrooms: 'Bathrooms', floors: 'Floors', kitchen: 'Kitchens', garage: 'Garage', lawn: 'Lawn', drawing_room: 'Drawing room', dining_room: 'Dining room', corner: 'Corner', park_facing: 'Park facing', main_road: 'Main road', boulevard: 'Boulevard', possession: 'Possession', development_status: 'Development status' };
@@ -37,6 +38,7 @@ export default function PropertyDetail() {
       {p.review_note && p.review_state === 'draft' && <div className="alert err" style={{ marginBottom: 12 }}><b>Sent back by the Listing Manager:</b> {p.review_note}</div>}
       <div className="grid" style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(280px,1fr)', alignItems: 'start' }}>
         <div className="stack">
+          <RegionFields entity="property" id={p.id} />
           <Card flush>
             <Tabs value={tab} onChange={setTab} tabs={[{ key: 'overview', label: 'Unit information' }, ...(s ? [{ key: 'sale', label: 'Customer & sale' }, { key: 'ledger', label: 'Ledger' }] : []), { key: 'media', label: 'Images & videos', count: p.media.length }, { key: 'docs', label: 'Documents', count: ws.documents.length }]} />
             <div className="card-b">

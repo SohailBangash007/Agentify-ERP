@@ -5,7 +5,7 @@
   "version": 1,
   "locale": "en-CA",
   "language": "en",
-  "languages": ["en", "fr"],
+  "languages": [ "en", "fr" ],
   "currency": "CAD",
   "money_scale": 2,
   "currency_style": "intl",
@@ -13,14 +13,60 @@
   "time_style": "12h",
   "timezone": "America/Toronto",
   "units_system": "imperial",
-  "area_units": ["sqft", "sqm", "acre", "hectare"],
+  "area_units": [ "sqft", "sqm", "acre", "hectare" ],
   "default_area_unit": "sqft",
-  "phone": { "calling_code": "1", "trunk": "1", "match_tail": 0, "national_length": [10] },
+  "phone": {
+    "calling_code": "1",
+    "trunk": "1",
+    "match_tail": 0,
+    "national_length": [
+      10
+    ]
+  },
   "sub_region_label": "Province / territory",
-  "sub_regions": ["Alberta", "British Columbia", "Manitoba", "New Brunswick", "Newfoundland and Labrador", "Northwest Territories", "Nova Scotia", "Nunavut", "Ontario", "Prince Edward Island", "Quebec", "Saskatchewan", "Yukon"],
-  "terminology": { "customer": "Client" },
-  "identity": { "national_id": { "label": "SIN (last 4 shown)", "pattern": "^\\d{3}-?\\d{3}-?\\d{3}$", "encrypted": true } },
-  "flags": { "mortgage": false, "transactions": false, "compliance": false },
+  "sub_regions": [ "Alberta", "British Columbia", "Manitoba", "New Brunswick", "Newfoundland and Labrador", "Northwest Territories", "Nova Scotia", "Nunavut", "Ontario", "Prince Edward Island", "Quebec", "Saskatchewan", "Yukon" ],
+  "terminology": {
+    "customer": "Client"
+  },
+  "identity": {
+    "national_id": {
+      "label": "SIN (last 4 shown)",
+      "pattern": "^\\d{3}-?\\d{3}-?\\d{3}$",
+      "encrypted": true
+    }
+  },
+  "flags": {
+    "mortgage": false,
+    "transactions": false,
+    "compliance": false
+  },
   "rules": [],
-  "notes": "Phase 1 manifest only. Quebec requires French: fr-CA arrives with the translation phase."
+  "notes": "Phase 1 manifest only. Quebec requires French: fr-CA arrives with the translation phase.",
+  "ext_fields": [
+    {
+      "entity": "contact",
+      "key": "residency_province",
+      "label": "Province of residence",
+      "type": "select",
+      "options": "sub_regions"
+    },
+    {
+      "entity": "property",
+      "key": "pid_number",
+      "label": "PID / roll number",
+      "type": "text"
+    },
+    {
+      "entity": "property",
+      "key": "condo_fee_monthly",
+      "label": "Condo fee (monthly)",
+      "type": "money"
+    },
+    {
+      "entity": "property",
+      "key": "year_built",
+      "label": "Year built",
+      "type": "number"
+    }
+  ]
 }

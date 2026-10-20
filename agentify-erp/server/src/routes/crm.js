@@ -5,7 +5,7 @@ import { can, ownerId, requireStaff, hasPerm } from '../rbac.js';
 import { audit, activity, notify, userName } from '../audit.js';
 import { buildWhere } from '../filters.js';
 import { sendTable } from './helpers.js';
-import { asyncH, bad, forbidden, notFound, jparse, now, today, int, required } from '../util.js';
+import { asyncH, bad, forbidden, notFound, jparse, now, today, int, required, region } from '../util.js';
 import { saleSummary } from '../services/sales.js';
 import { customerLedger } from '../services/payments.js';
 import { progressSql } from '../services/schedule.js';
@@ -111,7 +111,8 @@ function normalise(data, req, existing) {
     if (!d.full_name) d.full_name = `${fn} ${ln}`.trim();
   }
   if (d.email && !/^\S+@\S+\.\S+$/.test(d.email)) throw bad('Email address is not valid');
-  if (d.cnic && !/^\d{5}-?\d{7}-?\d$/.test(d.cnic)) throw bad('CNIC must look like 12345-1234567-1');
+  // the CNIC format is Pakistan's; other regions keep identity numbers in the encrypted identity store
+  if (d.cnic && region().config.region === 'PK' && !/^\d{5}-?\d{7}-?\d$/.test(d.cnic)) throw bad('CNIC must look like 12345-1234567-1');
   if (d.phone && !/^[+\d][\d\s\-()]{6,19}$/.test(d.phone)) throw bad('Phone number is not valid');
   if (d.followup_date && !/^\d{4}-\d{2}-\d{2}$/.test(d.followup_date)) throw bad('Follow-up date must be YYYY-MM-DD');
   if (d.budget != null && d.budget < 0) throw bad('Budget cannot be negative');
