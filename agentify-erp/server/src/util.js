@@ -1,4 +1,5 @@
 import { currentTenant } from './context.js';
+import { currentRegion } from './regions/runtime.js';
 
 /** Default timezone; each tenant can override it (tenants.timezone in the control plane). */
 export const TZ = 'Asia/Karachi';
@@ -65,7 +66,10 @@ export const int = (v, def = 0) => {
 export const num = (v, def = 0) => { const n = Number(v); return Number.isFinite(n) ? n : def; };
 export const jparse = (s, def) => { try { return s ? JSON.parse(s) : def; } catch { return def; } };
 export const asyncH = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-export const pkr = (n) => 'PKR ' + Number(n || 0).toLocaleString('en-PK');
+export const pkr = (n) => currentRegion().money.text(n);
+/** Helpers for the current workspace's region (money, units, phone, dates). Pakistan outside a workspace. */
+export const region = () => currentRegion();
+export const moneyText = (n) => currentRegion().money.text(n);
 
 export function required(obj, ...keys) {
   for (const k of keys) if (obj[k] === undefined || obj[k] === null || obj[k] === '') throw bad(`${k.replace(/_/g, ' ')} is required`);

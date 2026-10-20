@@ -11,6 +11,7 @@ import { HttpError, bad } from './util.js';
 import { initPlans } from './services/plansStore.js';
 import { PLAN_SETTINGS, PLANS, PRODUCT_CHOICES } from './services/plans.js';
 import crypto from 'node:crypto';
+import { initRegions, REGION_COLUMNS } from './regions/index.js';
 
 export const PLATFORM_DB_FILE = process.env.ERP_PLATFORM_DB || path.join(DATA_DIR, 'platform.db');
 /** Set ERP_BASE_DOMAIN (e.g. agentifyerp.com, or localhost in development) to serve many tenants by subdomain. */
@@ -144,6 +145,8 @@ export function platformDb() {
   if (!inv.has('one_time_amount')) pdb.exec('ALTER TABLE invoices ADD COLUMN one_time_amount INTEGER NOT NULL DEFAULT 0');
   if (!inv.has('plan')) pdb.exec('ALTER TABLE invoices ADD COLUMN plan TEXT');
   pdb.exec(PLATFORM_SCHEMA_2);
+  for (const [c, def] of REGION_COLUMNS) if (!have.has(c)) pdb.exec(`ALTER TABLE tenants ADD COLUMN ${c} ${def}`);
+  initRegions(pdb);
   // the original install keeps every product it already used and gains the construction module
   pdb.exec("UPDATE tenants SET product='bundle' WHERE is_legacy=1 AND product='real_estate'");
   ensureLegacyTenant();
