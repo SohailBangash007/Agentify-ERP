@@ -8,7 +8,10 @@ const pad = (n) => String(n).padStart(2, '0');
 const fmt = (d) => d.toISOString().slice(0, 10);
 
 /** Current wall-clock in the tenant's timezone (PKT by default) as 'YYYY-MM-DD HH:MM:SS'. */
+/** ERP_FIXED_NOW ('YYYY-MM-DD HH:MM:SS') freezes the wall clock. Used only by the regression snapshot tests. */
+const FIXED_NOW = process.env.ERP_FIXED_NOW || null;
 export function now() {
+  if (FIXED_NOW) return FIXED_NOW;
   const s = new Date().toLocaleString('sv-SE', { timeZone: tenantTz() });
   return s.replace('T', ' ');
 }

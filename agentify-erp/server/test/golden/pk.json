@@ -1,0 +1,207 @@
+{
+ "/api/sales?limit=200": {
+  "status": 200,
+  "sha": "4a358dcabc3e7cae",
+  "bytes": 4063
+ },
+ "/api/receipts?limit=200": {
+  "status": 200,
+  "sha": "31e069f1b7918641",
+  "bytes": 7523
+ },
+ "/api/installments?limit=200": {
+  "status": 200,
+  "sha": "8f8aa8abfb3c9f58",
+  "bytes": 53699
+ },
+ "/api/receivables": {
+  "status": 200,
+  "sha": "094e388e2e1f14cf",
+  "bytes": 1715
+ },
+ "/api/commissions?limit=200": {
+  "status": 200,
+  "sha": "7c15699ef1f23bce",
+  "bytes": 2367
+ },
+ "/api/customers?limit=200": {
+  "status": 200,
+  "sha": "8dd59e9a06291547",
+  "bytes": 1467
+ },
+ "/api/accounting/trial-balance": {
+  "status": 200,
+  "sha": "49cc39e5df236097",
+  "bytes": 3429
+ },
+ "/api/accounting/income-statement": {
+  "status": 200,
+  "sha": "cf3f3cb5aabf556b",
+  "bytes": 1768
+ },
+ "/api/accounting/balance-sheet": {
+  "status": 200,
+  "sha": "bd51529957a01633",
+  "bytes": 1906
+ },
+ "/api/accounting/treasury": {
+  "status": 200,
+  "sha": "51c2f1a3dc944fc0",
+  "bytes": 1624
+ },
+ "/api/accounting/expenses?limit=200": {
+  "status": 200,
+  "sha": "7bc666988a83cdb8",
+  "bytes": 6013
+ },
+ "/api/accounting/credit-book": {
+  "status": 200,
+  "sha": "ae9ee273192b04c6",
+  "bytes": 677
+ },
+ "/api/accounting/accounts": {
+  "status": 200,
+  "sha": "2d05e0a5efe1f92a",
+  "bytes": 7453
+ },
+ "/api/accounting/journals?limit=200": {
+  "status": 200,
+  "sha": "ca8c383a35eafbd7",
+  "bytes": 12071
+ },
+ "/api/properties?limit=200": {
+  "status": 200,
+  "sha": "d0012654e07bd683",
+  "bytes": 23804
+ },
+ "/api/projects": {
+  "status": 200,
+  "sha": "dc427dc3eabeeb46",
+  "bytes": 3582
+ },
+ "/api/hrm/payroll": {
+  "status": 200,
+  "sha": "8df6d26048299a5d",
+  "bytes": 4177
+ },
+ "/api/reports/sales-by-agent": {
+  "status": 200,
+  "sha": "e26d4f95beebad2c",
+  "bytes": 600
+ },
+ "/api/reports/commission": {
+  "status": 200,
+  "sha": "f41fa44222e5ffdb",
+  "bytes": 1453
+ },
+ "/api/settings/system": {
+  "status": 200,
+  "sha": "a239d17371eef612",
+  "bytes": 1592
+ },
+ "/api/auth/brand": {
+  "status": 200,
+  "sha": "1c7f8f7c47c15aef",
+  "bytes": 784
+ },
+ "/api/sales/5": {
+  "status": 200,
+  "sha": "90492daa9e3e00dd",
+  "bytes": 18700
+ },
+ "/api/customers/8/statement": {
+  "status": 200,
+  "sha": "8657f644c82e6a2d",
+  "bytes": 24183
+ },
+ "/api/sales/4": {
+  "status": 200,
+  "sha": "50ee957ba1ee1494",
+  "bytes": 19059
+ },
+ "/api/sales/3": {
+  "status": 200,
+  "sha": "5b3cc4daf3600b04",
+  "bytes": 4692
+ },
+ "/api/customers/3/statement": {
+  "status": 200,
+  "sha": "29be4cf4d88995fb",
+  "bytes": 4976
+ },
+ "/api/sales/2": {
+  "status": 200,
+  "sha": "a6461ae97a0d0ffa",
+  "bytes": 5257
+ },
+ "/api/customers/2/statement": {
+  "status": 200,
+  "sha": "28965e3a35c13e49",
+  "bytes": 4844
+ },
+ "/api/sales/1": {
+  "status": 200,
+  "sha": "68aa4a90694e6c82",
+  "bytes": 9192
+ },
+ "/api/customers/1/statement": {
+  "status": 200,
+  "sha": "2aaf3b4c82efd8a3",
+  "bytes": 8082
+ },
+ "/api/receipts/12": {
+  "status": 200,
+  "sha": "dbf30689943f0f94",
+  "bytes": 1700
+ },
+ "/api/receipts/9": {
+  "status": 200,
+  "sha": "aea4c5dafa066734",
+  "bytes": 1454
+ },
+ "/api/receipts/8": {
+  "status": 200,
+  "sha": "83b76f2e1c646c0f",
+  "bytes": 1443
+ },
+ "/api/receipts/11": {
+  "status": 200,
+  "sha": "5e01be428a329d38",
+  "bytes": 1700
+ },
+ "/api/accounting/expenses/6": {
+  "status": 200,
+  "sha": "1a98256cb5d28838",
+  "bytes": 915
+ },
+ "/api/accounting/expenses/5": {
+  "status": 200,
+  "sha": "c03c8db8c9f0b3bd",
+  "bytes": 1145
+ },
+ "/api/accounting/expenses/4": {
+  "status": 200,
+  "sha": "9bc2ddfeb32ea4ea",
+  "bytes": 1177
+ },
+ "/api/accounting/expenses/1": {
+  "status": 200,
+  "sha": "8fe5f001cb267dfc",
+  "bytes": 1175
+ },
+ "/api/portal/dashboard": {
+  "status": 200,
+  "sha": "55725c5528db8c0b",
+  "bytes": 1948
+ },
+ "/api/portal/payments": {
+  "status": 200,
+  "sha": "083273739199ee5b",
+  "bytes": 821
+ },
+ "/api/portal/ledger": {
+  "status": 200,
+  "sha": "24173c38602532f5",
+  "bytes": 1018
+ }
+}
