@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
-import { DATE_PRESETS, initials, money, titleCase, cur } from '../format.js';
+import { DATE_PRESETS, initials, money, titleCase, cur, getRegion } from '../format.js';
 
 export const Spinner = () => <span className="spinner" />;
 /** Skeleton placeholder (shimmer) instead of a bare spinner; `rows` lines plus a header block. */
@@ -163,14 +163,27 @@ export function Select({ value, onChange, options, placeholder = 'Select…', al
   );
 }
 
-/** Whole-rupee money input with thousands separators. onChange receives a number (or '' when empty). */
+/** Money input. Whole units (Pakistan) type digits only; regions with cents accept a decimal and report minor units (cents). onChange receives a number (or '' when empty). */
 export function CurrencyInput({ value, onChange, prefix = cur(), ...p }) {
-  const display = value === '' || value === null || value === undefined ? '' : Number(value).toLocaleString('en-PK');
+  const m = getRegion().money;
+  const [draft, setDraft] = useState(null);
+  if (m.scale === 0) {
+    const display = value === '' || value === null || value === undefined ? '' : Number(value).toLocaleString('en-PK');
+    return (
+      <div className="input-group">
+        <span className="addon">{prefix}</span>
+        <input className="input mono" inputMode="numeric" value={display}
+          onChange={(e) => { const d = e.target.value.replace(/[^d]/g, ''); onChange(d === '' ? '' : Number(d)); }} {...p} />
+      </div>
+    );
+  }
+  const shown = draft ?? (value === '' || value === null || value === undefined ? '' : m.number(value));
   return (
     <div className="input-group">
       <span className="addon">{prefix}</span>
-      <input className="input mono" inputMode="numeric" value={display}
-        onChange={(e) => { const d = e.target.value.replace(/[^\d]/g, ''); onChange(d === '' ? '' : Number(d)); }} {...p} />
+      <input className="input mono" inputMode="decimal" value={shown}
+        onChange={(e) => { const txt = e.target.value; setDraft(txt); const minor = m.fromMajor(txt); onChange(minor === null || Number.isNaN(minor) ? '' : minor); }}
+        onBlur={() => setDraft(null)} {...p} />
     </div>
   );
 }
