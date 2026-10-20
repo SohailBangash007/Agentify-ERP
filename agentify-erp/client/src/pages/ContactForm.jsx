@@ -7,7 +7,9 @@ import { getRegion } from '../format.js';
 
 const GENDERS = ['Male', 'Female', 'Other'];
 const PRIORITIES = ['Low', 'Medium', 'High'];
-const PROVINCES = ['Punjab', 'Sindh', 'Khyber Pakhtunkhwa', 'Balochistan', 'Islamabad Capital Territory', 'Gilgit-Baltistan', 'Azad Kashmir'];
+const PK_PROVINCES = ['Punjab', 'Sindh', 'Khyber Pakhtunkhwa', 'Balochistan', 'Islamabad Capital Territory', 'Gilgit-Baltistan', 'Azad Kashmir'];
+/** States, provinces or emirates of the workspace's country. */
+const provinces = () => (getRegion().config.region === 'PK' ? PK_PROVINCES : getRegion().config.sub_regions || []);
 
 export function CustomFieldInput({ f, value, onChange }) {
   if (f.type === 'select') return <Select value={value} onChange={onChange} options={f.options || []} />;
@@ -27,7 +29,7 @@ export default function ContactForm({ initial, onClose, onSaved }) {
   const toast = useToast();
   const editing = !!initial?.id;
   const [f, setF] = useState(() => ({
-    country: 'Pakistan', priority: 'Medium', ...initial,
+    country: getRegion().config.name || 'Pakistan', priority: 'Medium', ...initial,
     tags: initial?.tags || [], custom: initial?.custom || {},
     stage_id: initial?.stage_id ?? stages[0]?.id ?? '',
   }));
@@ -72,11 +74,11 @@ export default function ContactForm({ initial, onClose, onSaved }) {
           <Field label="First name" required><input className="input" value={f.first_name ?? ''} onChange={(e) => setF((x) => ({ ...x, first_name: e.target.value, full_name: `${e.target.value} ${x.last_name || ''}`.trim() }))} autoFocus /></Field>
           <Field label="Last name"><input className="input" value={f.last_name ?? ''} onChange={(e) => setF((x) => ({ ...x, last_name: e.target.value, full_name: `${x.first_name || ''} ${e.target.value}`.trim() }))} /></Field>
           <Field label="Full name" className="full"><input className="input" value={f.full_name ?? ''} onChange={(e) => set('full_name', e.target.value)} /></Field>
-          <Field label="Father / husband name"><input className="input" value={f.father_name ?? ''} onChange={(e) => set('father_name', e.target.value)} /></Field>
+          {getRegion().config.region === 'PK' && <Field label="Father / husband name"><input className="input" value={f.father_name ?? ''} onChange={(e) => set('father_name', e.target.value)} /></Field>}
           {getRegion().config.region === 'PK' && <Field label="CNIC" hint="Format 12345-1234567-1"><input className="input" value={f.cnic ?? ''} onChange={(e) => set('cnic', e.target.value)} onBlur={checkDup} placeholder="35202-1234567-1" /></Field>}
           <Field label="Date of birth"><input className="input" type="date" value={f.dob ?? ''} onChange={(e) => set('dob', e.target.value)} /></Field>
           <Field label="Gender"><Select value={f.gender} onChange={(v) => set('gender', v)} options={GENDERS} /></Field>
-          <Field label="Phone"><input className="input" value={f.phone ?? ''} onChange={(e) => set('phone', e.target.value)} onBlur={checkDup} placeholder="+92 3xx xxxxxxx" /></Field>
+          <Field label="Phone"><input className="input" value={f.phone ?? ''} onChange={(e) => set('phone', e.target.value)} onBlur={checkDup} placeholder={getRegion().config.phone?.example || '+92 3xx xxxxxxx'} /></Field>
           <Field label="Alternate phone"><input className="input" value={f.alt_phone ?? ''} onChange={(e) => set('alt_phone', e.target.value)} onBlur={checkDup} /></Field>
           <Field label="WhatsApp"><input className="input" value={f.whatsapp ?? ''} onChange={(e) => set('whatsapp', e.target.value)} onBlur={checkDup} /></Field>
           <Field label="Email"><input className="input" type="email" value={f.email ?? ''} onChange={(e) => set('email', e.target.value)} onBlur={checkDup} /></Field>
@@ -84,7 +86,7 @@ export default function ContactForm({ initial, onClose, onSaved }) {
         </Section>
         <Section title="Address">
           <Field label="Country"><input className="input" value={f.country ?? ''} onChange={(e) => set('country', e.target.value)} /></Field>
-          <Field label="Province"><Select value={f.province} onChange={(v) => set('province', v)} options={PROVINCES} /></Field>
+          <Field label={getRegion().config.region === 'PK' ? 'Province' : (getRegion().config.sub_region_label || 'State')}><Select value={f.province} onChange={(v) => set('province', v)} options={provinces()} /></Field>
           <Field label="City"><input className="input" value={f.city ?? ''} onChange={(e) => set('city', e.target.value)} /></Field>
           <Field label="Area"><input className="input" value={f.area ?? ''} onChange={(e) => set('area', e.target.value)} /></Field>
           <Field label="Complete address" className="full"><textarea className="textarea" value={f.address ?? ''} onChange={(e) => set('address', e.target.value)} /></Field>

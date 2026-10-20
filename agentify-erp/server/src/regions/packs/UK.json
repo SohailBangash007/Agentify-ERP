@@ -2,7 +2,7 @@
   "code": "UK",
   "name": "United Kingdom",
   "status": "draft",
-  "version": 2,
+  "version": 3,
   "locale": "en-GB",
   "language": "en",
   "languages": [ "en" ],
@@ -21,7 +21,8 @@
     "match_tail": 0,
     "national_length": [
       10
-    ]
+    ],
+    "example": "+44 7700 900123"
   },
   "sub_region_label": "Nation",
   "sub_regions": [ "England", "Wales", "Scotland", "Northern Ireland" ],

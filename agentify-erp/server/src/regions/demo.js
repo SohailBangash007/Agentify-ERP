@@ -1,10 +1,13 @@
 // Demo data for a workspace outside Pakistan: a handful of local-looking contacts and listings so a trial can be explored.
 // Names, streets and prices are invented. Amounts are minor units (cents, pence, fils).
 import { run, get } from '../db.js';
+import { createSale } from '../services/sales.js';
+import { receivePayment } from '../services/payments.js';
 import { now, addMonths, today } from '../util.js';
 import { currentRegion } from './runtime.js';
 
 const DEMO = {
+  // lender names are invented
   US: { city: 'Austin', state: 'Texas', phone: (n) => `+1 512 555 01${n}`, contacts: ['Jordan Miller', 'Priya Patel', 'Carlos Alvarez', 'Emily Chen'],
     props: [['Maple Street Family Home', 'House', 'Austin', '1204 Maple Street', 1850, 42500000], ['Downtown Loft 5B', 'Apartment', 'Austin', '88 Congress Ave', 980, 61000000], ['Lakeview Townhouse', 'House', 'Round Rock', '17 Lakeview Dr', 1520, 38900000]] },
   CA: { city: 'Toronto', state: 'Ontario', phone: (n) => `+1 416 555 01${n}`, contacts: ['Liam Tremblay', 'Aisha Khan', 'Noah Gagnon', 'Sofia Rossi'],
@@ -30,5 +33,22 @@ export function seedRegionDemo() {
     run(`INSERT INTO properties(code, title, purpose, property_type, city, address, area_size, unit, total_price, net_price, status, review_state, published, is_demo, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)`,
       `DEMO-${i + 1}`, title, 'Sell', type, city, address, size, area, price, price, 'available', 'published', 1, now());
   });
+  try { seedDemoSales(d); } catch (e) { console.warn('[demo] sample sales skipped:', e.message); }
   return true;
+}
+
+function seedDemoSales(d) {
+  const admin = get('SELECT id, name FROM users ORDER BY id LIMIT 1');
+  const req = { user: { id: admin.id, name: admin.name, role: 'Super Admin', isSuper: true, perms: new Set() }, ip: null };
+  const cash = get("SELECT id FROM accounts WHERE code='1110'");
+  const plan = [[1, 0.2, 6, 0.5], [2, 0.15, 12, 0.25]]; // [property, booking share, installments, share of the booking already paid]
+  plan.forEach(([n, bookingShare, count, paidShare], i) => {
+    const prop = get('SELECT id, total_price FROM properties WHERE code=?', `DEMO-${n}`);
+    const contact = get('SELECT id FROM contacts ORDER BY id LIMIT 1 OFFSET ?', i);
+    if (!prop || !contact) return;
+    const booking = Math.round(prop.total_price * bookingShare);
+    const sale = createSale({ contact_id: contact.id, property_id: prop.id, sale_price: prop.total_price, discount: 0, booking_amount: booking, num_installments: count, first_due: addMonths(today(), 1) }, req);
+    if (cash) receivePayment({ contact_id: contact.id, sale_id: sale.id, amount: Math.round(booking * paidShare), payment_type: 'Booking Payment', method: 'Cash', account_id: cash.id }, req);
+  });
+  if (!get('SELECT 1 FROM lenders LIMIT 1')) run("INSERT INTO lenders(name, kind) VALUES(?, 'bank')", d.lender || 'First National Bank');
 }

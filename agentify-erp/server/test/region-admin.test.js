@@ -23,7 +23,7 @@ test('only Pakistan is selectable until another region is switched on', () => {
   assert.deepEqual([...selectableRegions(pdb).keys()], ['PK']);
   admin.setRegionStatus(pdb, 'US', 'active', 'tester');
   assert.deepEqual([...selectableRegions(pdb).keys()].sort(), ['PK', 'US']);
-  assert.equal(regionFor({ region: 'US', money_scale: 2 }).config.pack_version, 2);
+  assert.equal(regionFor({ region: 'US', money_scale: 2 }).config.pack_version, 3);
   admin.setRegionStatus(pdb, 'US', 'draft', 'tester');
   assert.deepEqual([...selectableRegions(pdb).keys()], ['PK']);
   assert.throws(() => admin.setRegionStatus(pdb, 'PK', 'draft', 'tester'), /stays active/);
@@ -103,6 +103,8 @@ test('demo data for another region uses its own currency, names and units, and n
     const contacts = all('SELECT country, phone FROM contacts');
     assert.ok(contacts.length >= 4 && contacts.every((c) => c.country === 'United Kingdom' && c.phone.startsWith('+44')));
     assert.equal(JSON.stringify([props, contacts]).includes('Pakistan'), false);
+    assert.equal(all('SELECT id FROM sales').length, 2, 'two sample sales with schedules');
+    assert.ok(all('SELECT id FROM receipts').length >= 1, 'and a payment');
   });
 });
 

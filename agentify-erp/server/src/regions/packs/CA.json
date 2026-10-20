@@ -2,7 +2,7 @@
   "code": "CA",
   "name": "Canada",
   "status": "draft",
-  "version": 2,
+  "version": 3,
   "locale": "en-CA",
   "language": "en",
   "languages": [ "en", "fr" ],
@@ -21,7 +21,8 @@
     "match_tail": 0,
     "national_length": [
       10
-    ]
+    ],
+    "example": "+1 416 555 0100"
   },
   "sub_region_label": "Province / territory",
   "sub_regions": [ "Alberta", "British Columbia", "Manitoba", "New Brunswick", "Newfoundland and Labrador", "Northwest Territories", "Nova Scotia", "Nunavut", "Ontario", "Prince Edward Island", "Quebec", "Saskatchewan", "Yukon" ],

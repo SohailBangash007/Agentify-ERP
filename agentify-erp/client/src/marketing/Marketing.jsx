@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { Loading } from '../components/ui.jsx';
+import Flag from '../components/Flag.jsx';
 import { track, consent, setConsent, browserOptOut, configureGa4, attributionFields, onConsentChange } from './analytics.js';
 import { setRegion } from '../format.js';
 import { MortgageCalculator, PurchaseCostCalculator, UnitConverter } from '../site/RegionCalculators.jsx';
@@ -89,14 +90,32 @@ function CountryProvider({ info, children }) {
 }
 function CountrySwitch({ compact }) {
   const { country, countries, setCountry } = useCountry();
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => { if (!e.target.closest?.('.lcountry')) setOpen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('click', close); document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('click', close); document.removeEventListener('keydown', esc); };
+  }, [open]);
   if (countries.length < 2) return null;
   return (
-    <label className="lcountry" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-      <span className={compact ? 'lhp' : ''} style={compact ? undefined : { color: 'var(--l-mut,#667085)' }}>Country</span>
-      <select aria-label="Country" value={country.code} onChange={(e) => setCountry(e.target.value)} style={{ font: 'inherit', padding: '6px 8px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff' }}>
-        {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
-      </select>
-    </label>
+    <div className="lcountry" style={{ position: 'relative', display: 'inline-block', fontSize: 14 }}>
+      <button type="button" aria-haspopup="listbox" aria-expanded={open} aria-label={`Country: ${country.name}. Change`} onClick={() => setOpen(!open)}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, font: 'inherit', padding: '7px 10px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff', cursor: 'pointer', color: 'inherit' }}>
+        <Flag code={country.code} /><span>{country.name}</span><span aria-hidden style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
+      </button>
+      {open && (
+        <ul role="listbox" aria-label="Country" style={{ position: 'absolute', right: 0, top: '110%', zIndex: 50, margin: 0, padding: 4, listStyle: 'none', background: '#fff', border: '1px solid #d0d5dd', borderRadius: 10, boxShadow: '0 8px 24px rgba(16,24,40,.14)', minWidth: 210 }}>
+          {countries.map((c) => (
+            <li key={c.code} role="option" aria-selected={c.code === country.code}>
+              <button type="button" onClick={() => { setCountry(c.code); setOpen(false); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', font: 'inherit', padding: '8px 10px', border: 0, borderRadius: 8, background: c.code === country.code ? '#e6f4f1' : 'transparent', cursor: 'pointer', color: 'inherit' }}>
+                <Flag code={c.code} /><span style={{ flex: 1 }}>{c.name}</span>{!c.open && <small style={{ opacity: 0.6 }}>soon</small>}
+              </button>
+            </li>))}
+        </ul>)}
+    </div>
   );
 }
 const SITE_VARS = { '--s-primary': '#0f766e', '--s-accent': '#f59e0b', '--s-dark': '#17202e', '--s-bg': '#ffffff', '--s-soft': '#f4f7f6', '--s-radius': '12px', '--s-font-h': 'inherit', '--s-font-b': 'inherit' };
@@ -222,8 +241,16 @@ function Home({ info }) {
   );
 }
 
+// Screenshots come from a demo workspace in each country, so a visitor never sees another country's currency.
+const COUNTRY_SCREENS = (code) => ({
+  real_estate: [[`re-dashboard-${code}.png`, 'Dashboard with sales, collections and follow-ups'], [`re-sale-${code}.png`, 'A sale with its payment schedule']],
+  construction: [],
+});
 function Screens({ product }) {
-  const list = product ? SCREENS[product] : [...SCREENS.real_estate.slice(0, 1), ...SCREENS.construction.slice(0, 1)];
+  const { country } = useCountry();
+  const set = country.code === 'PK' ? SCREENS : COUNTRY_SCREENS(country.code.toLowerCase());
+  const list = product ? set[product] : country.code === 'PK' ? [...SCREENS.real_estate.slice(0, 1), ...SCREENS.construction.slice(0, 1)] : set.real_estate.slice(0, 2);
+  if (!list.length) return null;
   return <section className={product ? '' : 'alt'}><div className="lwrap"><div className="lsh"><h2>See the application</h2><p>Screens from the working product, with demo data.</p></div><div className="lshots">{list.map(([f, cap]) => <Shot key={f} file={f} caption={cap} />)}</div></div></section>;
 }
 
@@ -458,7 +485,7 @@ function Signup({ info }) {
     if (!product) { setErr('Choose a product first'); return; }
     if (!f.accept_terms) { setErr('Please accept the Terms of Service and Privacy Policy'); return; }
     setBusy(true);
-    try { setDone(await api.post('/api/platform/signup', { ...f, region: country.code, currency: country.currency, timezone: (country.timezones || []).includes(f.timezone) ? f.timezone : (country.timezones || [f.timezone])[0], language: f.language || null, product, analytics: attributionFields() })); } catch (x) { setErr(x.message); } finally { setBusy(false); }
+    try { setDone(await api.post('/api/platform/signup', { ...f, region: country.code, currency: country.currency, timezone: (country.timezones || []).includes(f.timezone) ? f.timezone : (country.timezones || [f.timezone])[0], language: f.language || null, sample_data: !!f.sample_data, product, analytics: attributionFields() })); } catch (x) { setErr(x.message); } finally { setBusy(false); }
   };
   if (done) {
     const t = done.tenant;
@@ -492,12 +519,13 @@ function Signup({ info }) {
         <label>Password<span className="lhint">At least 8 characters</span><input type="password" minLength={8} required value={f.admin_password} onChange={set('admin_password')} autoComplete="new-password" /></label>
         <div style={{ fontWeight: 700 }}>3. Your country</div>
         <div className="lrow">
-          <label>Country<select value={country.code} onChange={(e) => setCountry(e.target.value)}>{countries.map((c) => <option key={c.code} value={c.code} disabled={!c.open}>{c.name}{c.open ? '' : ' (opening soon)'}</option>)}</select></label>
+          <label>Country<span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Flag code={country.code} height={20} /><select style={{ flex: 1 }} value={country.code} onChange={(e) => setCountry(e.target.value)}>{countries.map((c) => <option key={c.code} value={c.code} disabled={!c.open}>{c.name}{c.open ? '' : ' (opening soon)'}</option>)}</select></span></label>
           {country.sub_regions?.length > 0 && <label>{country.sub_region_label || 'State'}<select required value={f.sub_region || ''} onChange={set('sub_region')}><option value="">Choose…</option>{country.sub_regions.map((x) => <option key={x}>{x}</option>)}</select></label>}
         </div>
         {country.timezones?.length > 1 && <label>Time zone<select value={country.timezones.includes(f.timezone) ? f.timezone : country.timezones[0]} onChange={set('timezone')}>{country.timezones.map((z) => <option key={z} value={z}>{z.replace('_', ' ')}</option>)}</select></label>}
         {country.languages?.length > 1 && <label>Language<select value={f.language || country.languages[0]} onChange={set('language')}>{country.languages.map((x) => <option key={x} value={x}>{{ en: 'English', fr: 'Français', ar: 'العربية' }[x] || x}</option>)}</select></label>}
         <div className="lhint" aria-live="polite">Set from your country: {[country.currency, country.config?.date_style, country.config?.area?.labels?.[country.config?.area?.default], country.config?.timezone].filter(Boolean).join(' · ')}</div>
+        {country.code !== 'PK' && <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontWeight: 400 }}><input type="checkbox" checked={!!f.sample_data} onChange={set('sample_data')} style={{ width: 'auto', marginTop: 4 }} /><span>Add sample listings, clients and sales for {country.name} so I can explore (marked as demo data).</span></label>}
         {!country.open && <div className="lerr" role="status">Signups for {country.name} are not open yet. <Link to={`/contact?country=${country.code.toLowerCase()}`}>Join the waiting list</Link> and we will email you when they open.</div>}
         <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontWeight: 400 }}><input type="checkbox" checked={f.accept_terms} onChange={set('accept_terms')} style={{ width: 'auto', marginTop: 4 }} />
           <span>I agree to the <Link to="/legal/terms" target="_blank">Terms of Service</Link>, <Link to="/legal/subscription" target="_blank">Subscription Terms</Link> and <Link to="/legal/privacy" target="_blank">Privacy Policy</Link>.</span></label>

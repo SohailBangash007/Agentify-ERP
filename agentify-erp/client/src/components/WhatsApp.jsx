@@ -1,12 +1,19 @@
 import Icon from './Icon.jsx';
 import { useMeta, useToast } from '../context.jsx';
-import { date, money } from '../format.js';
+import { date, money, getRegion } from '../format.js';
 
 /** 0300-5551350, +92 300 5551350, 3005551350 → 923005551350 (digits only, as wa.me expects). */
 export function waNumber(phone) {
   let d = String(phone || '').replace(/\D/g, '');
   if (!d) return '';
   if (d.startsWith('00')) d = d.slice(2);
+  const c = getRegion().config;
+  if (c.region !== 'PK') { // another country: its calling code replaces a leading trunk 0, and a bare national number gets the code
+    const pc = c.phone || {};
+    if (pc.trunk && pc.trunk !== '1' && d.startsWith(pc.trunk)) return `${pc.calling_code}${d.slice(pc.trunk.length)}`;
+    if ((pc.national_length || []).includes(d.length)) return `${pc.calling_code}${d}`;
+    return d;
+  }
   if (d.startsWith('0')) d = `92${d.slice(1)}`;
   else if (d.length === 10 && d.startsWith('3')) d = `92${d}`;
   return d;

@@ -51,7 +51,7 @@ r.post('/signup', signupLimiter, asyncH(async (req, res) => {
   if (b.accept_terms !== true) throw bad('Please accept the Terms of Service and Privacy Policy to create a workspace');
   const tenant = createTenant({
     slug: b.slug, name: b.company_name, adminName: String(b.admin_name || '').trim() || 'Admin', adminEmail: b.admin_email, adminPassword: b.admin_password,
-    timezone: b.timezone || 'Asia/Karachi', currency: b.currency || 'PKR', region: b.region || 'PK', sub_region: b.sub_region || null, language: b.language || null, demo: false, product: b.product || 'real_estate', trialPolicy: true,
+    timezone: b.timezone || 'Asia/Karachi', currency: b.currency || 'PKR', region: b.region || 'PK', sub_region: b.sub_region || null, language: b.language || null, demo: b.sample_data === true && String(b.region || 'PK').toUpperCase() !== 'PK', product: b.product || 'real_estate', trialPolicy: true,
   });
   // which version of the Terms the owner accepted (0 = the unpublished template) and when
   platformDb().prepare('UPDATE tenants SET terms_version=?, terms_accepted_at=? WHERE id=?').run(termsVersion(), new Date().toISOString(), tenant.id);

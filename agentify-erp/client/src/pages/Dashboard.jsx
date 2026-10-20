@@ -6,7 +6,7 @@ import Onboarding from '../components/Onboarding.jsx';
 import TodayCards, { NeedsAttention, useToday } from '../components/TodayFeed.jsx';
 import { Card, DateRangeFilter, Loading, ProgressBar, Stat, StatusBadge } from '../components/ui.jsx';
 import { useAuth, useFetch } from '../context.jsx';
-import { date, money, moneyShort } from '../format.js';
+import { date, money, moneyShort, getRegion } from '../format.js';
 import { Ring } from './Goals.jsx';
 
 const STATUS_COLORS = { available: '#14b8a6', featured: '#38bdf8', reserved: '#f59e0b', sold: '#8b5cf6', draft: '#94a3b8', on_hold: '#d97706', cancelled: '#fb7185' };
@@ -20,7 +20,7 @@ function Hero({ user, d, range, setRange, today }) {
     if (f) stats.push(['Collected', moneyShort(f.collected), 'this period', '/receipts'], ['Overdue', f.overdue_installments.n, money(f.overdue_installments.v), '/payments/installments?status=overdue']);
     if (crm) stats.push(['New leads', crm.new_leads, `${crm.total_leads} in total`, '/leads'], ['Follow-ups', crm.followups, `${crm.followups_today} today`, '/tasks'], ['Closed sales', crm.closed, 'this period', '/sales']);
     if (f) stats.push(['Cash & bank', moneyShort(f.cash_and_bank), 'available now', '/accounting/treasury']);
-    if (pr) stats.push(['Plots available', pr.available, `${pr.reserved} reserved`, '/projects/map'], ['Sold', pr.sold, `of ${pr.total}`, '/properties/sold']);
+    if (pr) stats.push([getRegion().config.region === 'PK' ? 'Plots available' : 'Listings available', pr.available, `${pr.reserved} reserved`, '/projects/map'], ['Sold', pr.sold, `of ${pr.total}`, '/properties/sold']);
     if (d?.hrm) {
       const unmarked = today?.cards.find((c) => c.key === 'attendance')?.count ?? 0;
       stats.push(['Team', d.hrm.headcount, 'active employees', '/hrm/employees'], ['Leave requests', d.hrm.pending_leaves, d.hrm.pending_leaves ? 'waiting for a decision' : 'none waiting', '/hrm/leave'], ['Attendance', unmarked ? unmarked : '✓', unmarked ? 'not marked today' : 'all marked today', '/hrm/attendance']);
@@ -56,10 +56,10 @@ function QuickActions() {
   const re = !products || products.includes('real_estate'), con = !!products?.includes('construction');
   const items = [
     ['New lead', 'plus', 'blue', '/contacts?new=1', can('crm', 'create')], ['Receive payment', 'receipt', 'green', '/receipts/new', can('payments', 'create')],
-    ['New voucher', 'wallet', 'teal', '/expenses/new', can('accounting', 'create')], ['Book a plot', 'badge', 'violet', '/sales/new', re && can('sales', 'create')], ['Construction projects', 'hardhat', 'violet', '/construction', con && can('construction', 'view')],
+    ['New voucher', 'wallet', 'teal', '/expenses/new', can('accounting', 'create')], [getRegion().config.region === 'PK' ? 'Book a plot' : 'New sale', 'badge', 'violet', '/sales/new', re && can('sales', 'create')], ['Construction projects', 'hardhat', 'violet', '/construction', con && can('construction', 'view')],
     ['Site report', 'file', 'blue', '/construction', con && can('construction', 'create')],
     ['Mark attendance', 'clock', 'orange', '/hrm/attendance', can('hrm', 'create')], ['Leave requests', 'calendar', 'violet', '/hrm/leave', can('hrm', 'edit')],
-    ['Plot map', 'grid', 'orange', '/projects/map', re && can('properties', 'view')], ['Asset library', 'layers', 'slate', '/assets', can('hrm', 'view') || can('accounting', 'view')], ['My tasks', 'check', 'rose', '/my/tasks', true],
+    ['Plot map', 'grid', 'orange', '/projects/map', re && getRegion().config.region === 'PK' && can('properties', 'view')], ['Asset library', 'layers', 'slate', '/assets', can('hrm', 'view') || can('accounting', 'view')], ['My tasks', 'check', 'rose', '/my/tasks', true],
   ].filter((x) => x[4]);
   return (
     <div className="quick" aria-label="Quick actions">

@@ -2,7 +2,7 @@
   "code": "PK",
   "name": "Pakistan",
   "status": "active",
-  "version": 2,
+  "version": 3,
   "locale": "en-PK",
   "language": "en",
   "languages": [ "en" ],
@@ -22,7 +22,8 @@
     "match_tail": 10,
     "national_length": [
       10
-    ]
+    ],
+    "example": "+92 3xx xxxxxxx"
   },
   "sub_region_label": "Province",
   "sub_regions": [ "Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad Capital Territory", "Gilgit-Baltistan", "Azad Jammu & Kashmir" ],

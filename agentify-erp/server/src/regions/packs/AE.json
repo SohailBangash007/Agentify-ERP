@@ -2,7 +2,7 @@
   "code": "AE",
   "name": "United Arab Emirates",
   "status": "draft",
-  "version": 2,
+  "version": 3,
   "locale": "en-AE",
   "language": "en",
   "languages": [ "en", "ar" ],
@@ -22,7 +22,8 @@
     "national_length": [
       8,
       9
-    ]
+    ],
+    "example": "+971 50 123 4567"
   },
   "sub_region_label": "Emirate",
   "sub_regions": [ "Abu Dhabi", "Dubai", "Sharjah", "Ajman", "Umm Al Quwain", "Ras Al Khaimah", "Fujairah" ],
