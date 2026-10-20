@@ -28,6 +28,7 @@ import { overview, tenantSummaries, tenantDetail, createWorkspace, extendTrial, 
 import { listPlans, savePlan, savePlanSettings } from '../services/plansStore.js';
 import { PLAN_SETTINGS, MODULES, PRODUCTS } from '../services/plans.js';
 import { setSubscription } from '../services/billing.js';
+import { caps as meetingCaps } from '../integrations/meetings.js';
 import { listRegions, setRegionStatus, setRegionFlag, saveRule, reviewRule, listRules, ruleAudit, saveFx, listFx } from '../regions/admin.js';
 import { subscriptionHistory } from '../services/subscriptions.js';
 import { setupNeeded, completeSetup, inviteAdmin, inviteInfo, acceptInvite } from '../services/platformStaff.js';
@@ -327,6 +328,19 @@ r.post('/fx', requireOperator, need('regions.manage'), asyncH((req, res) => {
   regionErr(() => saveFx(platformDb(), req.body || {}, req.operator.email));
   audit(req.operator.email, 'fx-rate-set', { base: req.body?.base, quote: req.body?.quote });
   res.status(201).json({ fx: listFx(platformDb()) });
+}));
+// ---- Meetings: the limits no workspace can go beyond
+r.get('/meetings-settings', requireOperator, need('system.view'), (_req, res) => res.json(meetingCaps()));
+r.put('/meetings-settings', requireOperator, need('system.manage'), asyncH((req, res) => {
+  const b = req.body || {}; const num = (v, lo, hi, name) => { const n = Math.round(Number(v)); if (!(n >= lo && n <= hi)) throw bad(`${name} must be between ${lo} and ${hi}.`); return String(n); };
+  if (b.max_minutes !== undefined) setSetting('meet_max_minutes_cap', num(b.max_minutes, 5, 600, 'Longest meeting (minutes)'));
+  if (b.max_participants !== undefined) setSetting('meet_max_participants', num(b.max_participants, 2, 25, 'People per meeting'));
+  if (b.early_join_minutes !== undefined) setSetting('meet_early_join_minutes', num(b.early_join_minutes, 0, 120, 'Early join (minutes)'));
+  if (b.max_advance_days !== undefined) setSetting('meet_max_advance_days', num(b.max_advance_days, 1, 730, 'Days ahead'));
+  if (b.enabled !== undefined) setSetting('meet_enabled', b.enabled ? '1' : '0');
+  if (b.recording !== undefined) setSetting('meet_recording', b.recording ? '1' : '0');
+  audit(req.operator.email, 'meetings-limits', { ...b });
+  res.json(meetingCaps());
 }));
 // ---- Announcements and release notes, integrations, running version
 r.get('/announcements', requireOperator, need('dashboard.view'), (_req, res) => res.json({ items: listAnnouncements(), version: versionInfo() }));

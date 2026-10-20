@@ -42,6 +42,7 @@ import documentRoutes from './regions/documents.js';
 import privacyRoutes from './regions/privacy.js';
 import integrationRoutes from './routes/integrations.js';
 import appointmentRoutes from './routes/appointments.js';
+import meetingRoutes, { roomRouter as meetingRoom, runMeetingReminders } from './routes/meetings.js';
 import integrationHooks from './integrations/hooks.js';
 import { sendAlert } from './services/integrations.js';
 
@@ -102,6 +103,9 @@ export function createApp() {
   // provider call-backs (signed by the provider; no sign-in)
   app.use('/api/hooks', rateLimit({ windowMs: 60_000, limit: 600, standardHeaders: true, legacyHeaders: false }), integrationHooks);
 
+  // the meeting room: guests join with a link and no account, so it sits before sign-in
+  app.use('/api/meet', meetingRoom);
+
   app.use('/api', rateLimit({ windowMs: 60_000, limit: 900, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many requests' } }));
   app.use('/api', authenticate, csrfGuard);
   app.use('/api', billingGuard);
@@ -137,6 +141,7 @@ export function createApp() {
   app.use('/api/privacy', privacyRoutes);
   app.use('/api/integrations', integrationRoutes);
   app.use('/api/appointments', appointmentRoutes);
+  app.use('/api/meetings', meetingRoutes);
   app.use('/api/push', push);
   app.use('/api/assistant', assistant);
   app.use('/api/portal', portal);
@@ -196,6 +201,8 @@ if (isMain) {
   // scheduled social posts go out within a minute of their time
   const socialTick = () => forEachTenantAsync(() => runDuePosts()).then(() => markJob('social-posts')).catch((e) => markJob('social-posts', e));
   setInterval(socialTick, 60 * 1000).unref();
+  const meetingTick = () => forEachTenantAsync(() => runMeetingReminders()).then(() => markJob('meeting-reminders')).catch((e) => markJob('meeting-reminders', e));
+  setInterval(meetingTick, 60 * 1000).unref();
   // platform-wide: daily metric snapshot (for period comparisons) and super-admin alerts
   const platformTick = () => { try { snapshot(); generateNotifications(null, true); markJob('platform-jobs'); } catch (e) { console.error('[platform jobs]', e); markJob('platform-jobs', e); }
     // trial expiry, reminders and renewals (idempotent; safe to run as often as you like)

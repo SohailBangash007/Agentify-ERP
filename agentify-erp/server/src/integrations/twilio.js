@@ -41,10 +41,12 @@ export async function sendSms(c, { to, body }) {
   return { sid: r.sid, status: r.status };
 }
 
-/** TwiML that connects the lead. XML-escaped; the number is validated before it gets here. */
-export function bridgeTwiml({ leadNumber, callerId }) {
-  const esc = (s) => String(s).replace(/[<>&"']/g, (ch) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[ch]));
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say>Connecting you to your lead.</Say><Dial callerId="${esc(callerId)}" answerOnBridge="true" record="false"><Number>${esc(leadNumber)}</Number></Dial></Response>`;
+/** TwiML that connects the lead. XML-escaped; the number is validated before it gets here. With recording on, the call opens with a spoken notice and both sides are recorded on separate tracks. */
+export function bridgeTwiml({ leadNumber, callerId, record = false, announcement = '', recordingCallback = '' }) {
+  const esc = (x) => String(x).replace(/[<>&"']/g, (ch) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[ch]));
+  const say = record && announcement ? `<Say>${esc(announcement)}</Say>` : '<Say>Connecting you to your lead.</Say>';
+  const rec = record ? ` record="record-from-answer-dual" recordingStatusCallback="${esc(recordingCallback)}" recordingStatusCallbackEvent="completed" recordingStatusCallbackMethod="POST"` : ' record="do-not-record"';
+  return `<?xml version="1.0" encoding="UTF-8"?><Response>${say}<Dial callerId="${esc(callerId)}" answerOnBridge="true"${rec}><Number>${esc(leadNumber)}</Number></Dial></Response>`;
 }
 
 /** Twilio signs each webhook: base64(HMAC-SHA1(authToken, url + sorted params)). */

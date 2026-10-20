@@ -5,7 +5,9 @@
 //   GET  /api/integrations/dialer/queue     "Call next": leads ranked by who most needs a call
 //   POST /api/integrations/calls            start a call;  POST /calls/:id/outcome records how it went
 //   POST /api/integrations/sms              send a text message
-import { Router } from 'express';
+import express, { Router } from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
 import { all, get, run } from '../db.js';
 import { audit, activity } from '../audit.js';
 import { asyncH, bad, notFound, forbidden, now, today, addDays } from '../util.js';
@@ -17,6 +19,11 @@ import { validateTwilioConfig, testTwilio, startBridgeCall, sendSms } from '../i
 import { validateVoiceHttp, testVoiceHttp, startVoiceCall } from '../integrations/voiceHttp.js';
 import { hubExtras } from '../integrations/hub.js';
 import { currentTenant } from '../context.js';
+import { callSettings, saveCallSettings, listScripts, ensureStarterScript, renderScript, callStats, recordingFile, transcribeRecording } from '../integrations/calls.js';
+import { AI_PROVIDERS, connectAi, aiStatus, aiConfig, activeProvider } from '../integrations/ai.js';
+import { getSetting, setSetting, uploadDir } from '../db.js';
+import { runWithTools, completeJson } from '../integrations/ai.js';
+import { toolsFor, systemPrompt } from '../integrations/aiTools.js';
 import { records as domainRecords, requestDomain, verifyDomain, removeDomain } from '../integrations/domains.js';
 import { getTenant } from '../platform.js';
 import { PROVIDERS, appCreds, authorizeUrl, redirectUri, signState } from '../services/oauthApps.js';
@@ -124,6 +131,103 @@ export function callQueue(user, limit = 15) {
 r.get('/dialer/queue', can('crm', 'view'), asyncH((req, res) => {
   res.json({ voice: activeVoice(), queue: callQueue(req.user, Math.min(50, Number(req.query.limit) || 15)) });
 }));
+
+// ---- call settings, scripts, statistics, recordings
+r.get('/calls-settings', can('crm', 'view'), (_req, res) => res.json({ ...callSettings(), ai_transcripts: !!aiConfig('openai') }));
+r.put('/calls-settings', can('settings', 'edit'), asyncH((req, res) => {
+  const b = req.body || {};
+  // a blank notice falls back to the default wording: recording never starts without one
+  const out = saveCallSettings(b); audit(req, out.record ? 'Turned call recording on' : 'Turned call recording off', 'integration', 'calls'); res.json(out);
+}));
+r.get('/scripts', can('crm', 'view'), (req, res) => { ensureStarterScript(req.user.id); res.json(listScripts()); });
+r.post('/scripts', can('settings', 'edit'), asyncH((req, res) => {
+  const name = String(req.body?.name || '').trim(), body = String(req.body?.body || '').trim();
+  if (!name || !body) throw bad('Give the script a name and some text.');
+  const id = Number(run('INSERT INTO call_scripts(name, body, kind, created_by, created_at) VALUES(?,?,?,?,?)', name.slice(0, 120), body.slice(0, 6000), req.body?.kind === 'meeting' ? 'meeting' : 'call', req.user.id, now()).lastInsertRowid);
+  res.status(201).json(get('SELECT * FROM call_scripts WHERE id=?', id));
+}));
+r.put('/scripts/:id', can('settings', 'edit'), asyncH((req, res) => {
+  const s0 = get('SELECT * FROM call_scripts WHERE id=?', Number(req.params.id));
+  if (!s0) throw notFound('Script not found');
+  run('UPDATE call_scripts SET name=?, body=?, updated_at=? WHERE id=?', String(req.body?.name ?? s0.name).trim().slice(0, 120), String(req.body?.body ?? s0.body).slice(0, 6000), now(), s0.id);
+  res.json(get('SELECT * FROM call_scripts WHERE id=?', s0.id));
+}));
+r.delete('/scripts/:id', can('settings', 'edit'), asyncH((req, res) => { run('UPDATE call_scripts SET active=0 WHERE id=?', Number(req.params.id)); res.json({ ok: true }); }));
+r.get('/scripts/:id/render', can('crm', 'view'), asyncH((req, res) => {
+  const c = req.query.contact_id ? get('SELECT full_name FROM contacts WHERE id=?', Number(req.query.contact_id)) : null;
+  const out = renderScript(Number(req.params.id), { contact: c, agent: req.user, company: getSetting('company_name', '') });
+  if (!out) throw notFound('Script not found');
+  res.json(out);
+}));
+r.get('/dialer/stats', can('crm', 'view'), (req, res) => res.json(callStats(req.user, String(req.query.range || '7d'))));
+r.get('/recordings/calls', can('crm', 'view'), (req, res) => {
+  const own = req.user.own_scope ? ' AND k.user_id=?' : '';
+  res.json(all(`SELECT r.id, r.call_id, r.duration, r.size, r.transcript_status, r.error, r.created_at, (r.path IS NOT NULL) AS has_audio, substr(r.transcript,1,300) AS excerpt, k.to_number, c.full_name AS contact_name, u.name AS agent_name
+    FROM call_recordings r JOIN calls k ON k.id=r.call_id LEFT JOIN contacts c ON c.id=k.contact_id LEFT JOIN users u ON u.id=k.user_id WHERE 1=1${own} ORDER BY r.id DESC LIMIT 200`, ...(req.user.own_scope ? [req.user.id] : [])));
+});
+const recFor = (req) => {
+  const rec = get('SELECT r.*, k.user_id FROM call_recordings r JOIN calls k ON k.id=r.call_id WHERE r.id=?', Number(req.params.id));
+  if (!rec) throw notFound('Recording not found');
+  if (req.user.own_scope && rec.user_id !== req.user.id) throw forbidden('This is not your call');
+  return rec;
+};
+r.get('/recordings/calls/:id', can('crm', 'view'), asyncH((req, res) => { const rec = recFor(req); res.json({ ...rec, path: undefined, remote_url: undefined, has_audio: !!rec.path }); }));
+r.get('/recordings/calls/:id/audio', can('crm', 'view'), asyncH((req, res) => { const rec = recFor(req); if (!rec.path) throw notFound('The audio is not available yet'); audit(req, 'Played call recording', 'call', rec.call_id); res.type('audio/mpeg').sendFile(recordingFile(rec.path)); }));
+r.post('/recordings/calls/:id/transcribe', can('crm', 'edit'), asyncH(async (req, res) => { const rec = recFor(req); try { await transcribeRecording(rec.id); } catch (e) { throw bad(e.message); } res.json(get('SELECT transcript, transcript_status FROM call_recordings WHERE id=?', rec.id)); }));
+
+// ---- AI providers (the workspace's own ChatGPT / Claude key)
+r.get('/ai', can('crm', 'view'), (_req, res) => res.json({ providers: Object.entries(AI_PROVIDERS).map(([id, p]) => ({ id, label: p.label, key_url: p.key_url, key_hint: p.key_hint, default_model: p.default_model, status: aiStatus(id) })), default: getSetting('ai_default', null), share_names: getSetting('ai_share_names', '0') === '1', active: activeProvider(getSetting('ai_default', null)) }));
+r.put('/ai/:provider', can('settings', 'edit'), asyncH(async (req, res) => { await connectAi(req.params.provider, req.body || {}, req.user.id); audit(req, 'Connected AI provider', 'integration', req.params.provider); res.json({ ok: true }); }));
+r.delete('/ai/:provider', can('settings', 'edit'), asyncH((req, res) => { removeIntegration(`ai_${req.params.provider}`); audit(req, 'Disconnected AI provider', 'integration', req.params.provider); res.json({ ok: true }); }));
+r.put('/ai-settings', can('settings', 'edit'), asyncH((req, res) => { if (req.body?.default !== undefined) setSetting('ai_default', ['anthropic', 'openai'].includes(req.body.default) ? req.body.default : null); if (req.body?.share_names !== undefined) setSetting('ai_share_names', req.body.share_names ? '1' : '0'); res.json({ ok: true }); }));
+
+// ---- ask the AI about your own data; write promotional video scripts; keep the rendered videos
+r.post('/ai/ask', can('crm', 'view'), asyncH(async (req, res) => {
+  const provider = activeProvider(getSetting('ai_default', null));
+  if (!provider) throw bad('Connect ChatGPT or Claude in Settings > Integrations first.');
+  const question = String(req.body?.question || '').trim().slice(0, 600);
+  if (!question) throw bad('Ask a question about your sales, leads, calls or listings.');
+  const history = (Array.isArray(req.body?.history) ? req.body.history : []).slice(-6).filter((m) => ['user', 'assistant'].includes(m.role) && typeof m.content === 'string').map((m) => ({ role: m.role, content: m.content.slice(0, 1500) }));
+  try {
+    const out = await runWithTools(provider, { system: systemPrompt(getSetting('company_name', '')), question, history, tools: toolsFor(req.user, { shareNames: getSetting('ai_share_names', '0') === '1' }) });
+    audit(req, 'Asked the AI assistant', 'assistant', null, question.slice(0, 120));
+    res.json({ ...out, provider });
+  } catch (e) { throw bad(`The AI could not answer: ${e.message}`); }
+}));
+r.post('/ai/promo-script', can('content', 'edit'), asyncH(async (req, res) => {
+  const provider = activeProvider(getSetting('ai_default', null));
+  if (!provider) throw bad('Connect ChatGPT or Claude in Settings > Integrations first.');
+  const p = get('SELECT * FROM properties WHERE id=?', Number(req.body?.property_id));
+  if (!p) throw notFound('Property not found');
+  const feats = (() => { try { return JSON.parse(p.features || '{}'); } catch { return {}; } })();
+  const photos = all("SELECT id FROM media WHERE entity_type='property' AND entity_id=? AND kind IN ('image','photo','cover')", p.id).length;
+  const reg = currentRegion().config;
+  const facts = { title: p.title, type: p.property_type, purpose: p.purpose, city: p.city, area_name: p.area_name, price: `${reg.currency} ${(p.net_price / 10 ** reg.money_scale).toLocaleString('en')}`, area: p.area_size ? `${p.area_size} ${p.unit}` : null, bedrooms: feats.bedrooms, bathrooms: feats.bathrooms, description: String(p.description || p.short_desc || '').slice(0, 600) };
+  const style = ['friendly', 'luxury', 'urgent', 'family'].includes(req.body?.style) ? req.body.style : 'friendly';
+  const lang = ['en', 'fr', 'ar', 'ur'].includes(req.body?.language) ? req.body.language : 'en';
+  try {
+    const plan = await completeJson(provider, { system: 'You write short promotional videos for real estate listings. Use only the facts given; never invent features, prices, distances or claims. Reply with JSON only.',
+      prompt: `Facts: ${JSON.stringify(facts)}\nPhotos available: ${photos}\nTone: ${style}. Language: ${lang}.\nReturn JSON: {"title": string, "scenes": [{"caption": string (max 70 chars), "seconds": number 2-5, "photo": index starting at 0}], "voiceover": string (what a presenter could say, 60-90 words), "call_to_action": string, "hashtags": [string]}. Use 4 to 7 scenes.` });
+    const scenes = (plan.scenes || []).slice(0, 8).map((x, i) => ({ caption: String(x.caption || '').slice(0, 90), seconds: Math.min(6, Math.max(2, Number(x.seconds) || 3)), photo: photos ? Math.min(photos - 1, Math.max(0, Number(x.photo) || i % photos)) : 0 }));
+    res.json({ title: String(plan.title || p.title).slice(0, 120), scenes, voiceover: String(plan.voiceover || ''), call_to_action: String(plan.call_to_action || ''), hashtags: (plan.hashtags || []).slice(0, 8).map(String), photos, provider });
+  } catch (e) { throw bad(`The AI could not write the script: ${e.message}`); }
+}));
+r.post('/ai/promo-videos', can('content', 'edit'), express.raw({ type: ['video/webm', 'video/mp4', 'application/octet-stream'], limit: '150mb' }), asyncH((req, res) => {
+  const buf = req.body;
+  if (!Buffer.isBuffer(buf) || buf.length < 1000) throw bad('No video was received.');
+  const ext = String(req.get('content-type') || '').includes('mp4') ? 'mp4' : 'webm';
+  const pid = req.query.property_id ? Number(req.query.property_id) : null;
+  const title = String(req.query.title || 'Promotional video').slice(0, 120);
+  const id = Number(run('INSERT INTO promo_videos(property_id, title, script, path, size, duration, created_by, created_at) VALUES(?,?,?,?,?,?,?,?)', pid, title, String(req.query.script || '').slice(0, 2000) || null, 'pending', buf.length, Number(req.query.duration) || null, req.user.id, now()).lastInsertRowid);
+  const rel = path.join('media', 'promo', `promo-${id}.${ext}`);
+  fs.mkdirSync(path.join(uploadDir(), 'media', 'promo'), { recursive: true });
+  fs.writeFileSync(path.join(uploadDir(), rel), buf);
+  run('UPDATE promo_videos SET path=? WHERE id=?', rel.split(path.sep).join('/'), id);
+  audit(req, 'Saved promotional video', 'promo_video', id, title);
+  res.status(201).json({ id, url: `/uploads/${rel.split(path.sep).join('/')}` });
+}));
+r.get('/ai/promo-videos', can('crm', 'view'), (_req, res) => res.json(all('SELECT id, property_id, title, path, size, duration, created_at FROM promo_videos ORDER BY id DESC LIMIT 100').map((v) => ({ ...v, url: `/uploads/${v.path}` }))));
+r.delete('/ai/promo-videos/:id', can('content', 'edit'), asyncH((req, res) => { const v = get('SELECT * FROM promo_videos WHERE id=?', Number(req.params.id)); if (v) { try { fs.rmSync(path.join(uploadDir(), v.path), { force: true }); } catch { /* gone */ } run('DELETE FROM promo_videos WHERE id=?', v.id); } res.json({ ok: true }); }));
 
 // ---- calls
 const ownsContact = (req, c) => { if (req.user.own_scope && c.agent_id !== req.user.id) throw forbidden('This contact is not assigned to you'); };

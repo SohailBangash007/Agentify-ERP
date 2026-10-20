@@ -1,0 +1,118 @@
+// OpenAI and Anthropic (Claude) for a workspace. The workspace owner pays for and owns the API key; it is stored encrypted
+// and never shown again. Uses: answering data questions with tools (read-only, scoped to what the signed-in user may see),
+// writing promotional video scripts, and turning call and meeting recordings into transcripts (OpenAI speech to text).
+// A provider is "connected" only after a real request to it succeeded. Language models do not make video: they write the
+// script and captions, and the app renders the video from the listing's own photos.
+import { bad } from '../util.js';
+import { saveIntegration, integrationConfig, integrationRow, markTested, mask } from './store.js';
+
+export const AI_PROVIDERS = {
+  anthropic: { label: 'Claude (Anthropic)', key_url: 'https://console.anthropic.com/settings/keys', default_model: 'claude-sonnet-5-5', key_hint: 'Starts with sk-ant-' },
+  openai: { label: 'ChatGPT (OpenAI)', key_url: 'https://platform.openai.com/api-keys', default_model: 'gpt-4o', key_hint: 'Starts with sk-' },
+};
+const KEY_RE = { anthropic: /^sk-ant-[A-Za-z0-9_-]{20,}$/, openai: /^sk-[A-Za-z0-9_-]{20,}$/ };
+const slot = (p) => `ai_${p}`;
+
+async function http(url, opts = {}) {
+  const res = await fetch(url, { ...opts, signal: AbortSignal.timeout(opts.timeout || 60_000) });
+  let d = null; try { d = await res.json(); } catch { /* not json */ }
+  if (!res.ok) throw new Error(d?.error?.message || d?.message || `The provider answered ${res.status}`);
+  return d;
+}
+
+export async function testAi(provider, key) {
+  if (provider === 'openai') { const d = await http('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${key}` }, timeout: 15_000 }); return { models: (d.data || []).length }; }
+  const d = await http('https://api.anthropic.com/v1/models', { headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, timeout: 15_000 });
+  return { models: (d.data || []).length };
+}
+export async function connectAi(provider, body, userId) {
+  if (!AI_PROVIDERS[provider]) throw bad('Unknown provider');
+  const prev = integrationConfig(slot(provider));
+  const key = !body.api_key || /^•/.test(body.api_key) ? prev?.api_key : String(body.api_key).trim();
+  if (!key || !KEY_RE[provider].test(key)) throw bad(`Paste the API key from your ${AI_PROVIDERS[provider].label} account. ${AI_PROVIDERS[provider].key_hint}.`);
+  try { await testAi(provider, key); } catch (e) { throw bad(`${AI_PROVIDERS[provider].label} did not accept this key: ${e.message}`); }
+  const model = String(body.model || prev?.model || AI_PROVIDERS[provider].default_model).trim().slice(0, 80);
+  saveIntegration(slot(provider), { api_key: key, model }, { publicInfo: { key: mask(key), model }, status: 'connected', userId });
+  markTested(slot(provider), true);
+}
+export const aiStatus = (provider) => { const r = integrationRow(slot(provider)); return r ? { status: r.status, ...(JSON.parse(r.public_info || '{}')) } : null; };
+export const aiConfig = (provider) => integrationConfig(slot(provider));
+/** The provider to use: the one the owner picked as default, else whichever is connected (Claude first). */
+export function activeProvider(preferred) {
+  const order = preferred && aiConfig(preferred) ? [preferred, 'anthropic', 'openai'] : ['anthropic', 'openai'];
+  return order.find((p) => aiConfig(p)) || null;
+}
+
+// ---- chat with tools (one loop for both providers)
+/** tools: [{ name, description, parameters (JSON schema), run: async (args) => object }] */
+export async function runWithTools(provider, { system, question, history = [], tools = [], maxRounds = 5 }) {
+  const cfg = aiConfig(provider);
+  if (!cfg) throw bad('Connect an AI provider first.');
+  const called = [];
+  if (provider === 'anthropic') {
+    const messages = [...history, { role: 'user', content: question }];
+    for (let round = 0; round < maxRounds; round += 1) {
+      const d = await http('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': cfg.api_key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: cfg.model, max_tokens: 1500, system, messages, tools: tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })) }) });
+      const uses = (d.content || []).filter((b) => b.type === 'tool_use');
+      if (d.stop_reason !== 'tool_use' || !uses.length) return { answer: (d.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim(), tools_used: called };
+      messages.push({ role: 'assistant', content: d.content });
+      const results = [];
+      for (const u of uses) {
+        const tool = tools.find((t) => t.name === u.name);
+        called.push(u.name);
+        let out; try { out = tool ? await tool.run(u.input || {}) : { error: 'Unknown tool' }; } catch (e) { out = { error: e.message }; }
+        results.push({ type: 'tool_result', tool_use_id: u.id, content: JSON.stringify(out).slice(0, 12_000) });
+      }
+      messages.push({ role: 'user', content: results });
+    }
+    return { answer: 'I could not finish that analysis in a few steps. Try a narrower question.', tools_used: called };
+  }
+  const messages = [{ role: 'system', content: system }, ...history, { role: 'user', content: question }];
+  for (let round = 0; round < maxRounds; round += 1) {
+    const d = await http('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${cfg.api_key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: cfg.model, messages, tools: tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } })) }) });
+    const m = d.choices?.[0]?.message;
+    if (!m?.tool_calls?.length) return { answer: String(m?.content || '').trim(), tools_used: called };
+    messages.push(m);
+    for (const tc of m.tool_calls) {
+      const tool = tools.find((t) => t.name === tc.function.name);
+      called.push(tc.function.name);
+      let out; try { out = tool ? await tool.run(JSON.parse(tc.function.arguments || '{}')) : { error: 'Unknown tool' }; } catch (e) { out = { error: e.message }; }
+      messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(out).slice(0, 12_000) });
+    }
+  }
+  return { answer: 'I could not finish that analysis in a few steps. Try a narrower question.', tools_used: called };
+}
+
+/** One plain completion that must return JSON (used for video scripts). */
+export async function completeJson(provider, { system, prompt }) {
+  const cfg = aiConfig(provider);
+  if (!cfg) throw bad('Connect an AI provider first.');
+  let text;
+  if (provider === 'anthropic') {
+    const d = await http('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': cfg.api_key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: cfg.model, max_tokens: 1800, system, messages: [{ role: 'user', content: prompt }] }) });
+    text = (d.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
+  } else {
+    const d = await http('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${cfg.api_key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: cfg.model, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] }) });
+    text = d.choices?.[0]?.message?.content || '';
+  }
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error('The AI did not return a usable answer. Try again.');
+  return JSON.parse(m[0]);
+}
+
+/** Speech to text (OpenAI). Claude has no audio input, so transcripts need an OpenAI key. */
+export async function transcribe(buffer, filename = 'audio.mp3', language) {
+  const cfg = aiConfig('openai');
+  if (!cfg) throw new Error('Transcripts need a connected OpenAI (ChatGPT) key.');
+  const form = new FormData();
+  form.append('file', new Blob([buffer]), filename);
+  form.append('model', 'whisper-1');
+  form.append('response_format', 'text');
+  if (language) form.append('language', language);
+  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', { method: 'POST', headers: { Authorization: `Bearer ${cfg.api_key}` }, body: form, signal: AbortSignal.timeout(180_000) });
+  const text = await res.text();
+  if (!res.ok) { let m = text; try { m = JSON.parse(text).error.message; } catch { /* plain */ } throw new Error(m || `OpenAI answered ${res.status}`); }
+  return text.trim();
+}

@@ -8,6 +8,7 @@ import { integrationConfig } from './store.js';
 import { bridgeTwiml, verifyTwilioSignature } from './twilio.js';
 import { PORTALS, feedToken, publishedListings, feedXml, feedCsv } from './portals.js';
 import crypto from 'node:crypto';
+import { callSettings, addRecording, fetchRecording } from './calls.js';
 
 const r = Router();
 r.use(express.urlencoded({ extended: false, limit: '100kb' }));
@@ -24,7 +25,8 @@ r.post('/twilio/bridge', (req, res) => {
   if (!cfg) return res.status(403).type('text/plain').send('Invalid signature');
   const call = get('SELECT * FROM calls WHERE id=?', Number(req.query.call));
   if (!call || call.provider !== 'twilio') return res.status(404).type('text/plain').send('Unknown call');
-  res.type('text/xml').send(bridgeTwiml({ leadNumber: call.to_number, callerId: cfg.phone_number }));
+  const set = callSettings();
+  res.type('text/xml').send(bridgeTwiml({ leadNumber: call.to_number, callerId: cfg.phone_number, record: set.record, announcement: set.announcement, recordingCallback: `${req.protocol}://${req.get('host')}/api/hooks/twilio/recording?call=${call.id}` }));
 });
 
 const MAP = { queued: 'queued', initiated: 'queued', ringing: 'ringing', 'in-progress': 'in_progress', completed: 'completed', busy: 'busy', failed: 'failed', 'no-answer': 'no_answer', canceled: 'canceled' };
@@ -38,6 +40,17 @@ r.post('/twilio/status', (req, res) => {
   }
   res.sendStatus(204);
 });
+/** Twilio tells us a recording is ready: store it, then download the audio and transcribe it in the background. */
+r.post('/twilio/recording', (req, res) => {
+  if (!verified(req)) return res.status(403).type('text/plain').send('Invalid signature');
+  const id = Number(req.query.call);
+  if (get('SELECT 1 FROM calls WHERE id=?', id) && req.body?.RecordingStatus === 'completed' && req.body.RecordingSid && !get('SELECT 1 FROM call_recordings WHERE provider_sid=?', req.body.RecordingSid)) {
+    const rid = addRecording(id, { sid: req.body.RecordingSid, url: String(req.body.RecordingUrl || ''), duration: req.body.RecordingDuration });
+    fetchRecording(rid).catch(() => {});
+  }
+  res.sendStatus(204);
+});
+
 /** Listing feeds for portals: /api/hooks/feeds/<portal>.<xml|csv|json>?token=... */
 r.get('/feeds/:portal.:fmt', (req, res) => {
   const pt = PORTALS.find((p) => p.id === req.params.portal);

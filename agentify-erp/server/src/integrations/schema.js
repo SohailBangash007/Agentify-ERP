@@ -24,4 +24,24 @@ CREATE TABLE IF NOT EXISTS social_metrics(
   post_id INTEGER PRIMARY KEY, fetched_at TEXT NOT NULL, impressions INTEGER, reach INTEGER, likes INTEGER, comments INTEGER, shares INTEGER, clicks INTEGER);
 CREATE TABLE IF NOT EXISTS portal_publications(
   id INTEGER PRIMARY KEY, property_id INTEGER NOT NULL, portal TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued', external_id TEXT, error TEXT, published_at TEXT, updated_at TEXT NOT NULL, UNIQUE(property_id, portal));
+
+CREATE TABLE IF NOT EXISTS call_scripts(
+  id INTEGER PRIMARY KEY, name TEXT NOT NULL, body TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'call', active INTEGER NOT NULL DEFAULT 1, created_by INTEGER, created_at TEXT NOT NULL, updated_at TEXT);
+CREATE TABLE IF NOT EXISTS call_recordings(
+  id INTEGER PRIMARY KEY, call_id INTEGER NOT NULL, provider_sid TEXT, remote_url TEXT, duration INTEGER, path TEXT, size INTEGER, transcript TEXT, transcript_status TEXT NOT NULL DEFAULT 'none', error TEXT, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_call_recordings_call ON call_recordings(call_id);
+CREATE TABLE IF NOT EXISTS meetings(
+  id INTEGER PRIMARY KEY, code TEXT NOT NULL UNIQUE, title TEXT NOT NULL, description TEXT, host_user_id INTEGER NOT NULL, contact_id INTEGER, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, max_minutes INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'scheduled', record INTEGER NOT NULL DEFAULT 0, transcribe INTEGER NOT NULL DEFAULT 1, script_id INTEGER, allow_guests INTEGER NOT NULL DEFAULT 1, started_at TEXT, ended_at TEXT, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_meetings_start ON meetings(starts_at);
+CREATE TABLE IF NOT EXISTS meeting_invites(
+  id INTEGER PRIMARY KEY, meeting_id INTEGER NOT NULL, kind TEXT NOT NULL, user_id INTEGER, contact_id INTEGER, name TEXT, email TEXT, phone TEXT, token TEXT NOT NULL UNIQUE, sent_via TEXT, sent_at TEXT, remind_24h_at TEXT, remind_15m_at TEXT, joined_at TEXT);
+CREATE INDEX IF NOT EXISTS idx_meeting_invites ON meeting_invites(meeting_id);
+CREATE TABLE IF NOT EXISTS meeting_recordings(
+  id INTEGER PRIMARY KEY, meeting_id INTEGER NOT NULL, kind TEXT NOT NULL DEFAULT 'video', path TEXT NOT NULL, size INTEGER, duration INTEGER, mime TEXT, uploaded_by TEXT, transcript TEXT, transcript_status TEXT NOT NULL DEFAULT 'none', error TEXT, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS meeting_transcript(
+  id INTEGER PRIMARY KEY, meeting_id INTEGER NOT NULL, speaker TEXT, text TEXT NOT NULL, at_ms INTEGER, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_meeting_transcript ON meeting_transcript(meeting_id, id);
+CREATE TABLE IF NOT EXISTS promo_videos(
+  id INTEGER PRIMARY KEY, property_id INTEGER, title TEXT NOT NULL, script TEXT, path TEXT NOT NULL, size INTEGER, duration INTEGER, created_by INTEGER, created_at TEXT NOT NULL);
 `;
