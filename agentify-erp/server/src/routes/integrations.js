@@ -51,7 +51,7 @@ r.get('/', can('crm', 'view'), asyncH((req, res) => {
   res.json({
     region: reg.region, base: webBase(req),
     items: catalogFor(reg.region).map((c) => {
-      const row = c.id === 'ai' ? (rows.ai_anthropic || rows.ai_openai || rows.ai_gemini) : rows[c.id];
+      const row = c.id === 'ai' ? (rows.ai_anthropic || rows.ai_openai || rows.ai_gemini || rows.ai_custom) : rows[c.id];
       const info = parseJson(row?.public_info) || {};
       return { ...c, status: row?.status || 'not_connected', connected_at: row?.connected_at || null, last_test_at: row?.last_test_at || null, error: row?.last_error || null, info };
     }),
@@ -176,7 +176,7 @@ r.get('/recordings/calls/:id/audio', can('crm', 'view'), asyncH((req, res) => { 
 r.post('/recordings/calls/:id/transcribe', can('crm', 'edit'), asyncH(async (req, res) => { const rec = recFor(req); try { await transcribeRecording(rec.id); } catch (e) { throw bad(e.message); } res.json(get('SELECT transcript, transcript_status FROM call_recordings WHERE id=?', rec.id)); }));
 
 // ---- AI providers (the workspace's own ChatGPT / Claude key)
-r.get('/ai', can('crm', 'view'), (_req, res) => res.json({ providers: Object.entries(AI_PROVIDERS).map(([id, p]) => ({ id, label: p.label, key_url: p.key_url, key_hint: p.key_hint, default_model: p.default_model, status: aiStatus(id) })), default: getSetting('ai_default', null), share_names: getSetting('ai_share_names', '0') === '1', active: activeProvider(getSetting('ai_default', null)) }));
+r.get('/ai', can('crm', 'view'), (_req, res) => res.json({ providers: Object.entries(AI_PROVIDERS).map(([id, p]) => ({ id, label: p.label, key_url: p.key_url, key_hint: p.key_hint, default_model: p.default_model, custom: !!p.custom, status: aiStatus(id) })), default: getSetting('ai_default', null), share_names: getSetting('ai_share_names', '0') === '1', active: activeProvider(getSetting('ai_default', null)) }));
 r.put('/ai/:provider', can('settings', 'edit'), asyncH(async (req, res) => { await connectAi(req.params.provider, req.body || {}, req.user.id); audit(req, 'Connected AI provider', 'integration', req.params.provider); res.json({ ok: true }); }));
 r.delete('/ai/:provider', can('settings', 'edit'), asyncH((req, res) => { removeIntegration(`ai_${req.params.provider}`); audit(req, 'Disconnected AI provider', 'integration', req.params.provider); res.json({ ok: true }); }));
 r.put('/ai-settings', can('settings', 'edit'), asyncH((req, res) => { if (req.body?.default !== undefined) setSetting('ai_default', Object.keys(AI_PROVIDERS).includes(req.body.default) ? req.body.default : null); if (req.body?.share_names !== undefined) setSetting('ai_share_names', req.body.share_names ? '1' : '0'); res.json({ ok: true }); }));

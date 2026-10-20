@@ -4,14 +4,17 @@
 // A provider is "connected" only after a real request to it succeeded. Language models do not make video: they write the
 // script and captions, and the app renders the video from the listing's own photos.
 import { bad } from '../util.js';
+import { assertPublicHttps } from '../services/integrations.js';
 import { saveIntegration, integrationConfig, integrationRow, markTested, mask } from './store.js';
 
 export const AI_PROVIDERS = {
   anthropic: { label: 'Claude (Anthropic)', key_url: 'https://console.anthropic.com/settings/keys', default_model: 'claude-sonnet-5-5', key_hint: 'Starts with sk-ant-' },
   openai: { label: 'ChatGPT (OpenAI)', key_url: 'https://platform.openai.com/api-keys', default_model: 'gpt-4o', key_hint: 'Starts with sk-' },
   gemini: { label: 'Gemini (Google)', key_url: 'https://aistudio.google.com/apikey', default_model: 'gemini-2.5-flash', key_hint: 'Starts with AIza' },
+  custom: { label: 'Other model (OpenAI-compatible)', custom: true, key_url: 'https://openrouter.ai/keys', default_model: '', key_hint: 'Works with Groq, Mistral, DeepSeek, OpenRouter, Together, Azure OpenAI and any service that offers an OpenAI-compatible API' },
 };
-const KEY_RE = { anthropic: /^sk-ant-[A-Za-z0-9_-]{20,}$/, openai: /^sk-[A-Za-z0-9_-]{20,}$/, gemini: /^AIza[A-Za-z0-9_-]{30,}$/ };
+const KEY_RE = { anthropic: /^sk-ant-[A-Za-z0-9_-]{20,}$/, openai: /^sk-[A-Za-z0-9_-]{20,}$/, gemini: /^AIza[A-Za-z0-9_-]{30,}$/, custom: /^\S{8,400}$/ };
+const oaBase = (provider, cfg) => (provider === 'custom' ? cfg.base_url : 'https://api.openai.com/v1');
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
 const gHeaders = (key) => ({ 'x-goog-api-key': key, 'Content-Type': 'application/json' });
 /** Gemini accepts a subset of JSON Schema: drop the keywords it rejects. */
@@ -36,6 +39,16 @@ export async function connectAi(provider, body, userId) {
   const prev = integrationConfig(slot(provider));
   const key = !body.api_key || /^•/.test(body.api_key) ? prev?.api_key : String(body.api_key).trim();
   if (!key || !KEY_RE[provider].test(key)) throw bad(`Paste the API key from your ${AI_PROVIDERS[provider].label} account. ${AI_PROVIDERS[provider].key_hint}.`);
+  if (provider === 'custom') {
+    // any OpenAI-compatible service: address and model are needed, and the test is a real tiny chat request
+    const base = String(await assertPublicHttps(body.base_url || prev?.base_url || '')).replace(/\/+$/, '').replace(/\/chat\/completions$/, '');
+    const model = String(body.model || prev?.model || '').trim().slice(0, 100);
+    if (!model) throw bad('Enter the model name to use, for example llama-3.3-70b-versatile.');
+    try { await http(`${base}/chat/completions`, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, max_tokens: 5, messages: [{ role: 'user', content: 'Say OK' }] }), timeout: 30_000 }); } catch (e) { throw bad(`That service did not accept the key or model: ${e.message}`); }
+    saveIntegration(slot(provider), { api_key: key, model, base_url: base }, { publicInfo: { key: mask(key), model, host: new URL(base).host }, status: 'connected', userId });
+    markTested(slot(provider), true);
+    return;
+  }
   try { await testAi(provider, key); } catch (e) { throw bad(`${AI_PROVIDERS[provider].label} did not accept this key: ${e.message}`); }
   const model = String(body.model || prev?.model || AI_PROVIDERS[provider].default_model).trim().slice(0, 80);
   saveIntegration(slot(provider), { api_key: key, model }, { publicInfo: { key: mask(key), model }, status: 'connected', userId });
@@ -45,7 +58,7 @@ export const aiStatus = (provider) => { const r = integrationRow(slot(provider))
 export const aiConfig = (provider) => integrationConfig(slot(provider));
 /** The provider to use: the one the owner picked as default, else whichever is connected (Claude first). */
 export function activeProvider(preferred) {
-  const order = preferred && aiConfig(preferred) ? [preferred, 'anthropic', 'openai', 'gemini'] : ['anthropic', 'openai', 'gemini'];
+  const order = preferred && aiConfig(preferred) ? [preferred, 'anthropic', 'openai', 'gemini', 'custom'] : ['anthropic', 'openai', 'gemini', 'custom'];
   return order.find((p) => aiConfig(p)) || null;
 }
 /** Speech to text works with an OpenAI or a Gemini key (Claude has no audio input). */
@@ -99,7 +112,7 @@ export async function runWithTools(provider, { system, question, history = [], t
   }
   const messages = [{ role: 'system', content: system }, ...history, { role: 'user', content: question }];
   for (let round = 0; round < maxRounds; round += 1) {
-    const d = await http('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${cfg.api_key}`, 'Content-Type': 'application/json' },
+    const d = await http(`${oaBase(provider, cfg)}/chat/completions`, { method: 'POST', headers: { Authorization: `Bearer ${cfg.api_key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: cfg.model, messages, tools: tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } })) }) });
     const m = d.choices?.[0]?.message;
     if (!m?.tool_calls?.length) return { answer: String(m?.content || '').trim(), tools_used: called };
@@ -126,7 +139,7 @@ export async function completeJson(provider, { system, prompt }) {
     const d = await http(`${GEMINI}/models/${encodeURIComponent(cfg.model)}:generateContent`, { method: 'POST', headers: gHeaders(cfg.api_key), body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } }) });
     text = (d.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
   } else {
-    const d = await http('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${cfg.api_key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: cfg.model, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] }) });
+    const d = await http(`${oaBase(provider, cfg)}/chat/completions`, { method: 'POST', headers: { Authorization: `Bearer ${cfg.api_key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: cfg.model, ...(provider === 'custom' ? {} : { response_format: { type: 'json_object' } }),messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] }) });
     text = d.choices?.[0]?.message?.content || '';
   }
   const m = text.match(/\{[\s\S]*\}/);

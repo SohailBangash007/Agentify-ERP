@@ -13,18 +13,22 @@ export function AiConnect({ can }) {
   const [d, setD] = useState(null);
   const [keys, setKeys] = useState({});
   const [busy, setBusy] = useState('');
+  const [extra, setExtra] = useState({});
   const load = useCallback(() => api.get('/api/integrations/ai').then(setD), []);
   useEffect(() => { load(); }, [load]);
   if (!d) return <Loading />;
-  const save = async (p) => { setBusy(p); try { await api.put(`/api/integrations/ai/${p}`, { api_key: keys[p] }); toast('Connected'); setKeys({ ...keys, [p]: '' }); load(); } catch (e) { toast(e.message, 'err'); } finally { setBusy(''); } };
+  const save = async (p) => { setBusy(p); try { await api.put(`/api/integrations/ai/${p}`, { api_key: keys[p], base_url: extra[p]?.base_url, model: extra[p]?.model }); toast('Connected'); setKeys({ ...keys, [p]: '' }); load(); } catch (e) { toast(e.message, 'err'); } finally { setBusy(''); } };
   const settings = async (patch) => { await api.put('/api/integrations/ai-settings', patch); load(); };
   return (
     <>
       <p className="muted">Bring your own key. You pay the provider directly for what you use. The key is saved encrypted and is never shown again. The AI can only read summaries of your own data, never change anything.</p>
       {d.providers.map((p) => (
         <div key={p.id} className="card" style={{ padding: 12, marginBottom: 10 }}>
-          <div className="row" style={{ justifyContent: 'space-between' }}><b>{p.label}</b><span className="muted">{p.status ? `Connected · ${p.status.key} · ${p.status.model}` : 'Not connected'}</span></div>
+          <div className="row" style={{ justifyContent: 'space-between' }}><b>{p.label}</b><span className="muted">{p.status ? `Connected · ${p.status.key} · ${p.status.model}${p.status.host ? ` · ${p.status.host}` : ''}` : 'Not connected'}</span></div>
           <div className="muted" style={{ margin: '4px 0 8px' }}>Create a key at <a href={p.key_url} target="_blank" rel="noreferrer">{p.key_url.replace('https://', '')} ↗</a>. {p.key_hint}.</div>
+          {can && p.custom && <div className="row wrap" style={{ gap: 8, marginBottom: 8 }}>
+            <input className="input" style={{ maxWidth: 360 }} placeholder="Service address, e.g. https://api.groq.com/openai/v1" value={extra.custom?.base_url || ''} onChange={(e) => setExtra({ ...extra, custom: { ...extra.custom, base_url: e.target.value } })} />
+            <input className="input" style={{ maxWidth: 240 }} placeholder="Model name" value={extra.custom?.model || ''} onChange={(e) => setExtra({ ...extra, custom: { ...extra.custom, model: e.target.value } })} /></div>}
           {can && <div className="row wrap" style={{ gap: 8 }}>
             <input className="input" style={{ maxWidth: 360 }} type="password" autoComplete="new-password" placeholder={p.status ? 'Paste a new key to replace' : 'Paste your API key'} value={keys[p.id] || ''} onChange={(e) => setKeys({ ...keys, [p.id]: e.target.value })} />
             <button className="btn primary" disabled={!keys[p.id] || busy === p.id} onClick={() => save(p.id)}>{busy === p.id ? 'Checking with the provider…' : 'Save and test'}</button>
@@ -35,7 +39,7 @@ export function AiConnect({ can }) {
           <label>Use first: <select className="input" style={{ display: 'inline-block', width: 'auto' }} value={d.default || ''} onChange={(e) => settings({ default: e.target.value })}><option value="">Whichever is connected</option>{d.providers.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
           <label><input type="checkbox" checked={d.share_names} onChange={(e) => settings({ share_names: e.target.checked })} /> Let the AI see customer names (off by default)</label>
         </div>)}
-      <p className="muted" style={{ marginTop: 10 }}>Speech-to-text for recordings uses an OpenAI or Gemini key. Claude, ChatGPT and Gemini write scripts and answer questions; none of them makes video, so videos are built from your listing photos.</p>
+      <p className="muted" style={{ marginTop: 10 }}>Speech-to-text for recordings uses an OpenAI or Gemini key. Claude, ChatGPT, Gemini and other models write scripts and answer questions; none of them makes video, so videos are built from your listing photos.</p>
     </>
   );
 }
@@ -52,7 +56,7 @@ function Ask() {
   useEffect(() => { api.get('/api/integrations/ai').then(setD); }, []);
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [msgs, busy]);
   if (!d) return <Loading />;
-  if (!d.active) return <div className="alert warn">Connect Claude, ChatGPT or Gemini on the <b>Connect</b> tab to ask questions about your data.</div>;
+  if (!d.active) return <div className="alert warn">Connect Claude, ChatGPT, Gemini or another model on the <b>Connect</b> tab to ask questions about your data.</div>;
   const ask = async (text) => {
     const question = (text ?? q).trim(); if (!question || busy) return;
     const history = msgs.map((m) => ({ role: m.role, content: m.text }));
@@ -60,7 +64,7 @@ function Ask() {
     try { const r = await api.post('/api/integrations/ai/ask', { question, history }); setMsgs((m) => [...m, { role: 'assistant', text: r.answer, tools: r.tools_used }]); } catch (e) { toast(e.message, 'err'); } finally { setBusy(false); }
   };
   return (
-    <Card title={`Ask ${{ anthropic: 'Claude', openai: 'ChatGPT', gemini: 'Gemini' }[d.active]} about your business`}>
+    <Card title={`Ask ${{ anthropic: 'Claude', openai: 'ChatGPT', gemini: 'Gemini', custom: 'your AI model' }[d.active]} about your business`}>
       <div style={{ minHeight: 220, maxHeight: 460, overflow: 'auto', display: 'grid', gap: 10, alignContent: 'start' }}>
         {!msgs.length && <div className="row wrap" style={{ gap: 8 }}>{SUGGESTIONS.map((s) => <button key={s} className="btn sm" onClick={() => ask(s)}>{s}</button>)}</div>}
         {msgs.map((m, i) => <div key={i} style={{ justifySelf: m.role === 'user' ? 'end' : 'start', maxWidth: '85%', background: m.role === 'user' ? 'var(--primary, #0f766e)' : 'var(--surface-2, #f1f5f9)', color: m.role === 'user' ? '#fff' : 'inherit', padding: '8px 12px', borderRadius: 12, whiteSpace: 'pre-wrap' }}>{m.text}{m.tools?.length > 0 && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Looked at: {[...new Set(m.tools.map((t) => t.name || t))].join(', ').replace(/_/g, ' ')}</div>}</div>)}
@@ -145,7 +149,7 @@ function Promo() {
     } catch (e) { setErr(e.message); } finally { setBusy(''); }
   };
   const upd = (i, k, v) => setPlan({ ...plan, scenes: plan.scenes.map((s, j) => (j === i ? { ...s, [k]: v } : s)) });
-  if (ai && !ai.active) return <div className="alert warn">Connect Claude, ChatGPT or Gemini on the <b>Connect</b> tab first. They write the script and captions for your video.</div>;
+  if (ai && !ai.active) return <div className="alert warn">Connect Claude, ChatGPT, Gemini or another model on the <b>Connect</b> tab first. They write the script and captions for your video.</div>;
   return (
     <>
       <Card title="Make a promotional video">
@@ -187,10 +191,10 @@ export default function AIStudio() {
   const [tab, setTab] = useState('ask');
   return (
     <>
-      <PageHead title="AI Studio" sub="Ask Claude, ChatGPT or Gemini about your numbers, and turn a listing into a short promotional video." />
+      <PageHead title="AI Studio" sub="Ask Claude, ChatGPT, Gemini or another model about your numbers, and turn a listing into a short promotional video." />
       <Tabs tabs={[{ key: 'ask', label: 'Ask your data' }, { key: 'promo', label: 'Promo videos' }, { key: 'connect', label: 'Connect' }]} value={tab} onChange={setTab} />
       {tab === 'ask' && <Ask />}
       {tab === 'promo' && <Promo />}
-      {tab === 'connect' && <Card title="Claude, ChatGPT and Gemini"><AiConnect can={can('settings', 'edit')} /></Card>}
+      {tab === 'connect' && <Card title="Claude, ChatGPT, Gemini and other models"><AiConnect can={can('settings', 'edit')} /></Card>}
     </>);
 }

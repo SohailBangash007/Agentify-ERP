@@ -192,3 +192,24 @@ test('Gemini connects with a real test, answers with data tools and transcribes'
     assert.equal(await transcribe(Buffer.from('abc'), 'a.mp3'), 'Speaker 1: hello');
   } finally { globalThis.fetch = realFetch; }
 });
+
+test('any OpenAI-compatible model connects with a real test request and answers', async () => {
+  const { connectAi, runWithTools, completeJson } = await import('../src/integrations/ai.js');
+  const seenCalls = [];
+  const realFetch2 = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    seenCalls.push({ url: String(url), body: opts.body ? JSON.parse(opts.body) : null, headers: opts.headers });
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    await assert.rejects(connectAi('custom', { api_key: 'k'.repeat(20), base_url: 'http://example.com/v1', model: 'm' }, 1), /https/);
+    await assert.rejects(connectAi('custom', { api_key: 'k'.repeat(20), base_url: 'https://10.0.0.5/v1', model: 'm' }, 1), /Internal/);
+    await assert.rejects(connectAi('custom', { api_key: 'k'.repeat(20), base_url: 'https://8.8.8.8/v1' }, 1), /model/);
+    await connectAi('custom', { api_key: 'k'.repeat(20), base_url: 'https://8.8.8.8/v1/', model: 'llama-x' }, 1);
+    assert.equal(seenCalls[0].url, 'https://8.8.8.8/v1/chat/completions');
+    const out = await runWithTools('custom', { system: 's', question: 'q' });
+    assert.equal(out.answer, '{"ok":true}');
+    assert.deepEqual(await completeJson('custom', { system: 's', prompt: 'p' }), { ok: true });
+    assert.equal(seenCalls.at(-1).body.response_format, undefined);
+  } finally { globalThis.fetch = realFetch2; }
+});

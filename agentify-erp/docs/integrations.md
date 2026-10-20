@@ -70,7 +70,7 @@ Facebook Pages and Instagram business accounts (publish and read likes, comments
 
 Testimonials are shown only when real quotes are entered in the console (the marketing content `testimonials` list; an optional `country` field limits a quote to one country). The site does not contain invented reviews. The "Example: Call next" panel on the landing page is labelled as an example.
 
-## AI (Claude, ChatGPT and Gemini)
+## AI (Claude, ChatGPT, Gemini and any OpenAI-compatible model)
 - Workspace owners paste their own API key under Integrations → Claude and ChatGPT. The key is tested against the provider, stored encrypted and never returned to the browser.
 - **Ask your data** (AI Studio): the model calls read-only tools (sales, leads, calls, listings summaries) limited to what the signed-in user may see. Customer names are hidden unless the owner switches that on.
 - **Promo videos**: the model writes the script and captions from the listing's real facts. Language models do not produce video, so the browser draws the video from the listing photos (canvas and MediaRecorder) and uploads it to the workspace.
@@ -86,3 +86,4 @@ Testimonials are shown only when real quotes are entered in the console (the mar
 - In the room: camera, microphone, screen sharing, pen and pointer drawn over the shared screen, live captions (Chrome/Edge speech recognition, saved as the meeting transcript), background blur or colour (MediaPipe, runs on the device), host recording to the workspace, script panel for staff.
 - Not possible in a browser: taking remote control of another person's computer. The pen and pointer replace it.
 - Reliability: set `ERP_ICE_SERVERS` (JSON array) to your TURN server for people behind strict firewalls; the default is a public STUN server only.
+- **Other models:** choose "Other model (OpenAI-compatible)", then enter the service address (https only, public hosts only), the model name and the key. This covers Groq, Mistral, DeepSeek, OpenRouter, Together, Azure OpenAI and similar. The connection is tested with a real one-word request. Tool calling needs a model that supports it; if it does not, questions are answered without looking at your data.
