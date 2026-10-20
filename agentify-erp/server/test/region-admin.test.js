@@ -14,7 +14,7 @@ const { platformDb } = await import('../src/platform.js');
 const admin = await import('../src/regions/admin.js');
 const { selectableRegions } = await import('../src/regions/index.js');
 const { regionFor } = await import('../src/regions/runtime.js');
-const { openDb, run, get } = await import('../src/db.js');
+const { openDb, run, get, all } = await import('../src/db.js');
 const { als } = await import('../src/context.js');
 const identity = await import('../src/regions/identity.js');
 
@@ -89,4 +89,19 @@ test('a workspace can be created in an active region and takes its currency, uni
   assert.equal(regionFor(row).money.format(123456), '$1,234.56');
   const pk = createTenant({ slug: 'pk-ok', name: 'Karachi Homes', adminName: 'A', adminEmail: 'owner@khi.test', adminPassword: 'password1' });
   assert.equal(getTenant(pk.id).money_scale, 0); assert.equal(getTenant(pk.id).currency, 'PKR');
+});
+
+test('demo data for another region uses its own currency, names and units, and no Pakistani text', async () => {
+  const { createTenant } = await import('../src/platform.js');
+  const { withTenant } = await import('../src/platform.js');
+  admin.setRegionStatus(platformDb(), 'UK', 'active', 'tester');
+  const t = createTenant({ slug: 'uk-demo', name: 'Thames Estates', adminName: 'A', adminEmail: 'owner@thames.test', adminPassword: 'password1', region: 'UK', sub_region: 'England', demo: true });
+  withTenant(t, () => {
+    const props = all('SELECT title, total_price, unit FROM properties');
+    assert.ok(props.length >= 3);
+    assert.ok(props.every((p) => p.unit === 'Sq Ft' && p.total_price > 1000000));
+    const contacts = all('SELECT country, phone FROM contacts');
+    assert.ok(contacts.length >= 4 && contacts.every((c) => c.country === 'United Kingdom' && c.phone.startsWith('+44')));
+    assert.equal(JSON.stringify([props, contacts]).includes('Pakistan'), false);
+  });
 });

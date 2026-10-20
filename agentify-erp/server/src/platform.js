@@ -11,6 +11,7 @@ import { HttpError, bad } from './util.js';
 import { initPlans } from './services/plansStore.js';
 import { PLAN_SETTINGS, PLANS, PRODUCT_CHOICES } from './services/plans.js';
 import crypto from 'node:crypto';
+import { seedRegionDemo } from './regions/demo.js';
 import { initRegions, REGION_COLUMNS, selectableRegions } from './regions/index.js';
 
 export const PLATFORM_DB_FILE = process.env.ERP_PLATFORM_DB || path.join(DATA_DIR, 'platform.db');
@@ -293,7 +294,7 @@ export function createTenant({ slug, name, adminName, adminEmail, adminPassword,
       bootstrap({ companyName: tenant.name, adminName, adminEmail: String(adminEmail).toLowerCase(), adminPassword, currency: tenant.currency });
       upgradePermissions();
       ensureSite({ withPosts: demo });
-      if (demo) seedDemo();
+      if (demo) { if (region === 'PK') seedDemo(); else seedRegionDemo(); }
     });
   } catch (e) {
     prun('DELETE FROM tenants WHERE id=?', id);

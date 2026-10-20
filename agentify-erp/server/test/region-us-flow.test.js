@@ -201,3 +201,12 @@ test('privacy: an administrator can export a person and erase their details; acc
   assert.ok(after.sales.length >= 1 && after.receipts.length >= 1, 'sales and receipts are kept');
   assert.equal((await get('/api/privacy/contact/999/export')).status, 404);
 });
+
+test('spreadsheet and CSV exports write cents as dollars.cents', async () => {
+  const host = 'lonestar.erp.test';
+  const l = await call(host, 'POST', '/api/auth/login', { identifier: 'owner@lonestar.test', password: 'Tenant@12345' });
+  const r = await call(host, 'GET', '/api/receipts?format=csv', null, { cookie: l.cookie });
+  assert.equal(r.status, 200);
+  assert.match(String(r.data), /50000(\.00)?/, 'the $50,000 booking payment appears in major units');
+  assert.doesNotMatch(String(r.data), /\b5000000\b/, 'raw cents must not leak into the export');
+});

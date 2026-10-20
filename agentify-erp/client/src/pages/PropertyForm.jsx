@@ -5,9 +5,12 @@ import { FileUploader, ImageUploader } from '../components/Uploaders.jsx';
 import { BackLink, Card, Check, ChipSelect, CurrencyInput, Field, Loading, Select, StatusBadge, Toggle } from '../components/ui.jsx';
 import { api, fileUrl } from '../api.js';
 import { useAuth, useFetch, useLookups, useToast } from '../context.jsx';
-import { money } from '../format.js';
+import { money, getRegion } from '../format.js';
 
-const UNITS = ['Marla', 'Kanal', 'Sq Ft', 'Sq Yards', 'Sq Meter'];
+const PK_UNITS = ['Marla', 'Kanal', 'Sq Ft', 'Sq Yards', 'Sq Meter'];
+const UNIT_LABEL = { sqft: 'Sq Ft', sqm: 'Sq M', acre: 'Acre', hectare: 'Hectare', marla: 'Marla', kanal: 'Kanal' };
+/** Area units offered for the workspace's region (Pakistan keeps its original list). */
+const regionUnits = () => { const c = getRegion().config; return c.region === 'PK' ? PK_UNITS : (c.area_units || ['sqft']).map((u) => UNIT_LABEL[u] || u); };
 const HOUSE_TYPES = ['Ready Homes', 'Houses', 'Apartments'];
 const PLOT_TYPES = ['Plots', 'Files'];
 const BEDS = ['Studio', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '10+'];
@@ -24,7 +27,8 @@ function Section({ icon, title, hint, children }) {
   );
 }
 
-const empty = { purpose: 'Sell', unit: 'Marla', features: {}, amenities: [], videos: [], total_price: '', discount: 0, installment_available: false, ready_possession: false, city: '' };
+// built when needed: the region is applied after this module loads
+const emptyForm = () => ({ purpose: 'Sell', unit: getRegion().config.region === 'PK' ? 'Marla' : (UNIT_LABEL[getRegion().config.default_area_unit] || regionUnits()[0]), features: {}, amenities: [], videos: [], total_price: '', discount: 0, installment_available: false, ready_possession: false, city: '' });
 
 export default function PropertyForm() {
   const { id } = useParams();
@@ -35,7 +39,7 @@ export default function PropertyForm() {
   const { list, projects, users, agents } = useLookups();
   const existing = useFetch(editing ? `/api/properties/${id}` : null);
   const [sp] = useSearchParams();
-  const [f, setF] = useState(() => ({ ...empty, project_id: Number(sp.get('project')) || undefined }));
+  const [f, setF] = useState(() => ({ ...emptyForm(), project_id: Number(sp.get('project')) || undefined }));
   const [media, setMedia] = useState([]);
   const [pending, setPending] = useState([]); // files queued before the property exists
   const [pendKind, setPendKind] = useState('cover');
@@ -44,7 +48,7 @@ export default function PropertyForm() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (existing.data) { setF({ ...empty, ...existing.data, features: existing.data.features || {}, amenities: existing.data.amenities || [], videos: existing.data.videos || [] }); setMedia(existing.data.media || []); }
+    if (existing.data) { setF({ ...emptyForm(), ...existing.data, features: existing.data.features || {}, amenities: existing.data.amenities || [], videos: existing.data.videos || [] }); setMedia(existing.data.media || []); }
   }, [existing.data]);
 
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
@@ -128,7 +132,7 @@ export default function PropertyForm() {
         <Section icon="dollar" title="Price & area" hint="Size, price and payment options">
           <div className="form-grid">
             <Field label="Area size"><input className="input" type="number" min="0" step="any" value={f.area_size ?? ''} onChange={(e) => set('area_size', e.target.value)} /></Field>
-            <Field label="Unit"><Select allowEmpty={false} value={f.unit} onChange={(v) => set('unit', v)} options={UNITS} /></Field>
+            <Field label="Unit"><Select allowEmpty={false} value={f.unit} onChange={(v) => set('unit', v)} options={regionUnits()} /></Field>
             <Field label="Total price" required error={err('total_price')}><CurrencyInput value={f.total_price} onChange={(v) => set('total_price', v)} disabled={locked} /></Field>
             <Field label="Price per unit" hint="Calculated"><CurrencyInput value={ppu ?? ''} onChange={() => {}} disabled /></Field>
             <Field label="Discount" error={err('discount')}><CurrencyInput value={f.discount} onChange={(v) => set('discount', v === '' ? 0 : v)} disabled={locked} /></Field>

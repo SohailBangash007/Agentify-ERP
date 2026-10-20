@@ -8,6 +8,7 @@ import { keepContext } from '../context.js';
 import { can } from '../rbac.js';
 import { audit } from '../audit.js';
 import { sendPdf } from '../services/pdf.js';
+import { region } from '../util.js';
 import { asyncH, bad, notFound, jparse, now } from '../util.js';
 
 /** Generic list/get/create/update/delete for simple masters. */
@@ -69,17 +70,28 @@ export function crud(router, o) {
   }));
 }
 
+const MONEY_KEY = /(price|amount|paid|outstanding|overdue|balance|debit|credit|value|budget|salary|net)$/i;
+/** Spreadsheet and CSV amounts are written in major units (1234.56) for regions that store cents; Pakistan (whole rupees) is unchanged. */
+function majorUnits(columns, rows) {
+  const m = region().money;
+  if (m.scale === 0) return { rows, moneyKeys: new Set() };
+  const keys = new Set(columns.filter((c) => c.type === 'money' || MONEY_KEY.test(c.key)).map((c) => c.key));
+  return { rows: rows.map((r) => ({ ...r, ...Object.fromEntries([...keys].filter((k) => typeof r[k] === 'number').map((k) => [k, m.toMajor(r[k])])) })), moneyKeys: keys };
+}
+
 /** Send rows as xlsx / csv / json. columns: [{key,label}] */
 export async function sendTable(res, format, name, columns, rows, opts = {}) {
   if (format === 'pdf') {
     const title = opts.title || name.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     return sendPdf(res, name, { title, subtitle: opts.subtitle, summary: opts.summary, columns, rows, totals: opts.totals });
   }
+  if (format === 'xlsx' || format === 'csv') { const x = majorUnits(columns, rows); rows = x.rows; opts = { ...opts, moneyKeys: x.moneyKeys }; }
   if (format === 'xlsx') {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet(name.slice(0, 30));
     ws.columns = columns.map((c) => ({ header: c.label, key: c.key, width: Math.max(12, c.label.length + 4) }));
     ws.getRow(1).font = { bold: true };
+    if (opts.moneyKeys?.size) { const fmt = `#,##0.${'0'.repeat(region().money.scale)}`; for (const k of opts.moneyKeys) ws.getColumn(k).numFmt = fmt; }
     rows.forEach((r) => ws.addRow(Object.fromEntries(columns.map((c) => [c.key, r[c.key]]))));
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${name}.xlsx"`);
