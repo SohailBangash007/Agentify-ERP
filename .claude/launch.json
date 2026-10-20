@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "agentify-erp",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["agentify-erp/server/src/index.js"],
+      "port": 4000,
+      "env": { "PORT": "4000", "ERP_BASE_DOMAIN": "localhost", "PLATFORM_ADMIN_EMAIL": "admin@agentify.local", "PLATFORM_ADMIN_PASSWORD": "ChangeMe-12345" }
+    }
+  ]
+}

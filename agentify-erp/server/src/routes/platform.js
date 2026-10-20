@@ -122,7 +122,8 @@ const mainOnly = (req) => { if (!isMultiTenant() || !onPlatformHost(req)) throw 
 r.get('/marketing', asyncH((req, res) => {
   mainOnly(req);
   const methods = [...new Set(platformDb().prepare('SELECT method FROM payment_accounts WHERE active=1 ORDER BY sort_order, id').all().map((a) => a.method))];
-  res.json({ content: publicContent(), base_domain: BASE_DOMAIN, trial_days: PLAN_SETTINGS.default_trial_days, one_trial_per_email: PLAN_SETTINGS.one_trial_per_email, products: PRODUCTS,
+  const regions = [...selectableRegions(platformDb()).values()].map((p) => ({ code: p.code, name: p.name, currency: p.currency, sub_region_label: p.sub_region_label, sub_regions: p.sub_regions, languages: p.languages }));
+  res.json({ content: publicContent(), base_domain: BASE_DOMAIN, regions, trial_days: PLAN_SETTINGS.default_trial_days, one_trial_per_email: PLAN_SETTINGS.one_trial_per_email, products: PRODUCTS,
     plans: planCatalog().filter((p) => PLANS[p.id]?.visible), addons: listAddons({ activeOnly: true }).map(({ id, name, description, product, price, entitlements }) => ({ id, name, description, product, price, entitlements })),
     local_methods: methods, cards: stripe.stripeConfigured(), terms_version: termsVersion(), ga4_id: getSetting('ga4_measurement_id') || null });
 }));

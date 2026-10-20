@@ -390,7 +390,19 @@ function Signup({ info }) {
           <input required value={f.slug} onChange={(e) => { setSlugTouched(true); setF((s) => ({ ...s, slug: slugify(e.target.value) })); }} placeholder="your-company" aria-invalid={avail && !avail.available} /></label>
         <div className="lrow"><label>Your name<input required value={f.admin_name} onChange={set('admin_name')} autoComplete="name" /></label><label>Work email<input type="email" required value={f.admin_email} onChange={set('admin_email')} autoComplete="email" /></label></div>
         <label>Password<span className="lhint">At least 8 characters</span><input type="password" minLength={8} required value={f.admin_password} onChange={set('admin_password')} autoComplete="new-password" /></label>
-        <div className="lrow"><label>Timezone<select value={f.timezone} onChange={set('timezone')}>{tzs.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label><label>Currency<select value={f.currency} onChange={set('currency')}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select></label></div>
+        {(info.regions || []).length > 1 ? (() => {
+          const reg = info.regions.find((x) => x.code === (f.region || 'PK')) || info.regions[0];
+          return (
+            <>
+              <div className="lrow"><label>Country / region<select value={reg.code} onChange={(e) => setF((x) => ({ ...x, region: e.target.value, sub_region: '', language: '' }))}>{info.regions.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}</select></label>
+                {reg.sub_regions?.length > 0 && <label>{reg.sub_region_label || 'State'}<select value={f.sub_region || ''} onChange={set('sub_region')}><option value="">Choose…</option>{reg.sub_regions.map((x) => <option key={x}>{x}</option>)}</select></label>}</div>
+              <div className="lhint">Currency {reg.currency}. Dates, units and terms follow the region.</div>
+              {reg.languages?.length > 1 && <label>Language<select value={f.language || reg.languages[0]} onChange={set('language')}>{reg.languages.map((x) => <option key={x} value={x}>{{ en: 'English', fr: 'Français', ar: 'العربية' }[x] || x}</option>)}</select></label>}
+            </>
+          );
+        })() : (
+          <div className="lrow"><label>Timezone<select value={f.timezone} onChange={set('timezone')}>{tzs.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label><label>Currency<select value={f.currency} onChange={set('currency')}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select></label></div>
+        )}
         <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontWeight: 400 }}><input type="checkbox" checked={f.accept_terms} onChange={set('accept_terms')} style={{ width: 'auto', marginTop: 4 }} />
           <span>I agree to the <Link to="/legal/terms" target="_blank">Terms of Service</Link>, <Link to="/legal/subscription" target="_blank">Subscription Terms</Link> and <Link to="/legal/privacy" target="_blank">Privacy Policy</Link>.</span></label>
         <button className="lbtn p" disabled={busy || (avail && !avail.available)}>{busy ? 'Creating your workspace…' : 'Create workspace'}</button>
