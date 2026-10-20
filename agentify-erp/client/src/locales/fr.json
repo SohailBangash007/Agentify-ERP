@@ -15,5 +15,22 @@
   "common.save": "Enregistrer",
   "common.cancel": "Annuler",
   "common.search": "Rechercher",
-  "common.loading": "Chargement…"
+  "common.loading": "Chargement…",
+  "nav.dashboard": "Tableau de bord",
+  "nav.my_space": "Mon espace",
+  "nav.content_calendar": "Calendrier de contenu",
+  "nav.crm": "Gestion de la clientèle",
+  "nav.mortgage": "Hypothèque",
+  "nav.documents": "Documents",
+  "nav.construction": "Construction",
+  "nav.properties": "Propriétés",
+  "nav.projects": "Projets",
+  "nav.customers": "Clients",
+  "nav.accounting": "Comptabilité",
+  "nav.payments": "Paiements",
+  "nav.vendors": "Fournisseurs",
+  "nav.hrm": "Ressources humaines",
+  "nav.website": "Site Web",
+  "nav.reports": "Rapports",
+  "nav.settings": "Paramètres"
 }

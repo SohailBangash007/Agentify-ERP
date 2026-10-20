@@ -15,5 +15,22 @@
   "common.save": "حفظ",
   "common.cancel": "إلغاء",
   "common.search": "بحث",
-  "common.loading": "جارٍ التحميل…"
+  "common.loading": "جارٍ التحميل…",
+  "nav.dashboard": "لوحة التحكم",
+  "nav.my_space": "مساحتي",
+  "nav.content_calendar": "تقويم المحتوى",
+  "nav.crm": "إدارة العملاء",
+  "nav.mortgage": "التمويل العقاري",
+  "nav.documents": "المستندات",
+  "nav.construction": "البناء",
+  "nav.properties": "العقارات",
+  "nav.projects": "المشاريع",
+  "nav.customers": "العملاء",
+  "nav.accounting": "المحاسبة",
+  "nav.payments": "المدفوعات",
+  "nav.vendors": "الموردون",
+  "nav.hrm": "الموارد البشرية",
+  "nav.website": "الموقع الإلكتروني",
+  "nav.reports": "التقارير",
+  "nav.settings": "الإعدادات"
 }

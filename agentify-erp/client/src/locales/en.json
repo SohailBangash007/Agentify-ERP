@@ -15,5 +15,22 @@
   "common.save": "Save",
   "common.cancel": "Cancel",
   "common.search": "Search",
-  "common.loading": "Loading…"
+  "common.loading": "Loading…",
+  "nav.dashboard": "Dashboard",
+  "nav.my_space": "My Space",
+  "nav.content_calendar": "Content Calendar",
+  "nav.crm": "CRM",
+  "nav.mortgage": "Mortgage",
+  "nav.documents": "Documents",
+  "nav.construction": "Construction",
+  "nav.properties": "Properties",
+  "nav.projects": "Projects",
+  "nav.customers": "Customers",
+  "nav.accounting": "Accounting",
+  "nav.payments": "Payments",
+  "nav.vendors": "Vendors",
+  "nav.hrm": "HRM",
+  "nav.website": "Website",
+  "nav.reports": "Reports",
+  "nav.settings": "Settings"
 }

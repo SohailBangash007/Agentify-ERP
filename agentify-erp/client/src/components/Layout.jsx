@@ -13,6 +13,7 @@ import { useBrand } from '../brand.js';
 import { BillingBanner, VerifyBanner } from '../pages/Billing.jsx';
 import Announcements from './Announcements.jsx';
 import { getRegion } from '../format.js';
+import { t } from '../i18n.js';
 
 // [label, path, perm module (view)]
 const NAV = [
@@ -23,6 +24,7 @@ const NAV = [
     ['Contacts', '/contacts'], ['Leads', '/leads'], ['Smart Lists', '/smart-lists'], ['Sales Pipeline', '/pipeline'], ['Tasks', '/tasks'], ['Notes', '/notes'],
     ['Goals & Rewards', '/goals'], ['Sales Agents', '/agents'], ['Commissions', '/commissions', 'commissions'] ] },
   { label: 'Mortgage', icon: 'card', to: '/mortgage', module: 'crm', flag: 'mortgage' },
+  { label: 'Documents', icon: 'file', to: '/documents', module: 'crm', flag: 'templates' },
   { label: 'Construction', icon: 'hardhat', module: 'construction', product: 'construction', children: [
     ['Overview & projects', '/construction'], ['Estimates', '/construction/estimates'], ['Purchase orders', '/construction/purchase-orders'], ['Materials & stock', '/construction/materials'], ['Subcontracts', '/construction/subcontracts'] ] },
   { label: 'Properties', icon: 'building', module: 'properties', product: 'real_estate', children: [
@@ -111,14 +113,14 @@ function Sidebar({ collapsed, setCollapsed, mobileOpen, closeMobile }) {
             {g.children ? (
               <>
                 <button className={`nav-item ${g.children.some((c) => c[1] === activePath) ? 'active' : ''}`} onClick={() => { if (collapsed) setCollapsed(false); setOpen((o) => ({ ...o, [g.label]: !o[g.label] })); }} title={g.label} aria-expanded={!!open[g.label]}>
-                  <Icon name={g.icon} /><span className="nav-label">{g.label}</span><Icon name="chevR" size={13} className={`nav-caret ${open[g.label] ? 'open' : ''}`} />
+                  <Icon name={g.icon} /><span className="nav-label">{t('nav.' + g.label.toLowerCase().replace(/[^a-z]+/g, '_'), g.label)}</span><Icon name="chevR" size={13} className={`nav-caret ${open[g.label] ? 'open' : ''}`} />
                 </button>
                 {open[g.label] && !collapsed && (
                   <div className="sub">{g.children.map((c) => <Link key={c[0] + c[1]} to={c[1]} className={`nav-item ${activePath === c[1] ? 'active' : ''}`}>{c[0]}</Link>)}</div>
                 )}
               </>
             ) : (
-              <NavLink to={g.to} end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title={g.label}><Icon name={g.icon} /><span className="nav-label">{g.label}</span></NavLink>
+              <NavLink to={g.to} end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title={g.label}><Icon name={g.icon} /><span className="nav-label">{t('nav.' + g.label.toLowerCase().replace(/[^a-z]+/g, '_'), g.label)}</span></NavLink>
             )}
           </div>
         ))}

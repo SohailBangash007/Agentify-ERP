@@ -45,6 +45,7 @@ import PlatformConsole from './pages/PlatformConsole.jsx';
 import MarketingSite from './marketing/Marketing.jsx';
 import { VerifyEmail } from './pages/AuthPages.jsx';
 import Mortgage from './pages/Mortgage.jsx';
+import Documents from './pages/Documents.jsx';
 import { ConstructionOverview, ConstructionProject, EstimatesPage, MaterialsPage, PurchaseOrdersPage, SubcontractsPage } from './pages/Construction.jsx';
 
 /**
@@ -161,6 +162,7 @@ export default function App() {
         <Route path="projects/map" element={G('properties', <PlotMap />)} />
         <Route path="projects/:id" element={G('projects', <ProjectWorkspace />)} />
         <Route path="mortgage" element={G('crm', <Mortgage />)} />
+        <Route path="documents" element={G('crm', <Documents />)} />
         {/* Construction */}
         <Route path="construction" element={G('construction', <ConstructionOverview />)} />
         <Route path="construction/projects/:id" element={G('construction', <ConstructionProject />)} />
