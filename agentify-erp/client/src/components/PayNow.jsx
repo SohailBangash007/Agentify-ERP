@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Card, Empty, Field, KV, Modal, StatusBadge } from './ui.jsx';
 import { api } from '../api.js';
 import { useFetch, useToast } from '../context.jsx';
-import { date, money } from '../format.js';
+import { date, money, cur } from '../format.js';
 
 const METHODS = [['Bank Transfer', '🏦 Bank transfer'], ['Easypaisa', 'Easypaisa'], ['JazzCash', 'JazzCash'], ['Online Transfer', 'Other wallet / app'], ['Cheque', 'Cheque'], ['Cash', 'Cash at office']];
 const ONLINE = ['Bank Transfer', 'Online Transfer', 'JazzCash', 'Easypaisa'];
@@ -123,7 +123,7 @@ export function PayNowModal({ onClose, onDone, presetIds }) {
         <div>
           <div className="section-title" style={{ marginTop: 0 }}>3. Tell us what you paid</div>
           <form className="form-grid" onSubmit={submit}>
-            <Field label="Amount paid (PKR)" required hint={chosen.length ? `Selected: ${money(total)}` : ''}><input className="input" type="number" min="1" value={f.amount} onChange={set('amount')} placeholder={total ? String(total) : ''} /></Field>
+            <Field label={`Amount paid (${cur()})`} required hint={chosen.length ? `Selected: ${money(total)}` : ''}><input className="input" type="number" min="1" value={f.amount} onChange={set('amount')} placeholder={total ? String(total) : ''} /></Field>
             <Field label="Date paid" required><input className="input" type="date" max={new Date().toLocaleDateString('en-CA')} value={f.paid_date} onChange={set('paid_date')} /></Field>
             {(online || f.method === 'Cheque') && <Field label={f.method === 'Cheque' ? 'Bank' : 'Bank / channel you paid from'} required><input className="input" value={f.bank} onChange={set('bank')} placeholder={['Easypaisa', 'JazzCash'].includes(f.method) ? f.method : 'e.g. HBL, Meezan'} /></Field>}
             {online && <Field label="Transaction ID" required hint="From your bank / wallet receipt"><input className="input" value={f.txn_id} onChange={set('txn_id')} /></Field>}

@@ -1,6 +1,6 @@
 import Icon from './Icon.jsx';
 import { useMeta, useToast } from '../context.jsx';
-import { date } from '../format.js';
+import { date, money } from '../format.js';
 
 /** 0300-5551350, +92 300 5551350, 3005551350 → 923005551350 (digits only, as wa.me expects). */
 export function waNumber(phone) {
@@ -15,18 +15,18 @@ export const waLink = (phone, text) => `https://wa.me/${waNumber(phone)}${text ?
 
 /** Ready-made messages. `co` is the company name. */
 export const WA = {
-  overdue: ({ name, amount, due_date, days, sale_no }, co) => `Assalam o Alaikum ${name},\n\nA gentle reminder from ${co}: your installment of PKR ${Number(amount).toLocaleString('en-PK')} against ${sale_no || 'your file'} was due on ${date(due_date)} (${days} day${days === 1 ? '' : 's'} ago).\n\nKindly arrange the payment at your earliest convenience and share the receipt/transaction ID. JazakAllah.`,
-  due: ({ name, amount, due_date, sale_no }, co) => `Assalam o Alaikum ${name},\n\nFriendly reminder from ${co}: your next installment of PKR ${Number(amount).toLocaleString('en-PK')} against ${sale_no || 'your file'} is due on ${date(due_date)}.\n\nPlease let us know if you need our bank details. JazakAllah.`,
+  overdue: ({ name, amount, due_date, days, sale_no }, co) => `Assalam o Alaikum ${name},\n\nA gentle reminder from ${co}: your installment of ${money(amount)} against ${sale_no || 'your file'} was due on ${date(due_date)} (${days} day${days === 1 ? '' : 's'} ago).\n\nKindly arrange the payment at your earliest convenience and share the receipt/transaction ID. JazakAllah.`,
+  due: ({ name, amount, due_date, sale_no }, co) => `Assalam o Alaikum ${name},\n\nFriendly reminder from ${co}: your next installment of ${money(amount)} against ${sale_no || 'your file'} is due on ${date(due_date)}.\n\nPlease let us know if you need our bank details. JazakAllah.`,
   overdueTotal: ({ name, amount }, co) => `Assalam o Alaikum ${name},
 
-A gentle reminder from ${co}: PKR ${Number(amount).toLocaleString('en-PK')} of your installments is overdue. Kindly arrange the payment at your earliest convenience and share the receipt/transaction ID. JazakAllah.`,
-  receipt: ({ name, amount, receipt_no, date: d }, co) => `Assalam o Alaikum ${name},\n\nThank you! ${co} has received PKR ${Number(amount).toLocaleString('en-PK')} on ${date(d)} (receipt ${receipt_no}). Your payment voucher is attached.\n\nJazakAllah.`,
+A gentle reminder from ${co}: ${money(amount)} of your installments is overdue. Kindly arrange the payment at your earliest convenience and share the receipt/transaction ID. JazakAllah.`,
+  receipt: ({ name, amount, receipt_no, date: d }, co) => `Assalam o Alaikum ${name},\n\nThank you! ${co} has received ${money(amount)} on ${date(d)} (receipt ${receipt_no}). Your payment voucher is attached.\n\nJazakAllah.`,
   /** Expense voucher to a vendor/contractor: approved, paid, or just "here is the voucher". */
   voucher: ({ name, amount, voucher_no, description, kind }, co) => {
     const what = description ? ` (${description})` : '';
-    const body = kind === 'paid' ? `${co} has paid PKR ${Number(amount).toLocaleString('en-PK')} against voucher ${voucher_no}${what}.`
-      : kind === 'approved' ? `${co} has approved expense voucher ${voucher_no}${what} for PKR ${Number(amount).toLocaleString('en-PK')}.`
-        : `Please find expense voucher ${voucher_no}${what} for PKR ${Number(amount).toLocaleString('en-PK')} from ${co}.`;
+    const body = kind === 'paid' ? `${co} has paid ${money(amount)} against voucher ${voucher_no}${what}.`
+      : kind === 'approved' ? `${co} has approved expense voucher ${voucher_no}${what} for ${money(amount)}.`
+        : `Please find expense voucher ${voucher_no}${what} for ${money(amount)} from ${co}.`;
     return `Assalam o Alaikum ${name},\n\n${body} The voucher is attached.\n\nJazakAllah.`;
   },
   followup: ({ name }, co) => `Assalam o Alaikum ${name}, this is from ${co}. Just following up on your property enquiry — would you like to schedule a site visit this week?`,

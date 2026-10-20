@@ -45,3 +45,4 @@ export const DATE_PRESETS = [
   ['today', 'Today'], ['yesterday', 'Yesterday'], ['this_week', 'This week'], ['this_month', 'This month'], ['last_month', 'Last month'],
   ['this_quarter', 'This quarter'], ['this_year', 'This year'], ['all', 'All time'], ['custom', 'Custom range'],
 ];
+export const cur = () => R.config.currency;

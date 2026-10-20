@@ -6,7 +6,7 @@ import { DocumentsPanel } from '../components/Uploaders.jsx';
 import { BackLink, Card, ConfirmDialog, CurrencyInput, Empty, Field, KV, Loading, Menu, Modal, PageHead, Select, Stat, StatusBadge, Tabs, Toggle } from '../components/ui.jsx';
 import { api, download } from '../api.js';
 import { useAuth, useFetch, useLookups, useToast } from '../context.jsx';
-import { date, money, todayPK } from '../format.js';
+import { date, money, todayPK, cur } from '../format.js';
 
 const TONE = { draft: 'grey', open: 'green', closed: 'amber', awarded: 'purple', cancelled: 'red' };
 const BID_TONE = { submitted: 'blue', shortlisted: 'amber', awarded: 'green', rejected: 'red' };
@@ -77,7 +77,7 @@ function TenderForm({ tender, onClose, onSaved }) {
         <Field label="Project"><Select value={f.project_id || ''} onChange={(v) => set('project_id', v ? Number(v) : '')} options={projects.map((p) => ({ value: p.id, label: p.name }))} placeholder="Not tied to a project" /></Field>
         <Field label="Site / location"><input className="input" value={f.location || ''} onChange={(e) => set('location', e.target.value)} /></Field>
         <Field label="Closing date" required hint="Bids are accepted up to and including this date"><input className="input" type="date" min={todayPK()} value={f.closes_on} onChange={(e) => set('closes_on', e.target.value)} /></Field>
-        <Field label="Your estimate (PKR)" hint="Internal — vendors only see it if you switch it on"><CurrencyInput value={f.estimated_budget} onChange={(v) => set('estimated_budget', v)} /><div style={{ marginTop: 6 }}><Toggle value={!!f.show_budget} onChange={(v) => set('show_budget', v)} label="Show the estimate to vendors" /></div></Field>
+        <Field label={`Your estimate (${cur()})`} hint="Internal — vendors only see it if you switch it on"><CurrencyInput value={f.estimated_budget} onChange={(v) => set('estimated_budget', v)} /><div style={{ marginTop: 6 }}><Toggle value={!!f.show_budget} onChange={(v) => set('show_budget', v)} label="Show the estimate to vendors" /></div></Field>
         <Field label="Description" className="full"><textarea className="textarea" rows={3} value={f.description || ''} onChange={(e) => set('description', e.target.value)} /></Field>
         <Field label="Scope of work" className="full"><textarea className="textarea" rows={3} value={f.scope || ''} onChange={(e) => set('scope', e.target.value)} /></Field>
         <Field label="Documents vendors must include" className="full"><input className="input" value={f.required_docs || ''} onChange={(e) => set('required_docs', e.target.value)} placeholder="e.g. NTN certificate, last 3 invoices, references" /></Field>

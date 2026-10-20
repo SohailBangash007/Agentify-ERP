@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import Icon from './Icon.jsx';
-import { DATE_PRESETS, initials, money, titleCase } from '../format.js';
+import { DATE_PRESETS, initials, money, titleCase, cur } from '../format.js';
 
 export const Spinner = () => <span className="spinner" />;
 /** Skeleton placeholder (shimmer) instead of a bare spinner; `rows` lines plus a header block. */
@@ -164,7 +164,7 @@ export function Select({ value, onChange, options, placeholder = 'Select…', al
 }
 
 /** Whole-rupee money input with thousands separators. onChange receives a number (or '' when empty). */
-export function CurrencyInput({ value, onChange, prefix = 'PKR', ...p }) {
+export function CurrencyInput({ value, onChange, prefix = cur(), ...p }) {
   const display = value === '' || value === null || value === undefined ? '' : Number(value).toLocaleString('en-PK');
   return (
     <div className="input-group">

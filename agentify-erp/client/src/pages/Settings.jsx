@@ -8,7 +8,7 @@ import { api } from '../api.js';
 import { useAuth, useFetch, useLookups, useMeta, useToast } from '../context.jsx';
 import PushToggle from '../components/Push.jsx';
 import Icon from '../components/Icon.jsx';
-import { dateTime, titleCase } from '../format.js';
+import { dateTime, titleCase, cur, money } from '../format.js';
 
 // ---------------------------------------------------------------- Users
 export function Users() {
@@ -193,12 +193,12 @@ export function CommissionRules() {
   return (
     <ResourcePage title="Commission rules" sub="Most specific rule wins: property → project → property type → general. Falls back to the default % in System settings." endpoint="/api/commission-rules" module="settings" noun="rule" tableId="comm-rules"
       fields={[{ name: 'name', label: 'Rule name', required: true }, { name: 'type', label: 'Type', type: 'select', options: [{ value: 'percentage', label: 'Percentage of sale' }, { value: 'fixed', label: 'Fixed amount' }, { value: 'tier', label: 'Tier-based (by sale value)' }], allowEmpty: false },
-        { name: 'value', label: 'Value (% or PKR)', type: 'number', hint: 'For tier rules this is the fallback %' }, { name: 'project_id', label: 'Only for project', type: 'select', number: true, options: projects.map((p) => ({ value: p.id, label: p.name })) }, { name: 'sale_kind', label: 'Only for', type: 'select', options: [{ value: 'property', label: 'Property sales' }, { value: 'construction', label: 'Construction contracts' }], placeholder: 'All sales' }, { name: 'property_type', label: 'Only for property type', type: 'select', lookup: 'property_type' },
+        { name: 'value', label: `Value (% or ${cur()})`, type: 'number', hint: 'For tier rules this is the fallback %' }, { name: 'project_id', label: 'Only for project', type: 'select', number: true, options: projects.map((p) => ({ value: p.id, label: p.name })) }, { name: 'sale_kind', label: 'Only for', type: 'select', options: [{ value: 'property', label: 'Property sales' }, { value: 'construction', label: 'Construction contracts' }], placeholder: 'All sales' }, { name: 'property_type', label: 'Only for property type', type: 'select', lookup: 'property_type' },
         { name: 'tiersText', label: 'Tiers: min:max:rate per line (e.g. 0:5000000:1.5)', type: 'textarea', showIf: (f) => f.type === 'tier', full: true }, { name: 'active', label: 'Active', type: 'bool' }]}
       defaults={{ type: 'percentage', value: 2, active: 1 }} toForm={(r) => ({ ...r, tiersText: (r.tiers || []).map((t) => `${t.min}:${t.max ?? ''}:${t.rate}`).join('\n') })}
       transformSave={(f) => ({ name: f.name, type: f.type, value: Number(f.value) || 0, project_id: f.project_id || null, property_type: f.property_type || null, sale_kind: f.sale_kind || null, active: f.active ? 1 : 0,
         tiers: f.type === 'tier' ? String(f.tiersText || '').split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const [min, max, rate] = l.split(':'); return { min: Number(min), max: max === '' ? null : Number(max), rate: Number(rate) }; }) : [] })}
-      columns={[{ key: 'name', label: 'Rule', render: (r) => <b>{r.name}</b> }, { key: 'type', label: 'Type' }, { key: 'value', label: 'Value', render: (r) => (r.type === 'fixed' ? `PKR ${Number(r.value).toLocaleString('en-PK')}` : `${r.value}%`) }, { key: 'project_id', label: 'Scope', render: (r) => [r.sale_kind && (r.sale_kind === 'construction' ? 'Construction' : 'Property'), projects.find((p) => p.id === r.project_id)?.name || r.property_type].filter(Boolean).join(' · ') || 'All sales' }, { key: 'active', label: 'Status', render: (r) => <StatusBadge status={r.active ? 'active' : 'inactive'} /> }]} />
+      columns={[{ key: 'name', label: 'Rule', render: (r) => <b>{r.name}</b> }, { key: 'type', label: 'Type' }, { key: 'value', label: 'Value', render: (r) => (r.type === 'fixed' ? money(r.value) : `${r.value}%`) }, { key: 'project_id', label: 'Scope', render: (r) => [r.sale_kind && (r.sale_kind === 'construction' ? 'Construction' : 'Property'), projects.find((p) => p.id === r.project_id)?.name || r.property_type].filter(Boolean).join(' · ') || 'All sales' }, { key: 'active', label: 'Status', render: (r) => <StatusBadge status={r.active ? 'active' : 'inactive'} /> }]} />
   );
 }
 
@@ -227,7 +227,7 @@ export function SystemSettings() {
           <Field label="Phone"><input className="input" disabled={ro} value={f.company_phone || ''} onChange={(e) => set('company_phone', e.target.value)} /></Field>
           <Field label="Email"><input className="input" disabled={ro} value={f.company_email || ''} onChange={(e) => set('company_email', e.target.value)} /></Field>
           <Field label="Address" className="full"><input className="input" disabled={ro} value={f.company_address || ''} onChange={(e) => set('company_address', e.target.value)} /></Field>
-          <Field label="Currency" hint="Amounts are stored in whole rupees; further currencies can be added later"><input className="input" disabled value={f.currency || 'PKR'} /></Field>
+          <Field label="Currency" hint="Set by the workspace region"><input className="input" disabled value={f.currency || cur()} /></Field>
           <Field label="Date format"><input className="input" disabled value="DD-MMM-YYYY (Asia/Karachi)" /></Field>
         </div></Card>
         <Card title="Commission & targets"><div className="form-grid">

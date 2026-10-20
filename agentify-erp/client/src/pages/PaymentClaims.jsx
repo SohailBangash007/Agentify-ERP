@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, ConfirmDialog, Empty, Field, Loading, Modal, PageHead, StatusBadge, Tabs, Toggle } from '../components/ui.jsx';
 import { api } from '../api.js';
 import { useAuth, useFetch, useLookups, useToast } from '../context.jsx';
-import { date, money } from '../format.js';
+import { date, money, cur } from '../format.js';
 
 const TONE = { pending: 'blue', verifying: 'purple', approved: 'green', rejected: 'red' };
 const LABEL = { pending: 'In process', verifying: 'Under verification', approved: 'Paid', rejected: 'Declined' };
@@ -78,7 +78,7 @@ export default function PaymentClaims() {
             <div className="form-grid">
               <Field label="Verified on" required><select className="input" value={f.verified_channel} onChange={set('verified_channel')}>{CHANNELS.map((c) => <option key={c}>{c}</option>)}</select></Field>
               <Field label="Bank / wallet reference seen"><input className="input" value={f.verified_ref} onChange={set('verified_ref')} placeholder="transaction ID in your statement" /></Field>
-              <Field label="Amount received (PKR)" required hint={Number(f.amount) !== approve.amount ? `The customer reported ${money(approve.amount)}` : ''}><input className="input" type="number" min="1" value={f.amount} onChange={set('amount')} /></Field>
+              <Field label={`Amount received (${cur()})`} required hint={Number(f.amount) !== approve.amount ? `The customer reported ${money(approve.amount)}` : ''}><input className="input" type="number" min="1" value={f.amount} onChange={set('amount')} /></Field>
               <Field label="Date received" required><input className="input" type="date" max={today()} value={f.received_date} onChange={set('received_date')} /></Field>
               <Field label="Deposited to" required className="full"><select className="input" value={f.account_id} onChange={set('account_id')}><option value="">Select account…</option>{treasury.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></Field>
               <Field label="Note (optional)" className="full"><input className="input" value={f.verified_note} onChange={set('verified_note')} /></Field>
