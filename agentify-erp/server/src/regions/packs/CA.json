@@ -2,7 +2,7 @@
   "code": "CA",
   "name": "Canada",
   "status": "draft",
-  "version": 1,
+  "version": 2,
   "locale": "en-CA",
   "language": "en",
   "languages": [ "en", "fr" ],
@@ -36,10 +36,10 @@
     }
   },
   "flags": {
-    "mortgage": false,
+    "mortgage": true,
     "transactions": false,
-    "compliance": false,
-    "templates": false
+    "compliance": true,
+    "templates": true
   },
   "rules": [],
   "notes": "Phase 1 manifest only. Quebec requires French: fr-CA arrives with the translation phase.",
@@ -128,5 +128,145 @@
         }
       ]
     }
-  ]
+  ],
+  "price_style": "intl",
+  "property_types": [
+    {
+      "group": "Houses",
+      "label": "Detached"
+    },
+    {
+      "group": "Houses",
+      "label": "Semi-detached"
+    },
+    {
+      "group": "Houses",
+      "label": "Townhouse"
+    },
+    {
+      "group": "Houses",
+      "label": "Duplex"
+    },
+    {
+      "group": "Apartments",
+      "label": "Condo apartment"
+    },
+    {
+      "group": "Apartments",
+      "label": "Condo townhouse"
+    },
+    {
+      "group": "Apartments",
+      "label": "Studio"
+    },
+    {
+      "group": "Apartments",
+      "label": "Loft"
+    },
+    {
+      "group": "Land",
+      "label": "Vacant land"
+    },
+    {
+      "group": "Land",
+      "label": "Farm"
+    },
+    {
+      "group": "Commercial",
+      "label": "Office"
+    },
+    {
+      "group": "Commercial",
+      "label": "Retail"
+    },
+    {
+      "group": "Commercial",
+      "label": "Industrial"
+    },
+    {
+      "group": "Commercial",
+      "label": "Multi-residential"
+    }
+  ],
+  "listing_fields": [ "bedrooms", "bathrooms", "parking", "lot_size", "year_built", "condo_fee", "property_tax" ],
+  "area": {
+    "default": "sqft",
+    "allowed": [ "sqft", "sqm", "acre" ],
+    "secondary": "sqm",
+    "labels": {
+      "sqft": "Sq Ft",
+      "sqm": "Sq M",
+      "acre": "Acres"
+    }
+  },
+  "rent_suffix": " / month",
+  "calculators": {
+    "mortgage": {
+      "terms": [
+        25,
+        30,
+        20
+      ],
+      "default_term": 25,
+      "default_rate_bp": 500,
+      "default_down_pct": 20,
+      "property_tax_bp": 100,
+      "insurance_annual": 120000,
+      "hoa_monthly": 0,
+      "pmi_bp": 0
+    },
+    "purchase_costs": "closing_costs",
+    "affordability": true,
+    "installments": false,
+    "unit_converter": false,
+    "construction": {
+      "unit": "sqft",
+      "rates": {
+        "grey": {
+          "Standard": 110,
+          "Premium": 125,
+          "Luxury": 150
+        },
+        "semi": {
+          "Standard": 165,
+          "Premium": 190,
+          "Luxury": 225
+        },
+        "turnkey": {
+          "Standard": 235,
+          "Premium": 275,
+          "Luxury": 340
+        }
+      },
+      "scopes": {
+        "grey": "Shell and structure",
+        "semi": "Semi-finished",
+        "turnkey": "Turnkey"
+      },
+      "locations": [ "Standard market", "Toronto / Vancouver" ],
+      "location_factor": {
+        "Standard market": 1,
+        "Toronto / Vancouver": 1.2
+      }
+    }
+  },
+  "fees": {
+    "closing_costs": {
+      "default_bp": 200,
+      "range_bp": [
+        150,
+        400
+      ],
+      "needs_legal_review": true,
+      "note": "Land transfer tax differs by province; editable percentage until tables are loaded."
+    }
+  },
+  "site_copy": {
+    "keyword_placeholder": "City, neighbourhood, postal code or address",
+    "hero_tagline": "Homes, condos and land across Canada",
+    "portal_blurb": "See your property, payments, receipts and documents",
+    "payment_steps": [ "Pay by e-transfer, bank transfer or card", "Include your reference", "We confirm and issue a receipt" ]
+  },
+  "lead_sources": [ "Walk-in", "Website", "REALTOR.ca", "Open house", "Referral", "Social media", "Phone call" ],
+  "amenities": [ "Garage", "Garden / yard", "Pool", "Central air", "Fireplace", "Basement", "Balcony", "Gym", "Concierge", "Parking locker", "Parking" ]
 }

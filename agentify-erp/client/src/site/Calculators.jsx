@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { buildPlan, addMonthsISO, addDaysISO } from '../../../shared/installmentPlan.js';
-import { MoneyBox, fullPrice, useSite } from './siteCore.jsx';
+import { MoneyBox, fullPrice, useSite, curCode } from './siteCore.jsx';
+import { getRegion } from '../format.js';
 
 const num = (v) => (v === '' || v == null ? 0 : Number(v));
-const inr = (n) => `PKR ${Math.round(n).toLocaleString('en-PK')}`;
-const todayISO = () => new Date(Date.now() + 5 * 3600 * 1000).toISOString().slice(0, 10); // Asia/Karachi
-const fmtDate = (s) => { const [y, m, d] = s.split('-').map(Number); return `${String(d).padStart(2, '0')}-${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]}-${y}`; };
+const inr = (n) => `${getRegion().config.currency} ${Math.round(n).toLocaleString(getRegion().config.locale)}`;
+const todayISO = () => getRegion().fmt.today(); // the workspace's timezone (Asia/Karachi for Pakistan)
+const fmtDate = (s) => getRegion().fmt.date(s);
+const fmtDateLegacy = (s) => { const [y, m, d] = s.split('-').map(Number); return `${String(d).padStart(2, '0')}-${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]}-${y}`; };
 
 /**
  * Full installment plan generator. Enter the price, booking, advance, number of installments and balloon payments —
@@ -34,7 +36,7 @@ export function InstallmentCalculator({ price: initialPrice, compact }) {
     try {
       if (kind === 'csv') {
         const esc = (v) => `"${String(v).replace(/"/g, '""')}"`;
-        const lines = [['#', 'Due date', 'Payment', 'Amount (PKR)', 'Balance after (PKR)'].map(esc).join(','), ...plan.rows.map((r, i) => [i + 1, r.date, r.label, r.amount, r.balance].map(esc).join(','))];
+        const lines = [['#', 'Due date', 'Payment', `Amount (${curCode()})`, `Balance after (${curCode()})`].map(esc).join(','), ...plan.rows.map((r, i) => [i + 1, r.date, r.label, r.amount, r.balance].map(esc).join(','))];
         save(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }), 'installment-plan.csv');
       } else {
         const r = await fetch('/api/site/installment-plan/pdf', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'ERP' }, body: JSON.stringify(f) });
@@ -49,10 +51,10 @@ export function InstallmentCalculator({ price: initialPrice, compact }) {
     <div>
       <div className={`calc ${compact ? 'compact' : ''}`}>
         <div className="calc-form">
-          <label>Total price (PKR)<MoneyBox value={f.price} onChange={set('price')} placeholder="e.g. 5,000,000" /></label>
+          <label>Total price ({curCode()})<MoneyBox value={f.price} onChange={set('price')} placeholder="e.g. 5,000,000" /></label>
           <div className="two">
-            <label>Booking amount (PKR)<MoneyBox value={f.booking} onChange={set('booking')} placeholder="e.g. 250,000" /></label>
-            <label>Advance payment (PKR)<MoneyBox value={f.advance} onChange={set('advance')} placeholder="e.g. 750,000" /></label>
+            <label>Booking amount ({curCode()})<MoneyBox value={f.booking} onChange={set('booking')} placeholder="e.g. 250,000" /></label>
+            <label>Advance payment ({curCode()})<MoneyBox value={f.advance} onChange={set('advance')} placeholder="e.g. 750,000" /></label>
           </div>
           <div className="two">
             <label>Number of installments<input type="number" min="1" max="360" value={f.installments} onChange={set('installments')} placeholder="e.g. 60" /></label>
@@ -60,7 +62,7 @@ export function InstallmentCalculator({ price: initialPrice, compact }) {
           </div>
           <div className="two">
             <label>Balloon payments (how many)<input type="number" min="0" max="60" value={f.balloons} onChange={set('balloons')} placeholder="e.g. 5" /></label>
-            <label>Each balloon (PKR)<MoneyBox value={f.balloon_amount} onChange={set('balloon_amount')} placeholder={`blank = 5% (${Math.round(num(f.price) * 0.05).toLocaleString('en-PK')})`} disabled={!num(f.balloons)} /></label>
+            <label>Each balloon ({curCode()})<MoneyBox value={f.balloon_amount} onChange={set('balloon_amount')} placeholder={`blank = 5% (${Math.round(num(f.price) * 0.05).toLocaleString('en-PK')})`} disabled={!num(f.balloons)} /></label>
           </div>
           {num(f.balloons) > 0 && <label>Balloon every (installments)<input type="number" min="1" value={f.balloon_every} onChange={set('balloon_every')} placeholder={`blank = spread evenly (every ${Math.max(1, Math.floor(num(f.installments) / num(f.balloons)))})`} /></label>}
           <div className="three">

@@ -17,7 +17,7 @@ import adminRoutes from './platformAdmin.js';
 import { verifySignature, applyBillingEvent, setSubscription, listSubmissions, approveSubmission, rejectSubmission, tenantByProviderIds } from '../services/billing.js';
 import * as stripe from '../services/stripe.js';
 import { stripeConfig, getSetting } from '../services/platformConfig.js';
-import { selectableRegions } from '../regions/index.js';
+import { selectableRegions, listCountries } from '../regions/index.js';
 import { BASE_DOMAIN, platformDb, withTenant, isMultiTenant, createTenant, validateSlug, listTenants, getTenant, setTenantStatus, RESERVED_SLUGS } from '../platform.js';
 
 const r = Router();
@@ -35,7 +35,7 @@ r.get('/site', (req, res) => {
   const landing = isMultiTenant() && onPlatformHost(req);
   if (!landing) return res.json({ landing: false, multi_tenant: isMultiTenant() });
   const methods = [...new Set(platformDb().prepare('SELECT method FROM payment_accounts WHERE active=1 ORDER BY sort_order, id').all().map((a) => a.method))];
-  res.json({ landing: true, regions: [...selectableRegions(platformDb()).values()].map((p) => ({ code: p.code, name: p.name, currency: p.currency, sub_region_label: p.sub_region_label, sub_regions: p.sub_regions, languages: p.languages })), base_domain: BASE_DOMAIN, trial_days: PLAN_SETTINGS.default_trial_days, plans: planCatalog(), products: PRODUCTS, addons: listAddons({ activeOnly: true }).map(({ id, name, description, product, price, entitlements }) => ({ id, name, description, product, price, entitlements })), local_methods: methods, cards: stripe.stripeConfigured() });
+  res.json({ landing: true, regions: [...selectableRegions(platformDb()).values()].map((p) => ({ code: p.code, name: p.name, currency: p.currency, sub_region_label: p.sub_region_label, sub_regions: p.sub_regions, languages: p.languages })), countries: listCountries(platformDb()), base_domain: BASE_DOMAIN, trial_days: PLAN_SETTINGS.default_trial_days, plans: planCatalog(), products: PRODUCTS, addons: listAddons({ activeOnly: true }).map(({ id, name, description, product, price, entitlements }) => ({ id, name, description, product, price, entitlements })), local_methods: methods, cards: stripe.stripeConfigured() });
 });
 
 /** Is this workspace address free? (never reveals which tenants exist beyond availability) */
@@ -123,7 +123,7 @@ r.get('/marketing', asyncH((req, res) => {
   mainOnly(req);
   const methods = [...new Set(platformDb().prepare('SELECT method FROM payment_accounts WHERE active=1 ORDER BY sort_order, id').all().map((a) => a.method))];
   const regions = [...selectableRegions(platformDb()).values()].map((p) => ({ code: p.code, name: p.name, currency: p.currency, sub_region_label: p.sub_region_label, sub_regions: p.sub_regions, languages: p.languages }));
-  res.json({ content: publicContent(), base_domain: BASE_DOMAIN, regions, trial_days: PLAN_SETTINGS.default_trial_days, one_trial_per_email: PLAN_SETTINGS.one_trial_per_email, products: PRODUCTS,
+  res.json({ content: publicContent(), base_domain: BASE_DOMAIN, regions, countries: listCountries(platformDb()), trial_days: PLAN_SETTINGS.default_trial_days, one_trial_per_email: PLAN_SETTINGS.one_trial_per_email, products: PRODUCTS,
     plans: planCatalog().filter((p) => PLANS[p.id]?.visible), addons: listAddons({ activeOnly: true }).map(({ id, name, description, product, price, entitlements }) => ({ id, name, description, product, price, entitlements })),
     local_methods: methods, cards: stripe.stripeConfigured(), terms_version: termsVersion(), ga4_id: getSetting('ga4_measurement_id') || null });
 }));

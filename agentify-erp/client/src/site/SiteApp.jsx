@@ -6,7 +6,8 @@ import ChatBot from './ChatBot.jsx';
 import { resolveStyle } from '../../../shared/sectionStyle.js';
 import { CalculatorTabs } from './ConstructionTools.jsx';
 import { A, safeHref, AgentCard, InquiryForm, Placeholder, PostCard, ProjectCard, PropertyCard, SearchBox, SectionRenderer, usePublic } from './components.jsx';
-import { Markdown, SECTION_TYPES, SiteProvider, fullPrice, imgUrl, priceText, useSite, useTitle, waLink, MoneyBox } from './siteCore.jsx';
+import { Markdown, SECTION_TYPES, SiteProvider, fullPrice, imgUrl, priceText, useSite, useTitle, waLink, MoneyBox, minorOf, curCode, siteCopy, isPK, exampleAmount } from './siteCore.jsx';
+import { getRegion } from '../format.js';
 import './site.css';
 
 const SOCIAL_ICON = { Facebook: 'f', Instagram: '◎', YouTube: '▶', WhatsApp: '✆', 'X (Twitter)': '𝕏', Twitter: '𝕏', LinkedIn: 'in', TikTok: '♪', Website: '🌐', Other: '🔗' };
@@ -113,7 +114,9 @@ function Properties() {
   const [view, setView] = useState('grid');
   const [showF, setShowF] = useState(false);
   const q = Object.fromEntries(sp.entries());
-  const d = usePublic('/api/site/listings', { ...q, limit: 12 });
+  // prices are typed in whole currency units and stored in the smallest unit (cents)
+  const apiQ = { ...q, ...(q.min_price ? { min_price: minorOf(q.min_price) } : {}), ...(q.max_price ? { max_price: minorOf(q.max_price) } : {}) };
+  const d = usePublic('/api/site/listings', { ...apiQ, limit: 12 });
   const set = (patch) => { const n = { ...q, ...patch, page: patch.page ?? '' }; for (const k of Object.keys(n)) if (n[k] === '' || n[k] == null) delete n[k]; setSp(n); };
   const rent = q.purpose === 'Rent';
   useTitle(rent ? 'Properties for rent' : q.purpose === 'Sell' ? 'Properties for sale' : 'Properties');
@@ -132,14 +135,14 @@ function Properties() {
       <div className="listing-layout">
         <aside className={`filters ${showF ? 'open' : ''}`}>
           <h4>Filters</h4>
-          <label>Keyword<input value={q.q || ''} placeholder="Location, project, plot…" onChange={(e) => set({ q: e.target.value })} /></label>
+          <label>Keyword<input value={q.q || ''} placeholder={siteCopy('keyword_placeholder', 'Location, project, plot…')} onChange={(e) => set({ q: e.target.value })} /></label>
           <label>City<select value={q.city || ''} onChange={(e) => set({ city: e.target.value })}><option value="">All</option>{facets?.cities.map((c) => <option key={c.value} value={c.value}>{c.value} ({c.n})</option>)}</select></label>
           <label>Property type<select value={q.type || ''} onChange={(e) => set({ type: e.target.value })}><option value="">All</option>{facets?.types.map((c) => <option key={c.value} value={c.value}>{c.value} ({c.n})</option>)}</select></label>
           <label>Project<select value={q.project_id || ''} onChange={(e) => set({ project_id: e.target.value })}><option value="">All</option>{facets?.projects.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-          <div className="two"><label>Min price (PKR)<MoneyBox value={q.min_price} placeholder="e.g. 2,000,000" onChange={(v) => set({ min_price: v })} /></label><label>Max price (PKR)<MoneyBox value={q.max_price} placeholder="e.g. 10,000,000" onChange={(v) => set({ max_price: v })} /></label></div>
-          <div className="two"><label>Min area<input type="number" min="0" value={q.min_area || ''} onChange={(e) => set({ min_area: e.target.value })} /></label><label>Max area<input type="number" min="0" value={q.max_area || ''} onChange={(e) => set({ max_area: e.target.value })} /></label></div>
+          <div className="two"><label>Min price ({curCode()})<MoneyBox value={q.min_price} placeholder={exampleAmount(2000000)} onChange={(v) => set({ min_price: v })} /></label><label>Max price ({curCode()})<MoneyBox value={q.max_price} placeholder={exampleAmount(10000000)} onChange={(v) => set({ max_price: v })} /></label></div>
+          <div className="two"><label>Min area ({getRegion().config.area?.labels?.[getRegion().config.area?.default] || 'area'})<input type="number" min="0" value={q.min_area || ''} onChange={(e) => set({ min_area: e.target.value })} /></label><label>Max area<input type="number" min="0" value={q.max_area || ''} onChange={(e) => set({ max_area: e.target.value })} /></label></div>
           <label>Bedrooms<div className="chips">{['', '1', '2', '3', '4', '5', '6+'].map((b) => <button key={b} className={(q.beds || '') === b ? 'on' : ''} onClick={() => set({ beds: b })}>{b || 'Any'}</button>)}</div></label>
-          <label className="chk"><input type="checkbox" checked={q.installment === '1'} onChange={(e) => set({ installment: e.target.checked ? '1' : '' })} /> Installments available</label>
+          {getRegion().config.calculators?.installments !== false && <label className="chk"><input type="checkbox" checked={q.installment === '1'} onChange={(e) => set({ installment: e.target.checked ? '1' : '' })} /> Installments available</label>}
           <label className="chk"><input type="checkbox" checked={q.ready === '1'} onChange={(e) => set({ ready: e.target.checked ? '1' : '' })} /> Ready for possession</label>
           <label className="chk"><input type="checkbox" checked={q.featured === '1'} onChange={(e) => set({ featured: e.target.checked ? '1' : '' })} /> Featured only</label>
           {active.length > 0 && <button className="btn-s" onClick={() => setSp(q.purpose ? { purpose: q.purpose } : {})}>Clear all filters</button>}
@@ -193,7 +196,7 @@ function PropertyPage() {
   if (err) return <NotFound />;
   if (!p) return <div className="center-box"><span className="spinner" /></div>;
   const imgs = p.images;
-  const facts = [['Type', p.type], ['Purpose', p.purpose === 'Rent' ? 'For rent' : 'For sale'], ['Area', p.area ? `${p.area} ${p.unit}` : null], ['Bedrooms', p.bedrooms], ['Bathrooms', p.bathrooms], ['Project', p.project?.name], ['Block / sector', [p.block, p.sector].filter(Boolean).join(' / ')], ['Plot / unit', p.plot_no], ['Possession', p.ready ? 'Ready' : null], ['Development', p.development_status || p.features?.development_status], ['Installments', p.installment ? 'Available' : null], ['Reference', p.code]].filter(([, v]) => v);
+  const facts = [['Type', p.type], ['Purpose', p.purpose === 'Rent' ? 'For rent' : 'For sale'], ['Area', p.area ? `${p.area} ${p.unit}` : null], ['Bedrooms', p.bedrooms], ['Bathrooms', p.bathrooms], ['Project', p.project?.name], ...(isPK() ? [['Block / sector', [p.block, p.sector].filter(Boolean).join(' / ')], ['Plot / unit', p.plot_no]] : []), ['Possession', p.ready ? 'Ready' : null], ['Development', p.development_status || p.features?.development_status], ['Installments', p.installment ? 'Available' : null], ['Reference', p.code]].filter(([, v]) => v);
   const feats = Object.entries(p.features || {}).filter(([k, v]) => v && v !== '' && !['bedrooms', 'bathrooms', 'possession', 'development_status'].includes(k)).map(([k, v]) => (v === true ? FEATURE[k] || k : `${FEATURE[k] || k}: ${v}`));
   const url = typeof window !== 'undefined' ? window.location.href : '';
   const share = async () => { try { if (navigator.share) await navigator.share({ title: p.title, url }); else { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1800); } } catch { /* cancelled */ } };
@@ -347,7 +350,7 @@ function PostPage() {
 function CalculatorsPage() {
   const [sp] = useSearchParams();
   useTitle('Calculators');
-  return <div className="wrap sec"><h1>Calculators</h1><p className="muted">Estimate what your home will cost to build, the materials it needs and the payment milestones.</p><CalculatorTabs defaultTab={sp.get('tab') || 'cost'} /></div>;
+  return <div className="wrap sec"><h1>Calculators</h1><p className="muted">{isPK() ? 'Estimate what your home will cost to build, the materials it needs and the payment milestones.' : 'Work out a monthly payment, the costs of buying and what it takes to build. Figures are estimates only.'}</p><CalculatorTabs defaultTab={sp.get('tab') || 'cost'} /></div>;
 }
 
 /** Public website mounted at /site/*. `override` renders the live preview inside the editor. */

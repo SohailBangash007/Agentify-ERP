@@ -80,6 +80,17 @@ export function initPlans(pdb) {
     for (const [id, p] of Object.entries(DEFAULT_CONSTRUCTION_PLANS)) insertPlan(id, p, i++);
     mark('seeded_construction_plans');
   }
+  // placeholder prices in the other launch currencies, derived from the USD price once; the platform owner edits them in the console
+  if (!setting('seeded_local_currencies_v1')) {
+    const RATE = { GBP: 0.8, AED: 3.67, CAD: 1.4 };
+    for (const r of db.prepare("SELECT plan_id, interval, amount FROM plan_prices WHERE currency='USD'").all()) {
+      for (const [cur, k] of Object.entries(RATE)) {
+        if (db.prepare('SELECT 1 FROM plan_prices WHERE plan_id=? AND currency=? AND interval=?').get(r.plan_id, cur, r.interval)) continue;
+        db.prepare("INSERT INTO plan_prices(plan_id,currency,interval,amount,effective_from,created_by) VALUES(?,?,?,?,'2000-01-01 00:00:00','system')").run(r.plan_id, cur, r.interval, Math.round(r.amount * k));
+      }
+    }
+    mark('seeded_local_currencies_v1');
+  }
   setAddonLookup((tenant) => {
     if (!tenant?.id) return [];
     return db.prepare("SELECT a.entitlements, ta.quantity FROM tenant_addons ta JOIN addons a ON a.id=ta.addon_id WHERE ta.tenant_id=? AND ta.status='active'").all(tenant.id).map((r) => {

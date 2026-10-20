@@ -118,3 +118,31 @@ test('templates fill placeholders safely and report what is missing', () => {
   assert.equal(checklistStatus(items, {}).complete, false);
   assert.equal(checklistStatus(items, { a: { done: true } }).complete, true);
 });
+
+import { sdlt, dldFees, closingCosts } from '../../shared/region/purchaseCosts.js';
+test('price text: Pakistan keeps crore/lakh, other regions use local style', () => {
+  const pk = buildRegion({}).price;
+  assert.equal(pk.priceText(12500000), 'PKR 1.25 Crore'); assert.equal(pk.priceText(4500000, 'Rent'), 'PKR 45 Lakh / month'); assert.equal(pk.priceText(85000), 'PKR 85,000'); assert.equal(pk.priceText(0), 'Price on request');
+  const us = buildRegion(FILE_PACKS.US).price; assert.equal(us.priceText(125000000), '$1.25M'); assert.equal(us.priceText(45000000), '$450,000'); assert.equal(us.fullPrice(50000050), '$500,000.50');
+  const uk = buildRegion(FILE_PACKS.UK).price; assert.equal(uk.priceText(185000, 'Rent'), '£1,850 pcm');
+  const ae = buildRegion(FILE_PACKS.AE).price; assert.equal(ae.priceText(240000000), 'AED 2.4M'); assert.equal(ae.fullPrice(240000000), 'AED 2,400,000');
+  for (const c of ['US', 'UK', 'AE', 'CA']) for (const v of [45000000, 125000000]) assert.doesNotMatch(buildRegion(FILE_PACKS[c]).price.priceText(v), /Crore|Lakh|PKR/);
+});
+test('purchase costs from pack data: UK stamp duty, Dubai DLD fees, US closing costs', () => {
+  const uk = FILE_PACKS.UK.fees.sdlt;
+  assert.equal(sdlt(40000000, uk).total, 1000000, '£400,000 standard purchase = £10,000');
+  assert.equal(sdlt(40000000, uk, { buyer: 'first_time' }).total, 500000, 'first-time buyer £400k = £5,000');
+  assert.equal(sdlt(60000000, uk, { buyer: 'first_time' }).total, sdlt(60000000, uk).total, 'no relief above £500k');
+  assert.equal(sdlt(40000000, uk, { buyer: 'additional' }).total, 1000000 + 2000000, '+5% surcharge');
+  assert.equal(sdlt(40000000, uk, { non_resident: true }).total, 1000000 + 800000, '+2% non-resident');
+  const ae = FILE_PACKS.AE.fees.dld;
+  const d = dldFees(200000000, ae);
+  assert.equal(d.rows[0].amount, 8000000, 'AED 2,000,000 transfer fee = AED 80,000');
+  assert.equal(d.rows[1].amount, 420000); assert.equal(d.rows[2].amount, 400000);
+  assert.equal(dldFees(40000000, ae, { with_agent: false }).total, 1600000 + 210000 + 200000, 'AED 400,000 at or below the threshold');
+  assert.equal(dldFees(200000000, ae, { loan: 160000000, with_agent: false }).rows.at(-1).amount, 400000 + 29000);
+  assert.equal(closingCosts(50000000, FILE_PACKS.US.fees.closing_costs).total, 1500000);
+});
+test('mortgage: $500,000 home, 20% down, 6.5%, 30 years = $2,528.27 a month', () => {
+  assert.equal(payment({ principal: 40000000, annual_bp: 650, term_months: 360 }), 252827);
+});

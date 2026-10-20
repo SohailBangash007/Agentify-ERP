@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { CalculatorTabs } from './ConstructionTools.jsx';
 import { useMemo } from 'react';
-import { Markdown, imgUrl, isInternal, priceText, useSite, waLink, MoneyBox } from './siteCore.jsx';
+import { Markdown, imgUrl, isInternal, priceText, useSite, waLink, MoneyBox, curCode, siteCopy, isPK, exampleAmount } from './siteCore.jsx';
 import { safeId, sectionCss } from '../../../shared/sectionStyle.js';
 
 /** Internal links use the router; external/tel/mailto use a normal anchor. */
@@ -113,8 +113,8 @@ export function SearchBox({ initial = {}, onSearch }) {
         <div className="sfields">
           <label>City<select value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })}><option value="">All cities</option>{facets?.cities?.map((c) => <option key={c.value} value={c.value}>{c.value} ({c.n})</option>)}</select></label>
           <label>Type<select value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}><option value="">All types</option>{facets?.types?.map((c) => <option key={c.value} value={c.value}>{c.value} ({c.n})</option>)}</select></label>
-          <label className="budget">{tab === 'Rent' ? 'Monthly rent (PKR)' : 'Budget (PKR)'}<span className="two-in"><MoneyBox value={f.min_price} onChange={(v) => setF({ ...f, min_price: v })} placeholder="Min  e.g. 2,000,000" /><MoneyBox value={f.max_price} onChange={(v) => setF({ ...f, max_price: v })} placeholder="Max  e.g. 10,000,000" /></span></label>
-          <label className="grow">Keyword<input value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} placeholder="Location, project or plot no." /></label>
+          <label className="budget">{tab === 'Rent' ? `${isPK() ? 'Monthly rent' : 'Rent'} (${curCode()})` : `Budget (${curCode()})`}<span className="two-in"><MoneyBox value={f.min_price} onChange={(v) => setF({ ...f, min_price: v })} placeholder={`Min  ${exampleAmount(2000000)}`} /><MoneyBox value={f.max_price} onChange={(v) => setF({ ...f, max_price: v })} placeholder={`Max  ${exampleAmount(10000000)}`} /></span></label>
+          <label className="grow">Keyword<input value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} placeholder={siteCopy('keyword_placeholder', 'Location, project or plot no.')} /></label>
           <button className="btn-p" type="submit">Search</button>
         </div>
       ) : <div className="sfields"><span className="grow">Explore our planned communities, see development progress and available units.</span><button className="btn-p" type="submit">View projects</button></div>}
@@ -356,7 +356,7 @@ const Portal = ({ p }) => (
   <section className="sec"><div className="wrap">
     <Head title={p.title} subtitle={p.subtitle} />
     <div className="portal-cards">
-      {p.show_customer !== false && <A href="/portal/login" className="portal-card"><span>🏠</span><h3>Customer portal</h3><p>See your plot or house, payments, receipts, documents and construction progress.</p><b>Sign in →</b></A>}
+      {p.show_customer !== false && <A href="/portal/login" className="portal-card"><span>🏠</span><h3>Customer portal</h3><p>{siteCopy('portal_blurb', 'See your plot or house, payments, receipts, documents and construction progress.')}</p><b>Sign in →</b></A>}
       {p.show_vendor !== false && <A href="/vendor/login" className="portal-card"><span>🧰</span><h3>Vendor portal</h3><p>Check payments and ledger, and bid on open tenders and contracts.</p><b>Sign in →</b></A>}
     </div>
   </div></section>

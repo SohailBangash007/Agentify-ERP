@@ -12,6 +12,7 @@ import { initPlans } from './services/plansStore.js';
 import { PLAN_SETTINGS, PLANS, PRODUCT_CHOICES } from './services/plans.js';
 import crypto from 'node:crypto';
 import { seedRegionDemo } from './regions/demo.js';
+import { syncRegionLookups } from './regions/lookups.js';
 import { initRegions, REGION_COLUMNS, selectableRegions } from './regions/index.js';
 
 export const PLATFORM_DB_FILE = process.env.ERP_PLATFORM_DB || path.join(DATA_DIR, 'platform.db');
@@ -268,7 +269,7 @@ export function createTenant({ slug, name, adminName, adminEmail, adminPassword,
   region = rp.code;
   if (sub_region && rp.sub_regions?.length && !rp.sub_regions.includes(sub_region)) throw bad(`Choose a valid ${String(rp.sub_region_label || 'state').toLowerCase()}`);
   if (language && !(rp.languages || [rp.language]).includes(language)) throw bad('That language is not offered in this region');
-  if (region !== 'PK') { timezone = rp.timezone; currency = rp.currency; }
+  if (region !== 'PK') { timezone = (rp.timezones || []).includes(timezone) ? timezone : rp.timezone; currency = rp.currency; }
   if (!String(name || '').trim()) throw bad('Company name is required');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(adminEmail || ''))) throw bad('A valid admin email is required');
   if (String(adminPassword || '').length < 8) throw bad('Admin password must be at least 8 characters');
@@ -293,6 +294,7 @@ export function createTenant({ slug, name, adminName, adminEmail, adminPassword,
     withTenant(tenant, () => {
       bootstrap({ companyName: tenant.name, adminName, adminEmail: String(adminEmail).toLowerCase(), adminPassword, currency: tenant.currency });
       upgradePermissions();
+      syncRegionLookups();
       ensureSite({ withPosts: demo });
       if (demo) { if (region === 'PK') seedDemo(); else seedRegionDemo(); }
     });

@@ -2,10 +2,10 @@
   "code": "PK",
   "name": "Pakistan",
   "status": "active",
-  "version": 1,
+  "version": 2,
   "locale": "en-PK",
   "language": "en",
-  "languages": ["en"],
+  "languages": [ "en" ],
   "currency": "PKR",
   "money_scale": 0,
   "currency_style": "code_prefix",
@@ -13,15 +13,118 @@
   "time_style": "12h",
   "timezone": "Asia/Karachi",
   "units_system": "mixed",
-  "area_units": ["marla", "kanal", "sqft", "sqyd", "acre"],
+  "area_units": [ "marla", "kanal", "sqft", "sqyd", "acre" ],
   "default_area_unit": "marla",
   "marla_sqft": 272.25,
-  "phone": { "calling_code": "92", "trunk": "0", "match_tail": 10, "national_length": [10] },
+  "phone": {
+    "calling_code": "92",
+    "trunk": "0",
+    "match_tail": 10,
+    "national_length": [
+      10
+    ]
+  },
   "sub_region_label": "Province",
-  "sub_regions": ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad Capital Territory", "Gilgit-Baltistan", "Azad Jammu & Kashmir"],
+  "sub_regions": [ "Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad Capital Territory", "Gilgit-Baltistan", "Azad Jammu & Kashmir" ],
   "terminology": {},
-  "identity": { "national_id": { "label": "CNIC", "pattern": "^\\d{5}-?\\d{7}-?\\d$", "encrypted": false } },
+  "identity": {
+    "national_id": {
+      "label": "CNIC",
+      "pattern": "^\\d{5}-?\\d{7}-?\\d$",
+      "encrypted": false
+    }
+  },
   "flags": {},
   "rules": [],
-  "notes": "Existing behaviour, unchanged. The ERP has no tax or withholding logic; rules stay empty until a Pakistan tax feature is requested."
+  "notes": "Existing behaviour, unchanged. The ERP has no tax or withholding logic; rules stay empty until a Pakistan tax feature is requested.",
+  "price_style": "south_asian",
+  "property_types": [
+    {
+      "group": "Homes",
+      "label": "House"
+    },
+    {
+      "group": "Homes",
+      "label": "Flat"
+    },
+    {
+      "group": "Homes",
+      "label": "Farmhouse"
+    },
+    {
+      "group": "Homes",
+      "label": "Upper portion"
+    },
+    {
+      "group": "Homes",
+      "label": "Lower portion"
+    },
+    {
+      "group": "Homes",
+      "label": "Penthouse"
+    },
+    {
+      "group": "Homes",
+      "label": "Room"
+    },
+    {
+      "group": "Plots",
+      "label": "Residential plot"
+    },
+    {
+      "group": "Plots",
+      "label": "Commercial plot"
+    },
+    {
+      "group": "Plots",
+      "label": "Agricultural land"
+    },
+    {
+      "group": "Plots",
+      "label": "Plot file"
+    },
+    {
+      "group": "Commercial",
+      "label": "Shop"
+    },
+    {
+      "group": "Commercial",
+      "label": "Office"
+    },
+    {
+      "group": "Commercial",
+      "label": "Warehouse"
+    },
+    {
+      "group": "Commercial",
+      "label": "Building"
+    },
+    {
+      "group": "Commercial",
+      "label": "Factory"
+    }
+  ],
+  "listing_fields": [ "bedrooms", "bathrooms", "plot_no", "block_sector", "file_no", "possession", "installments" ],
+  "area": {
+    "default": "marla",
+    "allowed": [ "marla", "kanal", "sqft", "sqyd", "sqm" ],
+    "secondary": "sqft",
+    "labels": {
+      "marla": "Marla",
+      "kanal": "Kanal",
+      "sqft": "Sq Ft",
+      "sqyd": "Sq Yards",
+      "sqm": "Sq Meter"
+    }
+  },
+  "rent_suffix": " / month",
+  "calculators": {
+    "mortgage": null,
+    "purchase_costs": null,
+    "affordability": false,
+    "installments": true,
+    "unit_converter": true
+  },
+  "fees": {},
+  "site_copy": {}
 }

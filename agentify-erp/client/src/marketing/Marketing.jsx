@@ -1,11 +1,14 @@
 // Public website on the main domain: home, the two product pages, pricing, contact/demo, legal documents, sign-up and
 // "find my workspace". Texts, plans, prices, trial terms and legal documents come from /api/platform/marketing and are
 // edited by platform staff in the console. Nothing here invents customers, counts, testimonials or integrations.
-import { useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { Loading } from '../components/ui.jsx';
 import { track, consent, setConsent, browserOptOut, configureGa4, attributionFields, onConsentChange } from './analytics.js';
+import { setRegion } from '../format.js';
+import { MortgageCalculator, PurchaseCostCalculator, UnitConverter } from '../site/RegionCalculators.jsx';
+import '../site/site.css';
 import '../pages/landing.css';
 import './marketing.css';
 
@@ -35,6 +38,93 @@ function useTitle(title, description) {
   }, [title, description]);
 }
 
+// ---------------------------------------------------------------- country
+// One site for every country. The visitor's country decides the currency, the wording and the calculators; it is saved in
+// localStorage and a cookie and kept in the URL (?country=uk) so a link keeps it. A first visit only suggests a country
+// from the browser's language and time zone, never from the IP address.
+const CountryCtx = createContext(null);
+export const useCountry = () => useContext(CountryCtx);
+const PATH_COUNTRY = { us: 'US', uk: 'UK', ae: 'AE', pk: 'PK', ca: 'CA' };
+function guessCountry(countries) {
+  const langs = (navigator.languages || [navigator.language || '']).map((l) => String(l).toLowerCase());
+  const tz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } })();
+  const g = tz === 'Asia/Karachi' || langs.some((l) => l.endsWith('-pk')) ? 'PK' : tz === 'Asia/Dubai' || langs.some((l) => l.endsWith('-ae')) ? 'AE' : tz === 'Europe/London' || langs.some((l) => l.endsWith('-gb')) ? 'UK'
+    : tz.startsWith('America/') || langs.some((l) => l.endsWith('-us')) ? 'US' : null;
+  return countries.find((c) => c.code === g)?.code || countries.find((c) => c.open)?.code || countries[0].code;
+}
+function CountryProvider({ info, children }) {
+  const loc = useLocation();
+  const nav = useNavigate();
+  const countries = info.countries?.length ? info.countries : [{ code: 'PK', name: 'Pakistan', currency: 'PKR', open: true, config: {}, copy: {}, timezones: ['Asia/Karachi'] }];
+  const byCode = (c) => countries.find((x) => x.code === String(c || '').toUpperCase());
+  const [code, setCode] = useState(() => {
+    const q = new URLSearchParams(loc.search).get('country');
+    const slug = loc.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+    let saved = null; try { saved = localStorage.getItem('agentify_country'); } catch { /* storage blocked */ }
+    return (byCode(q) || byCode(PATH_COUNTRY[slug]) || byCode(saved))?.code || guessCountry(countries);
+  });
+  const country = byCode(code) || countries[0];
+  // applied during render so the calculators below read this country's formats on their first paint
+  if (country.config?.region) setRegion(country.config);
+  useEffect(() => {
+    const slug = loc.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+    if (PATH_COUNTRY[slug] && byCode(PATH_COUNTRY[slug])) setCode(PATH_COUNTRY[slug]);
+  }, [loc.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    try { localStorage.setItem('agentify_country', country.code); } catch { /* ignore */ }
+    document.cookie = `agentify_country=${country.code}; path=/; max-age=31536000; samesite=lax`;
+    // alternate-language/country links for search engines
+    document.head.querySelectorAll('link[data-hreflang]').forEach((n) => n.remove());
+    for (const c of countries) {
+      const l = document.createElement('link'); l.rel = 'alternate'; l.hreflang = `${String(c.locale || 'en').split('-')[0]}-${c.code === 'UK' ? 'GB' : c.code}`; l.href = `${window.location.origin}/${c.slug}`; l.setAttribute('data-hreflang', '1'); document.head.appendChild(l);
+    }
+  }, [country.code]); // eslint-disable-line react-hooks/exhaustive-deps
+  const choose = (c) => {
+    setCode(c);
+    const q = new URLSearchParams(loc.search); q.set('country', String(c).toLowerCase() === 'uk' ? 'uk' : String(c).toLowerCase());
+    nav({ pathname: PATH_COUNTRY[loc.pathname.replace(/^\/+|\/+$/g, '').toLowerCase()] ? '/' : loc.pathname, search: `?${q}` }, { replace: true });
+    track('country_selected', { country: c });
+  };
+  return <CountryCtx.Provider value={{ country, countries, setCountry: choose }}>{children}</CountryCtx.Provider>;
+}
+function CountrySwitch({ compact }) {
+  const { country, countries, setCountry } = useCountry();
+  if (countries.length < 2) return null;
+  return (
+    <label className="lcountry" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+      <span className={compact ? 'lhp' : ''} style={compact ? undefined : { color: 'var(--l-mut,#667085)' }}>Country</span>
+      <select aria-label="Country" value={country.code} onChange={(e) => setCountry(e.target.value)} style={{ font: 'inherit', padding: '6px 8px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff' }}>
+        {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+      </select>
+    </label>
+  );
+}
+const SITE_VARS = { '--s-primary': '#0f766e', '--s-accent': '#f59e0b', '--s-dark': '#17202e', '--s-bg': '#ffffff', '--s-soft': '#f4f7f6', '--s-radius': '12px', '--s-font-h': 'inherit', '--s-font-b': 'inherit' };
+/** Live calculators for the chosen country, so a visitor can try the numbers before signing up. */
+function CalcStrip() {
+  const { country } = useCountry();
+  const c = country.config || {};
+  const copy = country.copy || {};
+  const tabs = [
+    ...(c.calculators?.mortgage ? [['mortgage', 'Mortgage calculator', MortgageCalculator]] : []),
+    ...(c.calculators?.purchase_costs ? [['costs', c.calculators.purchase_costs === 'sdlt' ? 'Stamp Duty' : c.calculators.purchase_costs === 'dld' ? 'Purchase fees' : 'Closing costs', PurchaseCostCalculator]] : []),
+    ...(c.calculators?.unit_converter ? [['units', 'Area converter', UnitConverter]] : []),
+  ];
+  const [tab, setTab] = useState(tabs[0]?.[0]);
+  useEffect(() => { setTab(tabs[0]?.[0]); }, [country.code]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!tabs.length) return null;
+  const Active = (tabs.find(([k]) => k === tab) || tabs[0])[2];
+  return (
+    <section className="alt"><div className="lwrap">
+      <div className="lsh"><h2>{copy.calc_title || 'Try the numbers'}</h2><p>{copy.calc_sub}</p></div>
+      <div className="site" style={{ ...SITE_VARS, background: 'transparent', minHeight: 0 }} key={country.code}>
+        <div className="tabs-pill">{tabs.map(([k, l]) => <button type="button" key={k} className={(tab || tabs[0][0]) === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}</div>
+        <Active />
+      </div>
+    </div></section>
+  );
+}
+
 function Header({ info }) {
   const [open, setOpen] = useState(false);
   const loc = useLocation();
@@ -49,11 +139,12 @@ function Header({ info }) {
         <nav aria-label="Main">
           {links.map(([to, l]) => <NavLink key={to} className="hide-m" to={to}>{l}</NavLink>)}
           <NavLink className="hide-m" to="/login">Sign in</NavLink>
+          <span className="hide-m"><CountrySwitch /></span>
           <Link className="lbtn p sm" to="/signup">Start free trial</Link>
           <button className="lmenu" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(!open)}>☰</button>
         </nav>
       </div></header>
-      <div className={`ldrawer ${open ? 'open' : ''}`}>{[...links, ['/login', 'Sign in']].map(([to, l]) => <Link key={to} to={to}>{l}</Link>)}</div>
+      <div className={`ldrawer ${open ? 'open' : ''}`}>{[...links, ['/login', 'Sign in']].map(([to, l]) => <Link key={to} to={to}>{l}</Link>)}<div style={{ padding: '10px 16px' }}><CountrySwitch /></div></div>
     </>
   );
 }
@@ -69,6 +160,7 @@ function Footer({ info, onCookies }) {
       </div>
       <div><h4>Products</h4><Link to="/real-estate">Real Estate Brokerage</Link><Link to="/construction">Construction Management</Link><Link to="/pricing">Pricing</Link></div>
       <div><h4>Company</h4><Link to="/contact">Book a demo</Link><Link to="/signup">Start free trial</Link><Link to="/login">Sign in</Link></div>
+      <div><h4>Country</h4><CountrySwitch /></div>
       <div><h4>Legal</h4>{info.content.legal.map((d) => <Link key={d.slug} to={`/legal/${d.slug}`}>{d.title}</Link>)}<button className="llink" onClick={onCookies}>Cookie settings</button></div>
     </div><div style={{ width: '100%', marginTop: 18 }}>© {new Date().getFullYear()} {c.brand}</div></div></footer>
   );
@@ -90,15 +182,17 @@ function ConsentBanner({ show, onClose }) {
 // ---------------------------------------------------------------- pages
 function Home({ info }) {
   const c = info.content;
+  const { country } = useCountry();
+  const cc = country.copy || {};
   useTitle(c.seo.home.title, c.seo.home.description);
   return (
     <>
       <div className="lwrap lhero">
-        <h1>{c.hero_title}</h1>
-        <p>{c.hero_subtitle}</p>
+        <h1>{cc.hero_title || c.hero_title}</h1>
+        <p>{cc.hero_subtitle || c.hero_subtitle}</p>
         <div className="lcta"><Link className="lbtn p" to="/signup">Start your {info.trial_days}-day free trial</Link><Link className="lbtn" to="/contact">Book a demo</Link></div>
         <div className="lfine">No card needed to start. If you stop paying, your data becomes read-only, never deleted.</div>
-        <div className="lchips"><span>Separate database per company</span><span>Role-based access per module</span><span>Two-factor sign-in</span><span>Audit trail</span><span>Automatic backups</span></div>
+        <div className="lchips">{(cc.chips || ['Separate database per company', 'Role-based access per module', 'Two-factor sign-in', 'Audit trail', 'Automatic backups']).map((x) => <span key={x}>{x}</span>)}</div>
       </div>
       <section className="alt"><div className="lwrap">
         <div className="lsh"><h2>Two products, one platform</h2><p>Pick the product your business needs. Shared sign-in, users, billing, reports and notifications; product modules stay separate.</p></div>
@@ -119,9 +213,10 @@ function Home({ info }) {
           {[['Choose your product', 'Real Estate Brokerage or Construction Management. A bundle gives you both.'], ['Create your workspace', 'Your company gets its own address and its own private database straight away.'], ['Invite your team', 'Email invitations with the right role for each person.'], ['Pick a plan when ready', `Use the full ${info.trial_days}-day trial first. Pay by card or local transfer.`]].map(([t, d], i) => <div className="lcard" key={t}><div className="lnum">{i + 1}</div><h3>{t}</h3><p>{d}</p></div>)}
         </div>
       </div></section>
+      <CalcStrip />
       <Screens product={null} />
       {!!c.testimonials.length && <section><div className="lwrap"><div className="lsh"><h2>What customers say</h2></div><div className="lgrid">{c.testimonials.map((t, i) => <blockquote key={i} className="lcard lquote" style={{ margin: 0 }}>“{t.quote}”<footer>{t.name}{t.role ? `, ${t.role}` : ''} · {t.company}</footer></blockquote>)}</div></div></section>}
-      <Faq faqs={c.faqs} />
+      <Faq faqs={[...(c.faqs || []), ...(cc.faqs || [])]} />
       <Band info={info} />
     </>
   );
@@ -141,6 +236,8 @@ function Band({ info, product }) {
 }
 
 function ProductPage({ info, product }) {
+  const { country } = useCountry();
+  const cur = country.currency;
   const c = info.content[product];
   const seo = info.content.seo[product];
   useTitle(seo.title, seo.description);
@@ -164,7 +261,7 @@ function ProductPage({ info, product }) {
         <div className="lcard"><h3>Shared with every product</h3><ul className="lcheck"><li>Contacts and CRM</li><li>Users, roles and invitations</li><li>Accounting, invoices and receipts</li><li>Documents and notifications</li><li>Reports and exports</li><li>Customer / client portal</li></ul></div>
       </div></section>}
       {!!plans.length && <section><div className="lwrap"><div className="lsh"><h2>Plans</h2><p>Monthly prices. Yearly billing and all details on the pricing page.</p></div>
-        <div className="lgrid">{plans.map((p) => <div key={p.id} className={`lcard lplan ${p.highlight ? 'hot' : ''}`}>{p.highlight && <span className="ltag">Recommended</span>}<h3>{p.name}</h3><div className="lprice">{p.price.PKR ? fmt(p.price.PKR.month, 'PKR') : '—'}<small> / month</small></div><p>{p.description || ''}</p><Link className={`lbtn ${p.highlight ? 'p' : ''}`} to={`/signup?product=${product}`}>Start free trial</Link></div>)}</div>
+        <div className="lgrid">{plans.map((p) => <div key={p.id} className={`lcard lplan ${p.highlight ? 'hot' : ''}`}>{p.highlight && <span className="ltag">Recommended</span>}<h3>{p.name}</h3><div className="lprice">{p.price[cur]?.month != null ? fmt(p.price[cur].month, cur) : '—'}<small> / month</small></div><p>{p.description || ''}</p><Link className={`lbtn ${p.highlight ? 'p' : ''}`} to={`/signup?product=${product}`}>Start free trial</Link></div>)}</div>
         <p className="lfine" style={{ textAlign: 'center' }}><Link to={`/pricing?product=${product}`}>Compare plans →</Link></p>
       </div></section>}
       <Band info={info} product={product} />
@@ -180,7 +277,9 @@ function Pricing({ info }) {
   const hasBundle = info.plans.some((p) => p.product === 'bundle');
   const [prod, setProd] = useState(['real_estate', 'construction', 'bundle'].includes(initial) ? initial : 'real_estate');
   const [int, setInt] = useState('month');
-  const [cur, setCur] = useState('PKR');
+  const { country } = useCountry();
+  const cur = country.currency;
+  const setCur = () => {};
   useEffect(() => { track('pricing_view', { product: prod }); }, [prod]);
   const plans = info.plans.filter((p) => p.product === prod);
   const currencies = [...new Set(info.plans.flatMap((p) => Object.keys(p.price)))].sort((a, b) => (a === 'PKR' ? -1 : b === 'PKR' ? 1 : a.localeCompare(b)));
@@ -200,7 +299,7 @@ function Pricing({ info }) {
         <div className="ltog">
           <div role="tablist" aria-label="Product">{[['real_estate', 'Real Estate'], ['construction', 'Construction'], ...(hasBundle ? [['bundle', 'Both']] : [])].map(([k, l]) => <button key={k} role="tab" aria-selected={prod === k} className={prod === k ? 'on' : ''} onClick={() => setProd(k)}>{l}</button>)}</div>
           <div role="tablist" aria-label="Billing">{['month', 'year'].map((i) => <button key={i} role="tab" aria-selected={int === i} className={int === i ? 'on' : ''} onClick={() => setInt(i)}>{i === 'month' ? 'Monthly' : 'Yearly'}</button>)}</div>
-          {currencies.length > 1 && <div role="tablist" aria-label="Currency">{currencies.map((k) => <button key={k} role="tab" aria-selected={cur === k} className={cur === k ? 'on' : ''} onClick={() => setCur(k)}>{k}</button>)}</div>}
+          {false && <div role="tablist" aria-label="Currency">{currencies.map((k) => <button key={k} role="tab" aria-selected={cur === k} className={cur === k ? 'on' : ''} onClick={() => setCur(k)}>{k}</button>)}</div>}
         </div>
         {!plans.length ? <p className="lfine" style={{ textAlign: 'center' }}>Plans for this product are being prepared. <Link to="/contact">Contact us</Link>.</p> : (
           <div className="lgrid">{plans.map((p) => (
@@ -335,6 +434,7 @@ const CURRENCIES = ['PKR', 'AED', 'SAR', 'INR', 'BDT', 'GBP', 'USD', 'EUR'];
 const slugify = (s) => String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
 
 function Signup({ info }) {
+  const { country, countries, setCountry } = useCountry();
   const loc = useLocation();
   const q = new URLSearchParams(loc.search);
   const [product, setProduct] = useState(['real_estate', 'construction'].includes(q.get('product')) ? q.get('product') : '');
@@ -358,7 +458,7 @@ function Signup({ info }) {
     if (!product) { setErr('Choose a product first'); return; }
     if (!f.accept_terms) { setErr('Please accept the Terms of Service and Privacy Policy'); return; }
     setBusy(true);
-    try { setDone(await api.post('/api/platform/signup', { ...f, product, analytics: attributionFields() })); } catch (x) { setErr(x.message); } finally { setBusy(false); }
+    try { setDone(await api.post('/api/platform/signup', { ...f, region: country.code, currency: country.currency, timezone: (country.timezones || []).includes(f.timezone) ? f.timezone : (country.timezones || [f.timezone])[0], language: f.language || null, product, analytics: attributionFields() })); } catch (x) { setErr(x.message); } finally { setBusy(false); }
   };
   if (done) {
     const t = done.tenant;
@@ -390,22 +490,18 @@ function Signup({ info }) {
           <input required value={f.slug} onChange={(e) => { setSlugTouched(true); setF((s) => ({ ...s, slug: slugify(e.target.value) })); }} placeholder="your-company" aria-invalid={avail && !avail.available} /></label>
         <div className="lrow"><label>Your name<input required value={f.admin_name} onChange={set('admin_name')} autoComplete="name" /></label><label>Work email<input type="email" required value={f.admin_email} onChange={set('admin_email')} autoComplete="email" /></label></div>
         <label>Password<span className="lhint">At least 8 characters</span><input type="password" minLength={8} required value={f.admin_password} onChange={set('admin_password')} autoComplete="new-password" /></label>
-        {(info.regions || []).length > 1 ? (() => {
-          const reg = info.regions.find((x) => x.code === (f.region || 'PK')) || info.regions[0];
-          return (
-            <>
-              <div className="lrow"><label>Country / region<select value={reg.code} onChange={(e) => setF((x) => ({ ...x, region: e.target.value, sub_region: '', language: '' }))}>{info.regions.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}</select></label>
-                {reg.sub_regions?.length > 0 && <label>{reg.sub_region_label || 'State'}<select value={f.sub_region || ''} onChange={set('sub_region')}><option value="">Choose…</option>{reg.sub_regions.map((x) => <option key={x}>{x}</option>)}</select></label>}</div>
-              <div className="lhint">Currency {reg.currency}. Dates, units and terms follow the region.</div>
-              {reg.languages?.length > 1 && <label>Language<select value={f.language || reg.languages[0]} onChange={set('language')}>{reg.languages.map((x) => <option key={x} value={x}>{{ en: 'English', fr: 'Français', ar: 'العربية' }[x] || x}</option>)}</select></label>}
-            </>
-          );
-        })() : (
-          <div className="lrow"><label>Timezone<select value={f.timezone} onChange={set('timezone')}>{tzs.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label><label>Currency<select value={f.currency} onChange={set('currency')}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select></label></div>
-        )}
+        <div style={{ fontWeight: 700 }}>3. Your country</div>
+        <div className="lrow">
+          <label>Country<select value={country.code} onChange={(e) => setCountry(e.target.value)}>{countries.map((c) => <option key={c.code} value={c.code} disabled={!c.open}>{c.name}{c.open ? '' : ' (opening soon)'}</option>)}</select></label>
+          {country.sub_regions?.length > 0 && <label>{country.sub_region_label || 'State'}<select required value={f.sub_region || ''} onChange={set('sub_region')}><option value="">Choose…</option>{country.sub_regions.map((x) => <option key={x}>{x}</option>)}</select></label>}
+        </div>
+        {country.timezones?.length > 1 && <label>Time zone<select value={country.timezones.includes(f.timezone) ? f.timezone : country.timezones[0]} onChange={set('timezone')}>{country.timezones.map((z) => <option key={z} value={z}>{z.replace('_', ' ')}</option>)}</select></label>}
+        {country.languages?.length > 1 && <label>Language<select value={f.language || country.languages[0]} onChange={set('language')}>{country.languages.map((x) => <option key={x} value={x}>{{ en: 'English', fr: 'Français', ar: 'العربية' }[x] || x}</option>)}</select></label>}
+        <div className="lhint" aria-live="polite">Set from your country: {[country.currency, country.config?.date_style, country.config?.area?.labels?.[country.config?.area?.default], country.config?.timezone].filter(Boolean).join(' · ')}</div>
+        {!country.open && <div className="lerr" role="status">Signups for {country.name} are not open yet. <Link to={`/contact?country=${country.code.toLowerCase()}`}>Join the waiting list</Link> and we will email you when they open.</div>}
         <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontWeight: 400 }}><input type="checkbox" checked={f.accept_terms} onChange={set('accept_terms')} style={{ width: 'auto', marginTop: 4 }} />
           <span>I agree to the <Link to="/legal/terms" target="_blank">Terms of Service</Link>, <Link to="/legal/subscription" target="_blank">Subscription Terms</Link> and <Link to="/legal/privacy" target="_blank">Privacy Policy</Link>.</span></label>
-        <button className="lbtn p" disabled={busy || (avail && !avail.available)}>{busy ? 'Creating your workspace…' : 'Create workspace'}</button>
+        <button className="lbtn p" disabled={busy || !country.open || (avail && !avail.available)}>{busy ? 'Creating your workspace…' : 'Create workspace'}</button>
         <p className="lmini" style={{ margin: 0, textAlign: 'center' }}>Already have one? <Link to="/login">Sign in</Link></p>
       </form>
     </div></section>
@@ -416,7 +512,7 @@ function Signup({ info }) {
 /** The page for a path. (The site is mounted from several top-level routes, so it picks its page itself.) */
 function page(path, info) {
   const p = path.replace(/\/+$/, '') || '/';
-  if (p === '/') return <Home info={info} />;
+  if (p === '/' || PATH_COUNTRY[p.slice(1)]) return <Home info={info} />;
   if (p === '/real-estate') return <ProductPage info={info} product="real_estate" />;
   if (p === '/construction') return <ProductPage info={info} product="construction" />;
   if (p === '/pricing') return <Pricing info={info} />;
@@ -440,6 +536,7 @@ export default function MarketingSite() {
   if (err) return <div className="lp"><div className="lwrap" style={{ padding: 40 }}><div className="lerr">{err}</div><button className="lbtn" onClick={() => nav(0)}>Try again</button></div></div>;
   if (!info) return <Loading />;
   return (
+    <CountryProvider info={info}>
     <div className="lp">
       <a href="#main" className="lhp">Skip to content</a>
       <Header info={info} />
@@ -449,5 +546,6 @@ export default function MarketingSite() {
       <Footer info={info} onCookies={() => setBanner(true)} />
       <ConsentBanner show={banner && !browserOptOut()} onClose={() => setBanner(false)} />
     </div>
+    </CountryProvider>
   );
 }

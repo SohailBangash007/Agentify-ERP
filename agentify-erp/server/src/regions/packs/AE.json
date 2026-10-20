@@ -2,7 +2,7 @@
   "code": "AE",
   "name": "United Arab Emirates",
   "status": "draft",
-  "version": 1,
+  "version": 2,
   "locale": "en-AE",
   "language": "en",
   "languages": [ "en", "ar" ],
@@ -37,12 +37,12 @@
     }
   },
   "flags": {
-    "mortgage": false,
+    "mortgage": true,
     "transactions": false,
-    "compliance": false,
-    "rentals": false,
-    "offplan": false,
-    "templates": false
+    "compliance": true,
+    "rentals": true,
+    "offplan": true,
+    "templates": true
   },
   "rules": [],
   "notes": "Phase 1 manifest only. Arabic (ar-AE, right-to-left) and Hijri date display arrive with the localisation phase.",
@@ -134,5 +134,147 @@
         }
       ]
     }
-  ]
+  ],
+  "price_style": "intl",
+  "property_types": [
+    {
+      "group": "Houses",
+      "label": "Villa"
+    },
+    {
+      "group": "Houses",
+      "label": "Townhouse"
+    },
+    {
+      "group": "Apartments",
+      "label": "Apartment"
+    },
+    {
+      "group": "Apartments",
+      "label": "Studio"
+    },
+    {
+      "group": "Apartments",
+      "label": "Penthouse"
+    },
+    {
+      "group": "Apartments",
+      "label": "Duplex"
+    },
+    {
+      "group": "Apartments",
+      "label": "Hotel apartment"
+    },
+    {
+      "group": "Land",
+      "label": "Land / Plot"
+    },
+    {
+      "group": "Commercial",
+      "label": "Office"
+    },
+    {
+      "group": "Commercial",
+      "label": "Retail"
+    },
+    {
+      "group": "Commercial",
+      "label": "Warehouse"
+    },
+    {
+      "group": "Commercial",
+      "label": "Whole building"
+    }
+  ],
+  "listing_fields": [ "bedrooms", "bathrooms", "maid_room", "parking", "furnished", "ready_or_offplan", "completion_date", "service_charge", "permit_no" ],
+  "area": {
+    "default": "sqft",
+    "allowed": [ "sqft", "sqm" ],
+    "secondary": "sqm",
+    "labels": {
+      "sqft": "Sq Ft",
+      "sqm": "Sq M"
+    }
+  },
+  "rent_suffix": " / year",
+  "calculators": {
+    "mortgage": {
+      "terms": [
+        25,
+        20,
+        15
+      ],
+      "default_term": 25,
+      "default_rate_bp": 450,
+      "default_down_pct": 20,
+      "property_tax_bp": 0,
+      "insurance_annual": 0,
+      "hoa_monthly": 0,
+      "pmi_bp": 0
+    },
+    "purchase_costs": "dld",
+    "affordability": true,
+    "installments": true,
+    "unit_converter": true,
+    "construction": {
+      "unit": "sqft",
+      "rates": {
+        "grey": {
+          "Standard": 150,
+          "Premium": 175,
+          "Luxury": 210
+        },
+        "semi": {
+          "Standard": 250,
+          "Premium": 290,
+          "Luxury": 340
+        },
+        "turnkey": {
+          "Standard": 350,
+          "Premium": 420,
+          "Luxury": 520
+        }
+      },
+      "scopes": {
+        "grey": "Shell and core",
+        "semi": "Semi-finished",
+        "turnkey": "Turnkey"
+      },
+      "locations": [ "Dubai", "Other emirates" ],
+      "location_factor": {
+        "Dubai": 1,
+        "Other emirates": 0.9
+      }
+    }
+  },
+  "fees": {
+    "dld": {
+      "emirate": "Dubai",
+      "effective_from": "2025-01-01",
+      "needs_legal_review": true,
+      "source_url": "https://famproperties.com/advice/what-are-the-fees-for-transferring-property-in-dubai",
+      "transfer_bp": 400,
+      "registration": {
+        "threshold": 50000000,
+        "above": 420000,
+        "at_or_below": 210000
+      },
+      "trustee": {
+        "above": 400000,
+        "at_or_below": 200000
+      },
+      "mortgage_registration_bp": 25,
+      "mortgage_registration_fixed": 29000,
+      "agent_bp": 200,
+      "vat_bp": 500
+    }
+  },
+  "site_copy": {
+    "keyword_placeholder": "Community, building or area",
+    "hero_tagline": "Apartments and villas, ready and off-plan",
+    "portal_blurb": "See your property, payment plan, receipts and documents",
+    "payment_steps": [ "Pay by bank transfer, cheque or card", "Use your reference", "We confirm and issue a receipt" ]
+  },
+  "lead_sources": [ "Walk-in", "Website", "Bayut", "Property Finder", "Dubizzle", "Referral", "Social media", "Phone call", "WhatsApp" ],
+  "amenities": [ "Balcony", "Maid's room", "Private pool", "Shared pool", "Gym", "Concierge", "Covered parking", "Sea view", "Private garden", "Central A/C", "Built-in wardrobes", "Kitchen appliances" ]
 }

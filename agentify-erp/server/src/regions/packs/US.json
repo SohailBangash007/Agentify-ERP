@@ -2,7 +2,7 @@
   "code": "US",
   "name": "United States",
   "status": "draft",
-  "version": 1,
+  "version": 2,
   "locale": "en-US",
   "language": "en",
   "languages": [ "en" ],
@@ -38,10 +38,10 @@
     }
   },
   "flags": {
-    "mortgage": false,
+    "mortgage": true,
     "transactions": false,
-    "compliance": false,
-    "templates": false
+    "compliance": true,
+    "templates": true
   },
   "rules": [],
   "notes": "Phase 1 manifest only (formats, units, terms). Rules, pipelines, templates and checklists arrive in the US phase; all legal values will be editable data marked needs_legal_review.",
@@ -134,5 +134,154 @@
         }
       ]
     }
-  ]
+  ],
+  "price_style": "intl",
+  "property_types": [
+    {
+      "group": "Houses",
+      "label": "Single-family home"
+    },
+    {
+      "group": "Houses",
+      "label": "Townhouse"
+    },
+    {
+      "group": "Houses",
+      "label": "Duplex"
+    },
+    {
+      "group": "Houses",
+      "label": "Triplex / Fourplex"
+    },
+    {
+      "group": "Houses",
+      "label": "Manufactured home"
+    },
+    {
+      "group": "Apartments",
+      "label": "Condo"
+    },
+    {
+      "group": "Apartments",
+      "label": "Co-op"
+    },
+    {
+      "group": "Apartments",
+      "label": "Apartment"
+    },
+    {
+      "group": "Apartments",
+      "label": "Studio"
+    },
+    {
+      "group": "Apartments",
+      "label": "Loft"
+    },
+    {
+      "group": "Land",
+      "label": "Lot / Land"
+    },
+    {
+      "group": "Land",
+      "label": "Farm / Ranch"
+    },
+    {
+      "group": "Commercial",
+      "label": "Office"
+    },
+    {
+      "group": "Commercial",
+      "label": "Retail"
+    },
+    {
+      "group": "Commercial",
+      "label": "Industrial"
+    },
+    {
+      "group": "Commercial",
+      "label": "Multi-family (5+ units)"
+    }
+  ],
+  "listing_fields": [ "bedrooms", "bathrooms", "half_baths", "garage", "lot_size", "year_built", "hoa", "property_tax" ],
+  "area": {
+    "default": "sqft",
+    "allowed": [ "sqft", "acre", "sqm" ],
+    "secondary": null,
+    "labels": {
+      "sqft": "Sq Ft",
+      "acre": "Acres",
+      "sqm": "Sq M"
+    }
+  },
+  "rent_suffix": " / month",
+  "calculators": {
+    "mortgage": {
+      "terms": [
+        30,
+        20,
+        15
+      ],
+      "default_term": 30,
+      "default_rate_bp": 650,
+      "default_down_pct": 20,
+      "property_tax_bp": 110,
+      "insurance_annual": 150000,
+      "hoa_monthly": 0,
+      "pmi_bp": 50
+    },
+    "purchase_costs": "closing_costs",
+    "affordability": true,
+    "installments": false,
+    "unit_converter": false,
+    "construction": {
+      "unit": "sqft",
+      "rates": {
+        "grey": {
+          "Standard": 95,
+          "Premium": 110,
+          "Luxury": 130
+        },
+        "semi": {
+          "Standard": 145,
+          "Premium": 170,
+          "Luxury": 200
+        },
+        "turnkey": {
+          "Standard": 210,
+          "Premium": 245,
+          "Luxury": 300
+        }
+      },
+      "scopes": {
+        "grey": "Shell and structure",
+        "semi": "Semi-finished",
+        "turnkey": "Turnkey"
+      },
+      "locations": [ "Standard market", "High-cost metro" ],
+      "location_factor": {
+        "Standard market": 1,
+        "High-cost metro": 1.25
+      }
+    }
+  },
+  "fees": {
+    "closing_costs": {
+      "default_bp": 300,
+      "range_bp": [
+        200,
+        500
+      ],
+      "needs_legal_review": true,
+      "note": "Editable percentage; state transfer tax tables follow as data."
+    }
+  },
+  "site_copy": {
+    "keyword_placeholder": "City, neighborhood, ZIP or address",
+    "hero_tagline": "Homes, condos and land with transparent costs",
+    "portal_blurb": "See your property, payments, receipts and documents",
+    "payment_steps": [ "Pay by bank transfer (ACH or wire) or card", "Send your reference with the payment", "We confirm and issue a receipt" ]
+  },
+  "lead_sources": [ "Walk-in", "Website", "Zillow", "Realtor.com", "Open house", "Referral", "Social media", "Phone call", "Sign call" ],
+  "amenities": [ "Garage", "Garden / yard", "Pool", "Central air", "Central heating", "Fireplace", "Basement", "Deck / patio", "Gym", "Security system", "Gated community", "Parking" ],
+  "timezones": [ "America/New_York", "America/Chicago", "America/Denver", "America/Phoenix", "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu" ]
 }

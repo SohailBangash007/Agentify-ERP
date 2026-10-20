@@ -2,7 +2,7 @@
   "code": "UK",
   "name": "United Kingdom",
   "status": "draft",
-  "version": 1,
+  "version": 2,
   "locale": "en-GB",
   "language": "en",
   "languages": [ "en" ],
@@ -39,11 +39,11 @@
     }
   },
   "flags": {
-    "mortgage": false,
+    "mortgage": true,
     "transactions": false,
-    "compliance": false,
-    "lettings": false,
-    "templates": false
+    "compliance": true,
+    "lettings": true,
+    "templates": true
   },
   "rules": [],
   "notes": "Phase 1 manifest only. Law differs by nation, so sub_region drives the rules.",
@@ -140,5 +140,196 @@
         }
       ]
     }
-  ]
+  ],
+  "price_style": "intl",
+  "property_types": [
+    {
+      "group": "Houses",
+      "label": "Detached"
+    },
+    {
+      "group": "Houses",
+      "label": "Semi-detached"
+    },
+    {
+      "group": "Houses",
+      "label": "Terraced"
+    },
+    {
+      "group": "Houses",
+      "label": "End of terrace"
+    },
+    {
+      "group": "Houses",
+      "label": "Bungalow"
+    },
+    {
+      "group": "Houses",
+      "label": "Cottage"
+    },
+    {
+      "group": "Apartments",
+      "label": "Flat"
+    },
+    {
+      "group": "Apartments",
+      "label": "Maisonette"
+    },
+    {
+      "group": "Apartments",
+      "label": "Studio"
+    },
+    {
+      "group": "Apartments",
+      "label": "Penthouse"
+    },
+    {
+      "group": "Land",
+      "label": "Land"
+    },
+    {
+      "group": "Land",
+      "label": "Plot"
+    },
+    {
+      "group": "Commercial",
+      "label": "Office"
+    },
+    {
+      "group": "Commercial",
+      "label": "Shop"
+    },
+    {
+      "group": "Commercial",
+      "label": "Industrial"
+    },
+    {
+      "group": "Commercial",
+      "label": "Mixed use"
+    }
+  ],
+  "listing_fields": [ "bedrooms", "bathrooms", "receptions", "tenure", "council_tax_band", "epc_rating", "ground_rent", "service_charge" ],
+  "area": {
+    "default": "sqft",
+    "allowed": [ "sqft", "sqm", "acre" ],
+    "secondary": "sqm",
+    "labels": {
+      "sqft": "Sq Ft",
+      "sqm": "Sq M",
+      "acre": "Acres"
+    }
+  },
+  "rent_suffix": " pcm",
+  "calculators": {
+    "mortgage": {
+      "terms": [
+        25,
+        30,
+        35,
+        20
+      ],
+      "default_term": 25,
+      "default_rate_bp": 450,
+      "default_down_pct": 10,
+      "property_tax_bp": 0,
+      "insurance_annual": 0,
+      "hoa_monthly": 0,
+      "pmi_bp": 0,
+      "repayment_types": [ "repayment", "interest_only" ]
+    },
+    "purchase_costs": "sdlt",
+    "affordability": true,
+    "installments": false,
+    "unit_converter": false,
+    "construction": {
+      "unit": "sqft",
+      "rates": {
+        "grey": {
+          "Standard": 110,
+          "Premium": 130,
+          "Luxury": 160
+        },
+        "semi": {
+          "Standard": 170,
+          "Premium": 200,
+          "Luxury": 240
+        },
+        "turnkey": {
+          "Standard": 230,
+          "Premium": 280,
+          "Luxury": 350
+        }
+      },
+      "scopes": {
+        "grey": "Shell and structure",
+        "semi": "Semi-finished",
+        "turnkey": "Turnkey"
+      },
+      "locations": [ "UK average", "London and South East" ],
+      "location_factor": {
+        "UK average": 1,
+        "London and South East": 1.3
+      }
+    }
+  },
+  "fees": {
+    "sdlt": {
+      "region": "England and Northern Ireland",
+      "effective_from": "2025-04-01",
+      "needs_legal_review": true,
+      "source_url": "https://www.gov.uk/stamp-duty-land-tax/residential-property-rates",
+      "standard": [
+        {
+          "from": 0,
+          "to": 12500000,
+          "rate_bp": 0
+        },
+        {
+          "from": 12500000,
+          "to": 25000000,
+          "rate_bp": 200
+        },
+        {
+          "from": 25000000,
+          "to": 92500000,
+          "rate_bp": 500
+        },
+        {
+          "from": 92500000,
+          "to": 150000000,
+          "rate_bp": 1000
+        },
+        {
+          "from": 150000000,
+          "to": null,
+          "rate_bp": 1200
+        }
+      ],
+      "first_time": {
+        "max_price": 50000000,
+        "bands": [
+          {
+            "from": 0,
+            "to": 30000000,
+            "rate_bp": 0
+          },
+          {
+            "from": 30000000,
+            "to": 50000000,
+            "rate_bp": 500
+          }
+        ]
+      },
+      "surcharge_additional_bp": 500,
+      "surcharge_non_resident_bp": 200
+    }
+  },
+  "site_copy": {
+    "keyword_placeholder": "Town, postcode or street",
+    "hero_tagline": "Homes for sale and to rent, with the costs made clear",
+    "portal_blurb": "See your property, payments, receipts and documents",
+    "payment_steps": [ "Pay by bank transfer (Faster Payments) or card", "Use your reference", "We confirm and issue a receipt" ]
+  },
+  "lead_sources": [ "Walk-in", "Website", "Rightmove", "Zoopla", "OnTheMarket", "Referral", "Social media", "Phone call", "Board / sign" ],
+  "amenities": [ "Garden", "Garage", "Off-street parking", "Central heating", "Double glazing", "Fireplace", "Balcony / terrace", "Lift", "Concierge", "Gym", "Pets allowed" ]
 }

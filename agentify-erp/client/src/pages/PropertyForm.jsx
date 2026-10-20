@@ -53,7 +53,10 @@ export default function PropertyForm() {
 
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const feat = (k, v) => setF((x) => ({ ...x, features: { ...x.features, [k]: v } }));
-  const isHouse = HOUSE_TYPES.includes(f.property_type), isPlot = PLOT_TYPES.includes(f.property_type);
+  const pk = getRegion().config.region === 'PK';
+  const groupOf = (label) => getRegion().config.property_types?.find((t) => t.label === label)?.group;
+  const isHouse = pk ? HOUSE_TYPES.includes(f.property_type) : ['Houses', 'Apartments'].includes(groupOf(f.property_type));
+  const isPlot = pk ? PLOT_TYPES.includes(f.property_type) : groupOf(f.property_type) === 'Land';
   const net = Math.max(0, (Number(f.total_price) || 0) - (Number(f.discount) || 0));
   const ppu = Number(f.area_size) > 0 && Number(f.total_price) ? Math.round(Number(f.total_price) / Number(f.area_size)) : null;
   const imgCount = media.filter((m) => !/\.pdf$/i.test(m.path)).length + pending.length;
@@ -111,13 +114,13 @@ export default function PropertyForm() {
           <Field label="Property type" required error={err('property_type')}><ChipSelect value={f.property_type} onChange={(v) => set('property_type', v)} options={list('property_type')} /></Field>
           <div className="form-grid">
             <Field label="Project" required error={err('project_id')}><Select value={f.project_id} onChange={(v) => set('project_id', v ? Number(v) : null)} options={projects.map((p) => ({ value: p.id, label: p.name }))} /></Field>
-            <Field label="Block"><input className="input" value={f.block ?? ''} onChange={(e) => set('block', e.target.value)} /></Field>
-            <Field label="Sector"><input className="input" value={f.sector ?? ''} onChange={(e) => set('sector', e.target.value)} /></Field>
+            {pk && <Field label="Block"><input className="input" value={f.block ?? ''} onChange={(e) => set('block', e.target.value)} /></Field>}
+            {pk && <Field label="Sector"><input className="input" value={f.sector ?? ''} onChange={(e) => set('sector', e.target.value)} /></Field>}
             <Field label="Plot / unit number"><input className="input" value={f.plot_no ?? ''} onChange={(e) => set('plot_no', e.target.value)} placeholder="e.g. 2B" /></Field>
-            <Field label="File number"><input className="input" value={f.file_no ?? ''} onChange={(e) => set('file_no', e.target.value)} placeholder="e.g. FL-12B" /></Field>
+            {pk && <Field label="File number"><input className="input" value={f.file_no ?? ''} onChange={(e) => set('file_no', e.target.value)} placeholder="e.g. FL-12B" /></Field>}
             <Field label="Registration number"><input className="input" value={f.registration_no ?? ''} onChange={(e) => set('registration_no', e.target.value)} placeholder="e.g. REG-2026-0412" /></Field>
-            <Field label="File status" hint="Is the file against this plot still running?"><Select value={f.file_status ?? ''} onChange={(v) => set('file_status', v)} placeholder="Not set" options={['Active', 'Inactive', 'Paused', 'Defaulted', 'Suspended']} /></Field>
-            <Field label="File notes"><input className="input" value={f.file_notes ?? ''} onChange={(e) => set('file_notes', e.target.value)} placeholder="e.g. Suspended by the authority until NOC" /></Field>
+            {pk && <Field label="File status" hint="Is the file against this plot still running?"><Select value={f.file_status ?? ''} onChange={(v) => set('file_status', v)} placeholder="Not set" options={['Active', 'Inactive', 'Paused', 'Defaulted', 'Suspended']} /></Field>}
+            {pk && <Field label="File notes"><input className="input" value={f.file_notes ?? ''} onChange={(e) => set('file_notes', e.target.value)} placeholder="e.g. Suspended by the authority until NOC" /></Field>}
             <Field label="City"><input className="input" value={f.city ?? ''} onChange={(e) => set('city', e.target.value)} /></Field>
             <Field label="Area / society"><input className="input" value={f.area_name ?? ''} onChange={(e) => set('area_name', e.target.value)} /></Field>
             <Field label="Location" className="full"><input className="input" value={f.location ?? ''} onChange={(e) => set('location', e.target.value)} placeholder="Search or type a location" /></Field>

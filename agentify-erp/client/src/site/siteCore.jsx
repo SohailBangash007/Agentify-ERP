@@ -1,30 +1,37 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
+import { getRegion } from '../format.js';
 
 const SiteCtx = createContext(null);
 export const useSite = () => useContext(SiteCtx);
 
 export const FONTS = ['Inter', 'Poppins', 'Roboto', 'Open Sans', 'Montserrat', 'Lato', 'Nunito', 'Playfair Display', 'Merriweather', 'DM Sans', 'Manrope', 'Raleway', 'Work Sans', 'Source Sans 3'];
 
-/** Pakistani price style: 1.25 Crore / 45 Lakh / 85,000 */
-export function priceText(n, purpose) {
-  const v = Number(n || 0);
-  if (!v) return 'Price on request';
-  const t = v >= 1e7 ? `${+(v / 1e7).toFixed(2)} Crore` : v >= 1e5 ? `${+(v / 1e5).toFixed(2)} Lakh` : v.toLocaleString('en-PK');
-  return `PKR ${t}${purpose === 'Rent' ? ' / month' : ''}`;
-}
-/** Whole-rupee input that types with thousands separators (5,000,000) and reads back as a plain number string. */
+/** Price text in the workspace's style: "PKR 1.25 Crore" in Pakistan, "$450,000" / "$1.25M" / "£1,850 pcm" / "AED 2.4M" elsewhere. Amounts are in the workspace's stored units. */
+export const priceText = (n, purpose) => getRegion().price.priceText(n, purpose);
+/** The exact amount in the workspace's style. */
+export const fullPrice = (n) => getRegion().price.fullPrice(n);
+/** Major units typed by a visitor (e.g. dollars) to the stored unit (cents); unchanged in Pakistan. */
+export const minorOf = (major) => Math.round(Number(major || 0) * getRegion().price.unit);
+/** Region-specific website wording from the pack's site_copy, with the original text as the fallback (Pakistan). */
+export const siteCopy = (key, fallback) => getRegion().config.site_copy?.[key] ?? fallback;
+export const isPK = () => getRegion().config.region === 'PK';
+/** An example amount for an input hint: the Pakistani figure there, a smaller one elsewhere. */
+export const exampleAmount = (pk) => `e.g. ${(isPK() ? pk : Math.round(pk / 20)).toLocaleString(getRegion().config.locale)}`;
+/** Currency code shown in input labels. */
+export const curCode = () => getRegion().config.currency;
+/** Whole-unit input that types with thousands separators (5,000,000) and reads back as a plain number string of major units. */
 export function MoneyBox({ value, onChange, placeholder, ...rest }) {
   const digits = String(value ?? '').replace(/[^\d]/g, '');
+  const locale = getRegion().config.locale;
   return (
     <>
-      <input inputMode="numeric" autoComplete="off" value={digits ? Number(digits).toLocaleString('en-PK') : ''} placeholder={placeholder}
+      <input inputMode="numeric" autoComplete="off" value={digits ? Number(digits).toLocaleString(locale) : ''} placeholder={placeholder}
         onChange={(e) => onChange(e.target.value.replace(/[^\d]/g, ''))} {...rest} />
-      {digits ? <small className="money-words">{priceText(Number(digits))}</small> : null}
+      {Number(digits) > 0 ? <small className="money-words">{priceText(minorOf(digits))}</small> : null}
     </>
   );
 }
-export const fullPrice = (n) => `PKR ${Math.round(Number(n || 0)).toLocaleString('en-PK')}`;
 export const imgUrl = (p) => (!p ? null : /^(https?:|data:|\/)/.test(p) ? p : `/uploads/${p}`);
 export const waLink = (num, text) => `https://wa.me/${String(num || '').replace(/[^\d]/g, '')}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
 
@@ -127,7 +134,7 @@ export function useOrgSchema(config) {
     const base = (config.seo?.base_url || window.location.origin).replace(/\/+$/, '');
     const logo = config.brand?.logo ? (/^https?:/.test(config.brand.logo) ? config.brand.logo : `${base}/uploads/${config.brand.logo}`) : undefined;
     const data = { '@context': 'https://schema.org', '@type': config.seo?.org_type || 'RealEstateAgent', name: config.brand?.name, url: `${base}/site`, logo, image: logo, telephone: config.contact?.phone, email: config.contact?.email, description: config.seo?.description,
-      address: config.contact?.address ? { '@type': 'PostalAddress', streetAddress: config.contact.address, addressCountry: 'PK' } : undefined, openingHours: config.contact?.hours, areaServed: ['Islamabad', 'Rawalpindi'], sameAs: (config.social || []).map((s) => s.url).filter((u) => /^https?:/.test(u)) };
+      address: config.contact?.address ? { '@type': 'PostalAddress', streetAddress: config.contact.address, addressCountry: ({ PK: 'PK', US: 'US', UK: 'GB', AE: 'AE', CA: 'CA' })[getRegion().config.region] || 'PK' } : undefined, openingHours: config.contact?.hours, areaServed: getRegion().config.region === 'PK' ? ['Islamabad', 'Rawalpindi'] : (config.contact?.city ? [config.contact.city] : undefined), sameAs: (config.social || []).map((s) => s.url).filter((u) => /^https?:/.test(u)) };
     let el = document.getElementById('org-schema');
     if (!el) { el = document.createElement('script'); el.id = 'org-schema'; el.type = 'application/ld+json'; document.head.appendChild(el); }
     el.textContent = JSON.stringify(data);

@@ -1,6 +1,7 @@
 // Region control plane: pack versions, per-region flag switches, effective-dated rules and FX rates live in platform.db.
 // Packs shipped in the code are seeded once; later edits made in the console are new versions, never overwrites.
-import { FILE_PACKS, setOverrides } from './runtime.js';
+import { FILE_PACKS, setOverrides, clientConfig, packOf } from './runtime.js';
+import { COUNTRY_COPY } from './marketingCopy.js';
 
 export const REGION_COLUMNS = [['region', "TEXT NOT NULL DEFAULT 'PK'"], ['sub_region', 'TEXT'], ['money_scale', 'INTEGER NOT NULL DEFAULT 0'],
   ['locale', "TEXT NOT NULL DEFAULT 'en-PK'"], ['language', "TEXT NOT NULL DEFAULT 'en'"], ['units_system', 'TEXT'], ['flags', 'TEXT']];
@@ -26,7 +27,15 @@ CREATE TABLE IF NOT EXISTS fx_rates(
 export function initRegions(pdb) {
   pdb.exec(SCHEMA);
   const ins = pdb.prepare('INSERT OR IGNORE INTO region_packs(code, version, status, manifest, note, created_by) VALUES(?,?,?,?,?,?)');
-  for (const p of Object.values(FILE_PACKS)) ins.run(p.code, p.version || 1, p.status === 'active' ? 'active' : 'draft', JSON.stringify(p), 'shipped with the release', 'system');
+  for (const p of Object.values(FILE_PACKS)) {
+    const v = p.version || 1;
+    if (pdb.prepare('SELECT 1 FROM region_packs WHERE code=? AND version=?').get(p.code, v)) continue;
+    // a newer shipped version inherits the status the console gave the previous one, and replaces it
+    const prev = pdb.prepare("SELECT version, status FROM region_packs WHERE code=? AND status IN ('active','draft') ORDER BY version DESC LIMIT 1").get(p.code);
+    const status = prev ? prev.status : (p.status === 'active' ? 'active' : 'draft');
+    ins.run(p.code, v, status, JSON.stringify(p), prev ? `shipped with the release (replaces v${prev.version})` : 'shipped with the release', 'system');
+    if (prev) pdb.prepare("UPDATE region_packs SET status='retired' WHERE code=? AND version<?").run(p.code, v);
+  }
   loadOverrides(pdb);
 }
 
@@ -47,3 +56,15 @@ export function loadOverrides(pdb) {
 /** Regions a new workspace may pick today: only packs that are active. */
 export const selectableRegions = (pdb) => pdb.prepare("SELECT code, manifest FROM region_packs WHERE status='active' ORDER BY code, version").all()
   .reduce((m, r) => m.set(r.code, JSON.parse(r.manifest)), new Map());
+
+/** Every country for the marketing site: open ones can sign up, the others show a waiting-list call to action. */
+export function listCountries(pdb) {
+  const open = selectableRegions(pdb);
+  const ORDER = ['US', 'UK', 'AE', 'PK', 'CA'];
+  return Object.keys(FILE_PACKS).sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b)).map((code) => {
+    const p = packOf(code);
+    const copy = COUNTRY_COPY[code] || {};
+    return { code, name: p.name, slug: copy.slug || code.toLowerCase(), flag: copy.flag || '', currency: p.currency, locale: p.locale, languages: p.languages, sub_region_label: p.sub_region_label, sub_regions: p.sub_regions,
+      timezones: p.timezones || [p.timezone], open: open.has(code), copy, config: clientConfig({ region: code }) };
+  });
+}

@@ -114,8 +114,9 @@ test('mortgage tools stay off until the region switch is on, then run an applica
   const get = (u) => call(host, 'GET', u, null, { cookie: c });
   const post = (u, b) => call(host, 'POST', u, b || {}, { cookie: c });
   const put = (u, b) => call(host, 'PUT', u, b || {}, { cookie: c });
-  assert.equal((await get('/api/mortgage/lenders')).status, 404);
   const { setRegionFlag } = await import('../src/regions/admin.js');
+  setRegionFlag(platformDb(), 'US', 'mortgage', false, 'tester');
+  assert.equal((await get('/api/mortgage/lenders')).status, 404, 'a region can switch the module off');
   setRegionFlag(platformDb(), 'US', 'mortgage', true, 'tester');
   { const t = await get('/api/mortgage/lenders'); assert.equal(t.status, 200, JSON.stringify(t.data)); }
 
@@ -151,9 +152,11 @@ test('templates and compliance checklists: off by default, versioned templates, 
   const get = (u) => call(host, 'GET', u, null, { cookie: c });
   const post = (u, b) => call(host, 'POST', u, b || {}, { cookie: c });
   const put = (u, b) => call(host, 'PUT', u, b || {}, { cookie: c });
+  const { setRegionFlag } = await import('../src/regions/admin.js');
+  setRegionFlag(platformDb(), 'US', 'templates', false, 'tester');
+  setRegionFlag(platformDb(), 'US', 'compliance', false, 'tester');
   assert.equal((await get('/api/documents/templates')).status, 404);
   assert.equal((await get('/api/documents/checklists')).status, 404);
-  const { setRegionFlag } = await import('../src/regions/admin.js');
   setRegionFlag(platformDb(), 'US', 'templates', true, 'tester');
   setRegionFlag(platformDb(), 'US', 'compliance', true, 'tester');
 

@@ -23,7 +23,7 @@ test('only Pakistan is selectable until another region is switched on', () => {
   assert.deepEqual([...selectableRegions(pdb).keys()], ['PK']);
   admin.setRegionStatus(pdb, 'US', 'active', 'tester');
   assert.deepEqual([...selectableRegions(pdb).keys()].sort(), ['PK', 'US']);
-  assert.equal(regionFor({ region: 'US', money_scale: 2 }).config.pack_version, 1);
+  assert.equal(regionFor({ region: 'US', money_scale: 2 }).config.pack_version, 2);
   admin.setRegionStatus(pdb, 'US', 'draft', 'tester');
   assert.deepEqual([...selectableRegions(pdb).keys()], ['PK']);
   assert.throws(() => admin.setRegionStatus(pdb, 'PK', 'draft', 'tester'), /stays active/);
@@ -104,4 +104,19 @@ test('demo data for another region uses its own currency, names and units, and n
     assert.ok(contacts.length >= 4 && contacts.every((c) => c.country === 'United Kingdom' && c.phone.startsWith('+44')));
     assert.equal(JSON.stringify([props, contacts]).includes('Pakistan'), false);
   });
+});
+
+test('marketing countries: every country is listed, only active ones are open, and plans have local-currency prices', async () => {
+  const { listCountries } = await import('../src/regions/index.js');
+  const { listPlans } = await import('../src/services/plansStore.js');
+  const pdb = platformDb();
+  admin.setRegionStatus(pdb, 'CA', 'draft', 'tester');
+  const cs = listCountries(pdb);
+  assert.deepEqual(cs.map((c) => c.code), ['US', 'UK', 'AE', 'PK', 'CA']);
+  assert.equal(cs.find((c) => c.code === 'PK').open, true);
+  assert.equal(cs.find((c) => c.code === 'CA').open, false);
+  assert.equal(cs.find((c) => c.code === 'UK').config.calculators.purchase_costs, 'sdlt');
+  assert.ok(cs.find((c) => c.code === 'US').copy.hero_title);
+  const starter = listPlans().find((p) => p.id === 'starter');
+  for (const cur of ['USD', 'GBP', 'AED', 'PKR']) assert.ok(starter.price[cur]?.month > 0, `starter has a ${cur} monthly price`);
 });
