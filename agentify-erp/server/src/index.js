@@ -38,6 +38,7 @@ import construction from './routes/construction.js';
 import regionRoutes from './routes/region.js';
 import mortgageRoutes from './regions/mortgage.js';
 import documentRoutes from './regions/documents.js';
+import privacyRoutes from './regions/privacy.js';
 import { sendAlert } from './services/integrations.js';
 
 import auth from './routes/auth.js';
@@ -126,6 +127,7 @@ export function createApp() {
   app.use('/api/region', regionRoutes);
   app.use('/api/mortgage', mortgageRoutes);
   app.use('/api/documents', documentRoutes);
+  app.use('/api/privacy', privacyRoutes);
   app.use('/api/push', push);
   app.use('/api/assistant', assistant);
   app.use('/api/portal', portal);

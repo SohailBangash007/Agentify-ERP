@@ -180,3 +180,24 @@ test('templates and compliance checklists: off by default, versioned templates, 
   assert.equal((await post(`/api/documents/checklists/run/${rid}/complete`)).data.completed, true);
   assert.equal((await post(`/api/documents/checklists/run/${rid}/item`, { key: 'inspection', done: true })).status, 400, 'locked once completed');
 });
+
+test('privacy: an administrator can export a person and erase their details; accounting records stay', async () => {
+  const host = 'lonestar.erp.test';
+  const l = await call(host, 'POST', '/api/auth/login', { identifier: 'owner@lonestar.test', password: 'Tenant@12345' });
+  const c = l.cookie;
+  const get = (u) => call(host, 'GET', u, null, { cookie: c });
+  const post = (u, b) => call(host, 'POST', u, b || {}, { cookie: c });
+  const exp = await get('/api/privacy/contact/1/export');
+  assert.equal(exp.status, 200);
+  assert.equal(exp.data.contact.full_name, 'Jane Buyer');
+  assert.ok(exp.data.sales.length >= 1 && exp.data.receipts.length >= 1);
+  assert.equal(JSON.stringify(exp.data).includes('123456789'), false, 'full identity numbers are never exported');
+  assert.equal((await post('/api/privacy/contact/1/erase', {})).status, 400, 'needs the typed confirmation');
+  const done = await post('/api/privacy/contact/1/erase', { confirm: 'ERASE 1', reason: 'customer request' });
+  assert.equal(done.data.erased, true);
+  const after = (await get('/api/privacy/contact/1/export')).data;
+  assert.equal(after.contact.full_name, 'Erased contact #1');
+  assert.equal(after.contact.phone, null); assert.equal(after.contact.email, null);
+  assert.ok(after.sales.length >= 1 && after.receipts.length >= 1, 'sales and receipts are kept');
+  assert.equal((await get('/api/privacy/contact/999/export')).status, 404);
+});

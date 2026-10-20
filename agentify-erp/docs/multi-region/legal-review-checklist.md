@@ -81,3 +81,9 @@ Status legend: `open` (not yet implemented), `draft` (implemented as editable da
 - [ ] **Starter templates** (offer, agency agreement) in each pack are generic sample wording, flagged `needs_legal_review`, and every render shows a notice to that effect. A licensed professional per region must review or replace them before the `templates` switch is turned on.
 - [ ] **Starter checklists** (US purchase, UK sale progression, Canada purchase, UAE sale) are prompts for a broker's own process, not a statement of what the law requires. Confirm each item list, and which items must be required, per region and sub-region.
 - [ ] Edits to a template create a new version and reset it to "needs review".
+
+## Privacy export and erasure (Phase 5)
+
+- [ ] **What erasure removes and keeps.** Erasing a contact removes personal details, notes, tasks, documents (and files), identity numbers, region fields and finance profile, and signs out and disables any portal login. Sales, receipts and accounting entries are kept, detached from the person's name. Confirm per region (GDPR/UK GDPR, CCPA/CPRA, PIPEDA and Quebec Law 25, UAE PDPL, Pakistan) what must be erased, what must be kept, and the response deadlines.
+- [ ] **Backups.** Erased data may remain in backups until they expire. State this in the privacy policy.
+- [ ] **Export contents.** The export never includes full identity numbers (only masked). Confirm that satisfies access requests.

@@ -9,6 +9,7 @@ import { useAuth, useFetch, useLookups, useToast, useUndoDelete } from '../conte
 import { ago, date, dateTime, money, todayPK } from '../format.js';
 import ContactForm from './ContactForm.jsx';
 import RegionFields from '../components/RegionFields.jsx';
+import PrivacyTools from '../components/PrivacyTools.jsx';
 import { getRegion } from '../format.js';
 import { leadMessage, useCompanyName, waLink } from '../components/WhatsApp.jsx';
 
@@ -224,6 +225,7 @@ export default function ContactWorkspace() {
             </div>
           </Card>
           <RegionFields entity="contact" id={c.id} />
+          <PrivacyTools contactId={c.id} />
           <Accordion title="Contact" open>
             <KV items={[['Phone', c.phone], ['Alt phone', c.alt_phone], ['WhatsApp', c.whatsapp], ['Email', c.email], ...(getRegion().config.region === 'PK' ? [['CNIC', c.cnic]] : []), ['Father/husband', c.father_name], ['DOB', c.dob && date(c.dob)], ['Gender', c.gender]]} />
           </Accordion>
