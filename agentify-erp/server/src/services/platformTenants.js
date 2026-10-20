@@ -306,7 +306,8 @@ export function createWorkspace(b, req) {
   const trialDays = b.trial_days === undefined || b.trial_days === '' ? PLAN_SETTINGS.default_trial_days : Math.trunc(Number(b.trial_days));
   if (!(trialDays >= 0 && trialDays <= 365)) throw bad('Trial days must be between 0 and 365');
   const t = createTenant({ slug: b.slug, name: b.company_name, adminName: String(b.admin_name || '').trim() || 'Admin', adminEmail: b.admin_email, adminPassword: b.admin_password,
-    timezone: b.timezone || 'Asia/Karachi', currency: b.currency || 'PKR', demo: !!b.demo, trialDays: trialDays || null, product: b.product || 'real_estate' });
+    timezone: b.timezone || 'Asia/Karachi', currency: b.currency || 'PKR', demo: !!b.demo, trialDays: trialDays || null, product: b.product || 'real_estate',
+    region: b.region || 'PK', sub_region: b.sub_region || null, language: b.language || null });
   return tenantRow(t, req);
 }
 
