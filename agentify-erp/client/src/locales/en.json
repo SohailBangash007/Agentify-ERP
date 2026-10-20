@@ -1,0 +1,19 @@
+{
+  "auth.sign_in": "Sign in",
+  "auth.signing_in": "Signing in…",
+  "auth.verify": "Verify",
+  "auth.email": "Email",
+  "auth.email_or_phone": "Email or phone",
+  "auth.password": "Password",
+  "auth.forgot": "Forgot password?",
+  "auth.create_workspace": "Create a workspace",
+  "auth.staff_sign_in": "Staff sign in",
+  "auth.customer_sign_in": "Customer sign in",
+  "auth.vendor_sign_in": "Vendor sign in",
+  "auth.demo_accounts": "Demo accounts",
+  "lang.label": "Language",
+  "common.save": "Save",
+  "common.cancel": "Cancel",
+  "common.search": "Search",
+  "common.loading": "Loading…"
+}

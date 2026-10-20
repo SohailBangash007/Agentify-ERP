@@ -10,6 +10,7 @@ import './styles.css';
 import './styles2.css';
 import './styles3.css';
 import { setRegion } from './format.js';
+import { setLanguage, pickLanguage } from './i18n.js';
 
 registerSW();
 
@@ -21,8 +22,7 @@ async function start() {
     if (r.ok) {
       const cfg = await r.json();
       setRegion(cfg);
-      document.documentElement.lang = cfg.language || 'en';
-      document.documentElement.dir = cfg.direction || 'ltr';
+      setLanguage(pickLanguage(cfg));
     }
   } catch { /* offline or old server: keep defaults */ }
   createRoot(document.getElementById('root')).render(

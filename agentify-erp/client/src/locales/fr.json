@@ -1,0 +1,19 @@
+{
+  "auth.sign_in": "Se connecter",
+  "auth.signing_in": "Connexion…",
+  "auth.verify": "Vérifier",
+  "auth.email": "Courriel",
+  "auth.email_or_phone": "Courriel ou téléphone",
+  "auth.password": "Mot de passe",
+  "auth.forgot": "Mot de passe oublié ?",
+  "auth.create_workspace": "Créer un espace de travail",
+  "auth.staff_sign_in": "Connexion du personnel",
+  "auth.customer_sign_in": "Connexion client",
+  "auth.vendor_sign_in": "Connexion fournisseur",
+  "auth.demo_accounts": "Comptes de démonstration",
+  "lang.label": "Langue",
+  "common.save": "Enregistrer",
+  "common.cancel": "Annuler",
+  "common.search": "Rechercher",
+  "common.loading": "Chargement…"
+}

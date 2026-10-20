@@ -76,3 +76,17 @@ test('identity numbers are encrypted, masked, validated by region, and reveals a
     assert.ok(get("SELECT 1 FROM audit_log WHERE action='Revealed identity number'"));
   });
 });
+
+test('a workspace can be created in an active region and takes its currency, units and formats', async () => {
+  const { createTenant, getTenant } = await import('../src/platform.js');
+  const pdb = platformDb();
+  assert.throws(() => createTenant({ slug: 'us-early', name: 'Early', adminName: 'A', adminEmail: 'a@b.co', adminPassword: 'password1', region: 'US' }), /not available/);
+  admin.setRegionStatus(pdb, 'US', 'active', 'tester');
+  assert.throws(() => createTenant({ slug: 'us-bad', name: 'Bad', adminName: 'A', adminEmail: 'a@b.co', adminPassword: 'password1', region: 'US', sub_region: 'Atlantis' }), /valid state/i);
+  const t = createTenant({ slug: 'us-ok', name: 'Lone Star Realty', adminName: 'A', adminEmail: 'owner@lonestar.test', adminPassword: 'password1', region: 'US', sub_region: 'Texas' });
+  const row = getTenant(t.id);
+  assert.equal(row.region, 'US'); assert.equal(row.currency, 'USD'); assert.equal(row.money_scale, 2); assert.equal(row.timezone, 'America/New_York'); assert.equal(row.sub_region, 'Texas');
+  assert.equal(regionFor(row).money.format(123456), '$1,234.56');
+  const pk = createTenant({ slug: 'pk-ok', name: 'Karachi Homes', adminName: 'A', adminEmail: 'owner@khi.test', adminPassword: 'password1' });
+  assert.equal(getTenant(pk.id).money_scale, 0); assert.equal(getTenant(pk.id).currency, 'PKR');
+});

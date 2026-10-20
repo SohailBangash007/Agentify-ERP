@@ -11,7 +11,7 @@ import { HttpError, bad } from './util.js';
 import { initPlans } from './services/plansStore.js';
 import { PLAN_SETTINGS, PLANS, PRODUCT_CHOICES } from './services/plans.js';
 import crypto from 'node:crypto';
-import { initRegions, REGION_COLUMNS } from './regions/index.js';
+import { initRegions, REGION_COLUMNS, selectableRegions } from './regions/index.js';
 
 export const PLATFORM_DB_FILE = process.env.ERP_PLATFORM_DB || path.join(DATA_DIR, 'platform.db');
 /** Set ERP_BASE_DOMAIN (e.g. agentifyerp.com, or localhost in development) to serve many tenants by subdomain. */
@@ -259,8 +259,15 @@ export const trialUsed = (email) => !!pget('SELECT 1 FROM trial_claims WHERE ema
  * Trial start and end are stored as UTC timestamps.
  */
 export function createTenant({ slug, name, adminName, adminEmail, adminPassword, timezone = 'Asia/Karachi', currency = 'PKR', demo = false, plan = 'trial',
-  trialDays = PLAN_SETTINGS.default_trial_days, product = 'real_estate', trialPolicy = false }) {
+  trialDays = PLAN_SETTINGS.default_trial_days, product = 'real_estate', trialPolicy = false, region = 'PK', sub_region = null, language = null }) {
   const s = validateSlug(slug);
+  // the region decides currency, minor units, timezone and formats; only active regions can be chosen
+  const rp = selectableRegions(platformDb()).get(String(region || 'PK').toUpperCase());
+  if (!rp) throw bad('That region is not available yet');
+  region = rp.code;
+  if (sub_region && rp.sub_regions?.length && !rp.sub_regions.includes(sub_region)) throw bad(`Choose a valid ${String(rp.sub_region_label || 'state').toLowerCase()}`);
+  if (language && !(rp.languages || [rp.language]).includes(language)) throw bad('That language is not offered in this region');
+  if (region !== 'PK') { timezone = rp.timezone; currency = rp.currency; }
   if (!String(name || '').trim()) throw bad('Company name is required');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(adminEmail || ''))) throw bad('A valid admin email is required');
   if (String(adminPassword || '').length < 8) throw bad('Admin password must be at least 8 characters');
@@ -276,8 +283,9 @@ export function createTenant({ slug, name, adminName, adminEmail, adminPassword,
   const start = new Date();
   const trialStart = days ? start.toISOString() : null;
   const trialEnds = days ? new Date(start.getTime() + days * 864e5).toISOString() : null;
-  const id = Number(prun('INSERT INTO tenants(slug,name,plan,trial_ends_at,trial_started_at,subscription_status,trial_note,product,db_file,upload_dir,timezone,currency,owner_email) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
-    s, String(name).trim(), plan, trialEnds, trialStart, status, note, product, path.join('tenants', s, 'erp.db'), path.join('tenants', s), timezone, String(currency).toUpperCase(), email).lastInsertRowid);
+  const id = Number(prun('INSERT INTO tenants(slug,name,plan,trial_ends_at,trial_started_at,subscription_status,trial_note,product,db_file,upload_dir,timezone,currency,owner_email,region,sub_region,money_scale,locale,language,units_system) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    s, String(name).trim(), plan, trialEnds, trialStart, status, note, product, path.join('tenants', s, 'erp.db'), path.join('tenants', s), timezone, String(currency).toUpperCase(), email,
+    region, sub_region || null, rp.money_scale ?? 0, rp.locale, language || rp.language || 'en', rp.units_system || null).lastInsertRowid);
   if (days) prun('INSERT OR IGNORE INTO trial_claims(email_hash,tenant_id) VALUES(?,?)', emailHash(email), id);
   const tenant = getTenant(id);
   try {

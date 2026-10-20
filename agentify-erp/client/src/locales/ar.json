@@ -1,0 +1,19 @@
+{
+  "auth.sign_in": "تسجيل الدخول",
+  "auth.signing_in": "جارٍ تسجيل الدخول…",
+  "auth.verify": "تحقق",
+  "auth.email": "البريد الإلكتروني",
+  "auth.email_or_phone": "البريد الإلكتروني أو الهاتف",
+  "auth.password": "كلمة المرور",
+  "auth.forgot": "هل نسيت كلمة المرور؟",
+  "auth.create_workspace": "إنشاء مساحة عمل",
+  "auth.staff_sign_in": "دخول الموظفين",
+  "auth.customer_sign_in": "دخول العملاء",
+  "auth.vendor_sign_in": "دخول الموردين",
+  "auth.demo_accounts": "حسابات تجريبية",
+  "lang.label": "اللغة",
+  "common.save": "حفظ",
+  "common.cancel": "إلغاء",
+  "common.search": "بحث",
+  "common.loading": "جارٍ التحميل…"
+}

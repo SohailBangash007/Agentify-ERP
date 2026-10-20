@@ -35,8 +35,9 @@ export function Signup() {
   const [done, setDone] = useState(null);
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
   const timer = useRef();
+  const [regions, setRegions] = useState([]);
   const [mode, setMode] = useState(null); // null while checking, false when the server runs in single-company mode
-  useEffect(() => { api.get('/api/platform/site').then((s) => setMode(s.landing || s.multi_tenant)).catch(() => setMode(undefined)); }, []);
+  useEffect(() => { api.get('/api/platform/site').then((s) => { setMode(s.landing || s.multi_tenant); setRegions(s.regions || []); }).catch(() => setMode(undefined)); }, []);
   useEffect(() => {
     if (!f.slug) { setAvail(null); return undefined; }
     clearTimeout(timer.current);
@@ -72,10 +73,24 @@ export function Signup() {
         <Field label="Your name" required><input className="input" value={f.admin_name} required onChange={set('admin_name')} autoComplete="name" /></Field>
         <Field label="Work email" required><input className="input" type="email" value={f.admin_email} required onChange={set('admin_email')} autoComplete="email" /></Field>
         <Field label="Password" required hint="At least 8 characters"><input className="input" type="password" minLength={8} value={f.admin_password} required onChange={set('admin_password')} autoComplete="new-password" /></Field>
-        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Country / timezone"><select className="input" value={f.timezone} onChange={set('timezone')}>{TIMEZONES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
-          <Field label="Currency"><select className="input" value={f.currency} onChange={set('currency')}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select></Field>
-        </div>
+        {regions.length > 1 ? (() => {
+          const reg = regions.find((x) => x.code === (f.region || 'PK')) || regions[0];
+          return (
+            <>
+              <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Field label="Country / region"><select className="input" value={reg.code} onChange={(e) => setF((x) => ({ ...x, region: e.target.value, sub_region: '', language: '' }))}>{regions.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}</select></Field>
+                {reg.sub_regions?.length > 0 && <Field label={reg.sub_region_label || 'State'}><select className="input" value={f.sub_region || ''} onChange={set('sub_region')}><option value="">Choose…</option>{reg.sub_regions.map((x) => <option key={x}>{x}</option>)}</select></Field>}
+              </div>
+              <div className="muted" style={{ marginTop: -4 }}>Currency {reg.currency}{reg.languages?.length > 1 ? '' : ''}. Dates, units and terms follow the region.</div>
+              {reg.languages?.length > 1 && <Field label="Language"><select className="input" value={f.language || reg.languages[0]} onChange={set('language')}>{reg.languages.map((x) => <option key={x} value={x}>{{ en: 'English', fr: 'Français', ar: 'العربية' }[x] || x}</option>)}</select></Field>}
+            </>
+          );
+        })() : (
+          <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Country / timezone"><select className="input" value={f.timezone} onChange={set('timezone')}>{TIMEZONES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
+            <Field label="Currency"><select className="input" value={f.currency} onChange={set('currency')}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select></Field>
+          </div>
+        )}
         <button className="btn primary" disabled={busy || (avail && !avail.available)}>{busy ? 'Creating…' : 'Create workspace'}</button>
         <div className="center muted">Already have one? <Link to="/login">Sign in</Link></div>
       </form>
