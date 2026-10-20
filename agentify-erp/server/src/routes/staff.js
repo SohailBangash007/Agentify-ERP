@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { all, get, run, tx, nextNo } from '../db.js';
 import { can, hasPerm, requireStaff } from '../rbac.js';
 import { audit, notify } from '../audit.js';
-import { asyncH, bad, forbidden, notFound, int, now, today, jparse } from '../util.js';
+import { asyncH, bad, forbidden, notFound, int, now, today, jparse, moneyText, curCode } from '../util.js';
 import { acct } from '../services/accounting.js';
 import { createVoucher } from '../services/expenses.js';
 import { sendPdf } from '../services/pdf.js';
@@ -21,7 +21,7 @@ const me = (req) => {
   if (!e) throw bad('No employee record is linked to your login yet — ask HR to link it (HRM → Employees → Edit → Login).');
   return e;
 };
-const money = (n) => `PKR ${Number(n || 0).toLocaleString('en-PK')}`;
+const money = (n) => `${moneyText(Number(n || 0))}`;
 
 // ---------------------------------------------------------------- profile
 r.get('/me/profile', asyncH((req, res) => {
@@ -105,7 +105,7 @@ r.get('/me/payroll/:id(\\d+)/pdf', asyncH((req, res) => {
     { item: 'Loan instalment', type: 'Deduction', amount: -p.loans },
   ].filter((x) => x.amount !== 0 || x.item === 'Basic salary');
   sendPdf(res, `payslip-${p.period}`, { title: 'PAYSLIP', subtitle: `${e.name} (${e.emp_code}) · ${e.designation || ''}\nPeriod ${p.period}${p.payment_date ? ` · paid ${p.payment_date}` : ''}`,
-    summary: [['Net pay', money(p.net)], ['Payment method', p.payment_method || '—']], columns: [{ key: 'item', label: 'Item' }, { key: 'type', label: 'Type' }, { key: 'amount', label: 'Amount (PKR)', type: 'money' }], rows,
+    summary: [['Net pay', money(p.net)], ['Payment method', p.payment_method || '—']], columns: [{ key: 'item', label: 'Item' }, { key: 'type', label: 'Type' }, { key: 'amount', label: `Amount (${curCode()})`, type: 'money' }], rows,
     totals: { item: 'Net pay', amount: p.net } });
 }));
 

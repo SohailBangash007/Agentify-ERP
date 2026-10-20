@@ -1,5 +1,5 @@
 import { get, all, run, tx, nextNo } from '../db.js';
-import { now, today, bad, int, num } from '../util.js';
+import { now, today, bad, int, num, moneyText, curCode } from '../util.js';
 import { postJournal, assertTreasury, assertFunds } from './accounting.js';
 import { audit, notifyPerm } from '../audit.js';
 import { notifyVendor } from './vendorAccount.js';
@@ -68,7 +68,7 @@ export function createVoucher(inp, req) {
     unit || amount / qty, amount, inp.payment_method || null, inp.reference_no || null, inp.paid_from_account_id || null,
     isCredit, inp.due_date || null, 'created', inp.notes ?? null, req.user.id, now(), inp.show_paid_from ? 1 : 0, isAsset, assetInfo ? JSON.stringify(assetInfo) : null);
     const id = Number(r.lastInsertRowid);
-    audit(req, 'Created Expense Voucher', 'expense', id, `${no} PKR ${amount}`);
+    audit(req, 'Created Expense Voucher', 'expense', id, `${no} ${curCode()} ${amount}`);
     return id;
   });
 }
@@ -79,7 +79,7 @@ export function submitVoucher(id, req) {
   if (!['created', 'rejected'].includes(v.status)) throw bad(`Cannot submit a ${v.status} voucher`);
   run("UPDATE expense_vouchers SET status='submitted' WHERE id=?", id);
   audit(req, 'Submitted Expense Voucher', 'expense', id, v.voucher_no);
-  notifyPerm('accounting', 'approve', 'expense', 'Expense awaiting approval', `${v.voucher_no}: PKR ${v.amount.toLocaleString('en-PK')}`, `/expenses/${id}`);
+  notifyPerm('accounting', 'approve', 'expense', 'Expense awaiting approval', `${v.voucher_no}: ${moneyText(v.amount)}`, `/expenses/${id}`);
 }
 
 export function rejectVoucher(id, req) {
@@ -101,8 +101,8 @@ export function approveVoucher(id, req) {
     });
     run("UPDATE expense_vouchers SET status='approved', approved_by=?, journal_id=? WHERE id=?", req.user.id, jid, id);
     if (v.is_asset) createAssetsFromVoucher({ ...v, journal_id: jid }, req);
-    audit(req, 'Approved Expense Voucher', 'expense', id, `${v.voucher_no} PKR ${v.amount}`);
-    if (v.vendor_id) notifyVendor(v.vendor_id, 'payment', 'Voucher approved', `${v.voucher_no}: PKR ${v.amount.toLocaleString('en-PK')} is approved${v.is_credit ? ' (credit purchase)' : ''}`, '/vendor/payments');
+    audit(req, 'Approved Expense Voucher', 'expense', id, `${v.voucher_no} ${curCode()} ${v.amount}`);
+    if (v.vendor_id) notifyVendor(v.vendor_id, 'payment', 'Voucher approved', `${v.voucher_no}: ${moneyText(v.amount)} is approved${v.is_credit ? ' (credit purchase)' : ''}`, '/vendor/payments');
   });
 }
 
@@ -124,8 +124,8 @@ export function payVoucher(id, inp, req) {
       pno, v.vendor_id, id, inp.date || today(), amount, acc.id, inp.method || v.payment_method || null, inp.reference_no ?? null, jid, req.user.id, now());
     const paid = v.paid_amount + amount;
     run('UPDATE expense_vouchers SET paid_amount=?, status=?, paid_by=? WHERE id=?', paid, paid >= v.amount ? 'paid' : 'partial', req.user.id, id);
-    audit(req, 'Paid Expense Voucher', 'expense', id, `${v.voucher_no} PKR ${amount} via ${acc.name}`);
-    if (v.vendor_id) notifyVendor(v.vendor_id, 'payment', 'Payment released', `PKR ${amount.toLocaleString('en-PK')} released against ${v.voucher_no} (${pno})`, '/vendor/payments');
+    audit(req, 'Paid Expense Voucher', 'expense', id, `${v.voucher_no} ${curCode()} ${amount} via ${acc.name}`);
+    if (v.vendor_id) notifyVendor(v.vendor_id, 'payment', 'Payment released', `${moneyText(amount)} released against ${v.voucher_no} (${pno})`, '/vendor/payments');
   });
 }
 
@@ -138,7 +138,7 @@ export function payVendor(vendorId, inp, req) {
     if (left <= 0) throw bad('Amount must be greater than zero');
     const open = require_open(vendorId);
     const total = open.reduce((s, v) => s + (v.amount - v.paid_amount), 0);
-    if (left > total) throw bad(`Payment exceeds the vendor's outstanding balance (PKR ${total.toLocaleString('en-PK')})`);
+    if (left > total) throw bad(`Payment exceeds the vendor's outstanding balance (${moneyText(total)})`);
     for (const v of open) {
       if (left <= 0) break;
       const take = Math.min(left, v.amount - v.paid_amount);

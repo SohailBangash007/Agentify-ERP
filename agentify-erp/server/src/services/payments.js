@@ -1,5 +1,5 @@
 import { get, all, run, tx, nextNo } from '../db.js';
-import { now, today, bad, int } from '../util.js';
+import { now, today, bad, int, moneyText, curCode } from '../util.js';
 import { postJournal, reverseJournal, assertTreasury, assertFunds } from './accounting.js';
 import { audit, activity, notify } from '../audit.js';
 
@@ -80,7 +80,7 @@ export function receivePayment(inp, req) {
     if (isRefund) {
       const p = parts[0];
       if (!p) throw bad('A refund must reference a sale');
-      if (amount > p.sale.paid_amount) throw bad(`Refund exceeds amount paid (PKR ${p.sale.paid_amount.toLocaleString('en-PK')})`);
+      if (amount > p.sale.paid_amount) throw bad(`Refund exceeds amount paid (${moneyText(p.sale.paid_amount)})`);
       assertFunds(acc.id, amount);
       let left = amount;
       for (const i of all('SELECT * FROM installments WHERE sale_id=? AND paid>0 ORDER BY due_date DESC, seq DESC', p.sale.id)) {
@@ -94,7 +94,7 @@ export function receivePayment(inp, req) {
       for (const p of parts) {
         const outstanding = p.sale.net_price - p.sale.paid_amount;
         if (p.amount > outstanding && !inp.overpayment) {
-          throw bad(`Payment for ${p.sale.sale_no} exceeds its outstanding balance of PKR ${outstanding.toLocaleString('en-PK')}. Mark it as an overpayment/advance to accept the excess.`);
+          throw bad(`Payment for ${p.sale.sale_no} exceeds its outstanding balance of ${moneyText(outstanding)}. Mark it as an overpayment/advance to accept the excess.`);
         }
         p.settled = Math.min(p.amount, outstanding);
         p.advance = p.amount - p.settled;
@@ -141,14 +141,14 @@ export function receivePayment(inp, req) {
     });
     run('UPDATE receipts SET journal_id=? WHERE id=?', jid, rid);
 
-    const partText = parts.length > 1 ? ` split: ${parts.map((p) => `${p.sale.sale_no} PKR ${p.amount.toLocaleString('en-PK')}`).join(' + ')}` : '';
-    activity(contact.id, user, isRefund ? 'Refund issued' : 'Payment received', { detail: `${no} — PKR ${amount.toLocaleString('en-PK')} (${type}, ${method})${partText}`, entityType: 'receipt', entityId: rid });
+    const partText = parts.length > 1 ? ` split: ${parts.map((p) => `${p.sale.sale_no} ${moneyText(p.amount)}`).join(' + ')}` : '';
+    activity(contact.id, user, isRefund ? 'Refund issued' : 'Payment received', { detail: `${no} — ${moneyText(amount)} (${type}, ${method})${partText}`, entityType: 'receipt', entityId: rid });
     activity(contact.id, user, 'Receipt generated', { detail: no, entityType: 'receipt', entityId: rid });
-    audit(req, isRefund ? 'Created refund voucher' : 'Created Receipt Voucher', 'receipt', rid, `${no} PKR ${amount} ${contact.full_name}${partText}`);
-    notify([contact.agent_id, ...parts.map((p) => p.sale.agent_id)], 'payment', isRefund ? 'Refund issued' : 'Payment received', `${contact.full_name}: PKR ${amount.toLocaleString('en-PK')} (${no})`, `/receipts/${rid}`);
+    audit(req, isRefund ? 'Created refund voucher' : 'Created Receipt Voucher', 'receipt', rid, `${no} ${curCode()} ${amount} ${contact.full_name}${partText}`);
+    notify([contact.agent_id, ...parts.map((p) => p.sale.agent_id)], 'payment', isRefund ? 'Refund issued' : 'Payment received', `${contact.full_name}: ${moneyText(amount)} (${no})`, `/receipts/${rid}`);
     // the customer's own portal login is told too, with a link to the receipt
     notify(all('SELECT id FROM users WHERE contact_id=? AND active=1', contact.id).map((u) => u.id), 'payment', isRefund ? 'Refund issued' : 'Payment received — receipt ready',
-      `PKR ${amount.toLocaleString('en-PK')} · receipt ${no}. Open Payments to view or download it.`, '/portal/payments');
+      `${moneyText(amount)} · receipt ${no}. Open Payments to view or download it.`, '/portal/payments');
     return rid;
   });
 }

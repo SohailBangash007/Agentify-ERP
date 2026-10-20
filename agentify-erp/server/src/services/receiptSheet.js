@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { getSetting } from '../db.js';
 import { brand } from './pdf.js';
+import { moneyText } from '../util.js';
 
 /**
  * Receipt voucher laid out for A4 paper with an OFFICE COPY and a CLIENT COPY, built from ruled tables like a printed
@@ -14,7 +15,7 @@ import { brand } from './pdf.js';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dmy = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? `${m[3]}-${MON[Number(m[2]) - 1]}-${m[1]}` : ''; };
-const pkr = (n) => `PKR ${Math.round(Number(n || 0)).toLocaleString('en-PK')}`;
+const pkr = (n) => `${moneyText(Math.round(Number(n || 0)))}`;
 const num = (n) => Math.round(Number(n || 0)).toLocaleString('en-PK');
 const NAVY = '#0b3d3a', INK = '#1f2937', GREY = '#667085', LINE = '#b9c7c4', SOFT = '#eef5f3';
 

@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { ensureCustomerCode } from './customers.js';
 import crypto from 'node:crypto';
 import { get, all, run, tx, nextNo } from '../db.js';
-import { now, today, bad, int, addMonths, notFound } from '../util.js';
+import { now, today, bad, int, addMonths, notFound, curCode } from '../util.js';
 import { postJournal } from './accounting.js';
 import { generateCommission, cancelCommission } from './commissions.js';
 import { receivePayment } from './payments.js';
@@ -138,7 +138,7 @@ function createSaleTx(inp, req) {
   if (inp.collect_booking && int(body.booking_amount) > 0) {
     receivePayment({ contact_id: contact.id, sale_id: id, amount: int(body.booking_amount), payment_type: 'Booking Payment', date: body.sale_date, ...inp.collect_booking }, req);
   }
-  audit(req, kind === 'property' ? 'Created sale' : 'Created construction contract', 'sale', id, `${saleNo} ${label} for ${contact.full_name}, net PKR ${plan.net}`);
+  audit(req, kind === 'property' ? 'Created sale' : 'Created construction contract', 'sale', id, `${saleNo} ${label} for ${contact.full_name}, net ${curCode()} ${plan.net}`);
   notify([agentId, contact.manager_id], 'sale', kind === 'property' ? 'Property sold' : 'Construction contract signed', `${label} — ${contact.full_name}`, `/sales/${id}`);
   notifyPerm('accounting', 'view', 'sale', kind === 'property' ? 'Property sold' : 'Construction contract signed', `${saleNo}: ${label}`, `/sales/${id}`);
   return { id, contact, agentId, prop };

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { all, get, getSetting, run } from '../db.js';
-import { asyncH, bad, notFound, int, jparse, today } from '../util.js';
+import { asyncH, bad, notFound, int, jparse, today, moneyText, curCode } from '../util.js';
 import { websiteState } from '../services/website.js';
 import { progressSql, scheduleFor } from '../services/schedule.js';
 import { ingest } from './public.js';
@@ -171,12 +171,12 @@ r.post('/installment-plan', (req, res) => {
 r.post('/installment-plan/pdf', (req, res) => {
   const p = buildPlan(planInput(req.body));
   if (!p.ok) throw bad(p.errors[0]);
-  const t = p.totals, money = (n) => `PKR ${Number(n || 0).toLocaleString('en-PK')}`;
+  const t = p.totals, money = (n) => `${moneyText(Number(n || 0))}`;
   sendPdf(res, 'installment-plan', {
     title: 'INSTALLMENT PLAN', subtitle: `Indicative plan · ${t.installments} installments over ${t.months} months`,
     summary: [['Total price', money(t.price)], ['Booking', money(t.booking)], ['Advance', money(t.advance)], ['Monthly installment', money(t.installment_amount)],
       ...(t.balloons ? [[`${t.balloons} balloon payment(s)`, money(t.balloon_amount) + ' each']] : []), ...(t.markup ? [['Markup', money(t.markup)]] : []), ['Total payable', money(t.payable)]],
-    columns: [{ key: 'n', label: '#' }, { key: 'date', label: 'Due date' }, { key: 'label', label: 'Payment' }, { key: 'amount', label: 'Amount (PKR)', type: 'money' }, { key: 'balance', label: 'Balance after (PKR)', type: 'money' }],
+    columns: [{ key: 'n', label: '#' }, { key: 'date', label: 'Due date' }, { key: 'label', label: 'Payment' }, { key: 'amount', label: `Amount (${curCode()})`, type: 'money' }, { key: 'balance', label: 'Balance after (PKR)', type: 'money' }],
     rows: p.rows.map((r, i) => ({ n: i + 1, date: r.date, label: r.label, amount: r.amount, balance: r.balance })),
     totals: { label: 'Total payable', amount: t.payable },
   });

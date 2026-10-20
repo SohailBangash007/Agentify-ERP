@@ -3,7 +3,7 @@ import { all, get, run, tx, update, nextNo, getSetting } from '../db.js';
 import { can, hasPerm, requireStaff } from '../rbac.js';
 import { audit, notify, notifyPerm } from '../audit.js';
 import { crud, sendTable, uploader } from './helpers.js';
-import { asyncH, bad, notFound, int, now, today, jparse, addDays } from '../util.js';
+import { asyncH, bad, notFound, int, now, today, jparse, addDays, moneyText, curCode } from '../util.js';
 import { postJournal, assertTreasury, assertFunds } from '../services/accounting.js';
 import { payCommission } from '../services/commissions.js';
 import { attendanceSummary, createLeave, decideLeave, leaveBalances, commissionDue, ATTENDANCE_STATUS } from '../services/hr.js';
@@ -118,7 +118,7 @@ r.post('/payroll/:id(\\d+)/pay', can('hrm', 'approve'), asyncH((req, res) => {
       let commission = p.commission;
       if (commission > 0) {
         if (!userId) throw bad('This employee has no login linked, so commission cannot be settled — set commission to 0 or link a user');
-        if (commission > commissionDue(userId)) throw bad(`Commission on the payslip (PKR ${commission.toLocaleString('en-PK')}) is more than the approved commission still owed (PKR ${commissionDue(userId).toLocaleString('en-PK')})`);
+        if (commission > commissionDue(userId)) throw bad(`Commission on the payslip (${moneyText(commission)}) is more than the approved commission still owed (${moneyText(commissionDue(userId))})`);
         let left = commission;
         for (const c of all("SELECT * FROM commissions WHERE agent_id=? AND status IN ('approved','partially_paid') ORDER BY id", userId)) {
           if (left <= 0) break;
@@ -133,8 +133,8 @@ r.post('/payroll/:id(\\d+)/pay', can('hrm', 'approve'), asyncH((req, res) => {
     }
     run("UPDATE payroll SET status='paid', payment_date=?, payment_method=?, account_id=?, journal_id=? WHERE id=?", date, req.body.payment_method ?? null, accId, jid, p.id);
     const eu = get('SELECT user_id FROM employees WHERE id=?', p.employee_id)?.user_id;
-    if (eu) notify(eu, 'payroll', 'Salary paid', `Your ${p.period} salary of PKR ${p.net.toLocaleString('en-PK')} has been paid`, '/my/payroll');
-    audit(req, 'Paid salary', 'payroll', p.id, `${p.employee_name} ${p.period} PKR ${p.net}`);
+    if (eu) notify(eu, 'payroll', 'Salary paid', `Your ${p.period} salary of ${moneyText(p.net)} has been paid`, '/my/payroll');
+    audit(req, 'Paid salary', 'payroll', p.id, `${p.employee_name} ${p.period} ${curCode()} ${p.net}`);
   });
   res.json({ ok: true });
 }));

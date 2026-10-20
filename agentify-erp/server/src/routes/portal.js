@@ -4,7 +4,7 @@ import path from 'node:path';
 import { all, get, getSetting, uploadDir } from '../db.js';
 import { requirePortal } from '../rbac.js';
 import { audit } from '../audit.js';
-import { asyncH, notFound, jparse } from '../util.js';
+import { asyncH, notFound, jparse, moneyText } from '../util.js';
 import { saleSummary } from '../services/sales.js';
 import { customerLedger, ledgerTable } from '../services/payments.js';
 import { sendPdf } from '../services/pdf.js';
@@ -109,7 +109,7 @@ r.get('/ledger', asyncH(async (req, res) => {
   const t = ledgerTable(ledger);
   audit(req, 'Portal ledger download', 'contact', mine(req), `${format} ${from || ''}..${to || ''}`);
   if (format === 'pdf') {
-    return sendPdf(res, 'account-ledger', { title: 'ACCOUNT LEDGER', subtitle: `${c.full_name} · ${label}\n${from || 'Beginning'} to ${to || 'today'}`, summary: [['Opening balance', `PKR ${(ledger.opening || 0).toLocaleString('en-PK')}`], ['Total debits', `PKR ${(ledger.total_debit ?? t.totals.debit).toLocaleString('en-PK')}`], ['Total payments', `PKR ${(ledger.total_credit ?? t.totals.credit).toLocaleString('en-PK')}`], ['Closing balance (you owe)', `PKR ${ledger.balance.toLocaleString('en-PK')}`]], columns: t.columns, rows: t.rows, totals: t.totals });
+    return sendPdf(res, 'account-ledger', { title: 'ACCOUNT LEDGER', subtitle: `${c.full_name} · ${label}\n${from || 'Beginning'} to ${to || 'today'}`, summary: [['Opening balance', `${moneyText((ledger.opening || 0))}`], ['Total debits', `${moneyText((ledger.total_debit ?? t.totals.debit))}`], ['Total payments', `${moneyText((ledger.total_credit ?? t.totals.credit))}`], ['Closing balance (you owe)', `${moneyText(ledger.balance)}`]], columns: t.columns, rows: t.rows, totals: t.totals });
   }
   return sendTable(res, format, 'account-ledger', t.columns, t.rows.concat([{ description: 'Closing balance', balance: ledger.balance }]));
 }));

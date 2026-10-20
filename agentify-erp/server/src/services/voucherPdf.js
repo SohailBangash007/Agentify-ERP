@@ -1,9 +1,10 @@
 import { getSetting } from '../db.js';
 import { sendPdf } from './pdf.js';
+import { moneyText } from '../util.js';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dmy = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? `${m[3]}-${MON[Number(m[2]) - 1]}-${m[1]}` : ''; };
-const pkr = (n) => `PKR ${Math.round(Number(n || 0)).toLocaleString('en-PK')}`;
+const pkr = (n) => `${moneyText(Math.round(Number(n || 0)))}`;
 const g = (k, d = '') => getSetting(k, d) || d;
 
 /**

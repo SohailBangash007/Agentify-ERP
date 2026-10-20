@@ -1,6 +1,6 @@
 import QRCode from 'qrcode';
 import { all, get, getSetting, run } from '../db.js';
-import { jparse, now } from '../util.js';
+import { jparse, now, moneyText } from '../util.js';
 
 /**
  * QR code for a receipt voucher. It carries a plain-text ledger summary of the customer's plan — as it stood when
@@ -11,7 +11,7 @@ import { jparse, now } from '../util.js';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dmy = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? `${m[3]}-${MON[Number(m[2]) - 1]}-${m[1]}` : ''; };
-const pkr = (n) => `PKR ${Math.round(Number(n || 0)).toLocaleString('en-PK')}`;
+const pkr = (n) => `${moneyText(Math.round(Number(n || 0)))}`;
 
 /** Public address of the website / portal: the address saved in the SEO settings, else the address the request came in on. */
 export function publicBase(req) {

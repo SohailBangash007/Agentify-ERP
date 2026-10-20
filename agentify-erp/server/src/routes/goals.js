@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { all, get, run } from '../db.js';
 import { can, hasPerm, requireStaff, requireAuth } from '../rbac.js';
 import { audit, notify } from '../audit.js';
-import { asyncH, bad, forbidden, int, now } from '../util.js';
+import { asyncH, bad, forbidden, int, now, curCode } from '../util.js';
 import { overview, leaderboard, teamView, salesAgents, goalFor, progress, METRICS, DEFAULTS, runGoalReminders } from '../services/goals.js';
 import { vapidPublicKey, saveSubscription, removeSubscription, hasSubscription, pushTo } from '../services/push.js';
 
@@ -51,7 +51,7 @@ r.put('/', can('crm', 'approve'), asyncH((req, res) => {
   const who = uid ? get('SELECT name FROM users WHERE id=?', uid).name : 'all agents';
   audit(req, 'Set sales goal', 'goal', uid, `${period} goal for ${who}: ${JSON.stringify(v)}`);
   const targets = uid ? [uid] : salesAgents().filter((a) => !get('SELECT 1 FROM agent_goals WHERE user_id=? AND period=?', a.id, period)).map((a) => a.id);
-  notify(targets, 'goal', `Your ${period} goal was updated`, `${req.user.name} set: ${METRICS.filter((m) => v[m.key]).map((m) => `${m.money ? 'PKR ' : ''}${v[m.key].toLocaleString('en-PK')} ${m.short.toLowerCase()}`).join(', ')}`, '/goals');
+  notify(targets, 'goal', `Your ${period} goal was updated`, `${req.user.name} set: ${METRICS.filter((m) => v[m.key]).map((m) => `${m.money ? curCode() + ' ' : ''}${v[m.key].toLocaleString('en-PK')} ${m.short.toLowerCase()}`).join(', ')}`, '/goals');
   res.json({ ok: true });
 }));
 r.delete('/:uid(\\d+)/:period', can('crm', 'approve'), asyncH((req, res) => {

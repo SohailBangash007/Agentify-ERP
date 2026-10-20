@@ -4,7 +4,7 @@ import { can, hasPerm, requireStaff } from '../rbac.js';
 import { createVendorPortalUser } from '../services/vendorAccount.js';
 import { audit } from '../audit.js';
 import { sendTable, crud } from './helpers.js';
-import { asyncH, bad, notFound, int, today, now, dateRange } from '../util.js';
+import { asyncH, bad, notFound, int, today, now, dateRange, moneyText, curCode } from '../util.js';
 import { postJournal, reverseJournal, accountBalance, trialBalance, treasuryAccounts, assertTreasury, assertFunds, postOpening, isDebitNature } from '../services/accounting.js';
 import { sendPdf } from '../services/pdf.js';
 import { expensePdf } from '../services/voucherPdf.js';
@@ -142,7 +142,7 @@ r.get('/balance-sheet', can('accounting', 'view'), asyncH(async (req, res) => {
     const mk = (title, list, total, extra = []) => ({ heading: title, columns: cols, rows: [...list.map((a) => ({ account: `${a.code} ${a.name}`, balance: a.balance })), ...extra], totals: { account: `Total ${title.toLowerCase()}`, balance: total } });
     const sections = [mk('Assets', out.assets, out.total_assets), mk('Liabilities', out.liabilities, out.total_liabilities),
       mk('Equity', out.equity, out.total_equity + profit, [{ account: 'Current profit / (loss)', balance: profit }])];
-    if (req.query.format === 'pdf') return sendPdf(res, 'balance-sheet', { title: 'BALANCE SHEET', subtitle: `As of ${asOf}`, summary: [['Total assets', `PKR ${out.total_assets.toLocaleString('en-PK')}`], ['Liabilities', `PKR ${out.total_liabilities.toLocaleString('en-PK')}`], ['Equity + profit', `PKR ${(out.total_equity + profit).toLocaleString('en-PK')}`], ['Books balance', out.balanced ? 'Yes' : 'NO']], sections });
+    if (req.query.format === 'pdf') return sendPdf(res, 'balance-sheet', { title: 'BALANCE SHEET', subtitle: `As of ${asOf}`, summary: [['Total assets', `${moneyText(out.total_assets)}`], ['Liabilities', `${moneyText(out.total_liabilities)}`], ['Equity + profit', `${moneyText((out.total_equity + profit))}`], ['Books balance', out.balanced ? 'Yes' : 'NO']], sections });
     return sendTable(res, req.query.format, 'balance-sheet', [{ key: 'section', label: 'Section' }, ...cols], sections.flatMap((x) => x.rows.map((r) => ({ section: x.heading, ...r }))));
   }
   res.json(out);
@@ -174,7 +174,7 @@ r.post('/transfers', can('accounting', 'create'), asyncH((req, res) => {
     return postJournal({ date: date || today(), memo: memo || `Transfer ${from.name} → ${to.name}`, refType: 'transfer', userId: req.user.id,
       lines: [{ account: to.id, debit: amt }, { account: from.id, credit: amt }] });
   });
-  audit(req, 'Treasury transfer', 'journal', id, `${from.name} → ${to.name} PKR ${amt}`);
+  audit(req, 'Treasury transfer', 'journal', id, `${from.name} → ${to.name} ${curCode()} ${amt}`);
   res.status(201).json({ id });
 }));
 r.post('/reconciliations', can('accounting', 'approve'), asyncH((req, res) => {

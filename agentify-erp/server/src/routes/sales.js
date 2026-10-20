@@ -8,7 +8,7 @@ import { receiptQr } from '../services/receiptQr.js';
 import { receiptCopiesPdf } from '../services/receiptSheet.js';
 import { customerSearchClause, receiptRecord } from '../services/customers.js';
 import { sendTable } from './helpers.js';
-import { asyncH, bad, forbidden, notFound, int, now, today } from '../util.js';
+import { asyncH, bad, forbidden, notFound, int, now, today, moneyText } from '../util.js';
 import { createSale, cancelSale, planSchedule, saleSummary, ensurePortalUser } from '../services/sales.js';
 import { sendPdf } from '../services/pdf.js';
 import { scheduleFor } from '../services/schedule.js';
@@ -149,7 +149,7 @@ r.get('/customers/:id(\\d+)/statement', can('customers', 'view'), asyncH((req, r
     const t = ledgerTable(ledger);
     if (req.query.format === 'pdf') {
       return sendPdf(res, `statement-${c.full_name}`, { title: 'ACCOUNT STATEMENT', subtitle: `${c.full_name}${c.customer_code ? ' · ' + c.customer_code : ''}${c.cnic ? ' · CNIC ' + c.cnic : ''}\n${req.query.from || 'Beginning'} to ${req.query.to || 'today'}`,
-        summary: sales.map((s) => [s.property_title, `Paid PKR ${s.paid_amount.toLocaleString('en-PK')} / ${s.net_price.toLocaleString('en-PK')}`]).slice(0, 4), columns: t.columns, rows: t.rows, totals: t.totals });
+        summary: sales.map((s) => [s.property_title, `Paid ${moneyText(s.paid_amount)} / ${s.net_price.toLocaleString('en-PK')}`]).slice(0, 4), columns: t.columns, rows: t.rows, totals: t.totals });
     }
     return sendTable(res, req.query.format, `statement-${c.full_name}`, t.columns, t.rows);
   }

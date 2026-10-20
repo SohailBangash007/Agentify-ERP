@@ -74,3 +74,5 @@ export const moneyText = (n) => currentRegion().money.text(n);
 export function required(obj, ...keys) {
   for (const k of keys) if (obj[k] === undefined || obj[k] === null || obj[k] === '') throw bad(`${k.replace(/_/g, ' ')} is required`);
 }
+/** Currency code of the current workspace (PKR for Pakistan). */
+export const curCode = () => currentRegion().config.currency;

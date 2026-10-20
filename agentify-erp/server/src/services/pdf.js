@@ -2,9 +2,9 @@ import PDFDocument from 'pdfkit';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getSetting, uploadDir } from '../db.js';
-import { now } from '../util.js';
+import { now, moneyText } from '../util.js';
 
-const money = (n) => `PKR ${Math.round(Number(n) || 0).toLocaleString('en-PK')}`;
+const money = (n) => `${moneyText(Math.round(Number(n) || 0))}`;
 const NAVY = '#0f1b33', GREY = '#667085', LINE = '#e4e7ec', ZEBRA = '#f7f8fa';
 
 export function brand() {

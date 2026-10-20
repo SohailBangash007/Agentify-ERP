@@ -1,5 +1,5 @@
 import { get, all, run, tx, nextNo, getSetting } from '../db.js';
-import { now, today, bad, int, jparse } from '../util.js';
+import { now, today, bad, int, jparse, moneyText, curCode } from '../util.js';
 import { postJournal, assertFunds, assertTreasury } from './accounting.js';
 import { audit, activity, notify } from '../audit.js';
 
@@ -47,8 +47,8 @@ export function generateCommission(saleId, user) {
     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`, no, saleId, sale.agent_id, sale.contact_id, sale.property_id, sale.project_id,
   sale.net_price, rule?.id ?? null, c.type, c.value, c.amount, 'pending', now());
   const id = Number(r.lastInsertRowid);
-  activity(sale.contact_id, user, 'Commission generated', { detail: `${no} — PKR ${c.amount.toLocaleString('en-PK')}`, entityType: 'commission', entityId: id });
-  notify(sale.agent_id, 'commission', 'Commission generated', `${no}: PKR ${c.amount.toLocaleString('en-PK')} pending approval`, `/commissions`);
+  activity(sale.contact_id, user, 'Commission generated', { detail: `${no} — ${moneyText(c.amount)}`, entityType: 'commission', entityId: id });
+  notify(sale.agent_id, 'commission', 'Commission generated', `${no}: ${moneyText(c.amount)} pending approval`, `/commissions`);
   return id;
 }
 
@@ -62,7 +62,7 @@ export function approveCommission(id, req) {
       lines: [{ account: '5700', debit: c.amount }, { account: '2300', credit: c.amount, contactId: c.contact_id, saleId: c.sale_id }],
     });
     run("UPDATE commissions SET status='approved', approved_by=?, journal_id=? WHERE id=?", req.user.id, jid, id);
-    audit(req, 'Approved commission', 'commission', id, `${c.commission_no} PKR ${c.amount}`);
+    audit(req, 'Approved commission', 'commission', id, `${c.commission_no} ${curCode()} ${c.amount}`);
     activity(c.contact_id, req.user, 'Commission approved', { detail: c.commission_no, entityType: 'commission', entityId: id });
     notify(c.agent_id, 'commission', 'Commission approved', `${c.commission_no} has been approved`, '/commissions');
   });
@@ -86,8 +86,8 @@ export function payCommission(id, inp, req) {
       id, amount, acc.id, inp.date || today(), inp.method ?? null, inp.reference_no ?? null, jid, req.user.id, now());
     const paid = c.paid_amount + amount;
     run('UPDATE commissions SET paid_amount=?, status=? WHERE id=?', paid, paid >= c.amount ? 'paid' : 'partially_paid', id);
-    audit(req, 'Paid commission', 'commission', id, `${c.commission_no} PKR ${amount}`);
-    notify(c.agent_id, 'commission', 'Commission paid', `PKR ${amount.toLocaleString('en-PK')} paid for ${c.commission_no}`, '/commissions');
+    audit(req, 'Paid commission', 'commission', id, `${c.commission_no} ${curCode()} ${amount}`);
+    notify(c.agent_id, 'commission', 'Commission paid', `${moneyText(amount)} paid for ${c.commission_no}`, '/commissions');
   });
 }
 

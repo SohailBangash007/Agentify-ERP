@@ -5,7 +5,7 @@ import { all, get, run, uploadDir } from '../db.js';
 import { can, hasPerm, ownerId, requireStaff, requireAuth } from '../rbac.js';
 import { audit } from '../audit.js';
 import { uploader } from './helpers.js';
-import { asyncH, bad, forbidden, notFound, now } from '../util.js';
+import { asyncH, bad, forbidden, notFound, now, moneyText } from '../util.js';
 
 const r = Router();
 
@@ -59,14 +59,14 @@ r.get('/search', requireStaff, asyncH((req, res) => {
   }
   if (hasPerm(req.user, 'payments', 'view')) {
     add('Receipt', all(`SELECT r.id,r.receipt_no,r.amount,r.txn_id,c.full_name FROM receipts r JOIN contacts c ON c.id=r.contact_id WHERE r.receipt_no LIKE ? OR r.txn_id LIKE ? OR r.reference_no LIKE ? OR r.cheque_no LIKE ? LIMIT 5`, like, like, like, like),
-      (x) => ({ id: x.id, title: x.receipt_no, subtitle: `${x.full_name} · PKR ${x.amount.toLocaleString('en-PK')}${x.txn_id ? ' · ' + x.txn_id : ''}`, link: `/receipts/${x.id}` }));
+      (x) => ({ id: x.id, title: x.receipt_no, subtitle: `${x.full_name} · ${moneyText(x.amount)}${x.txn_id ? ' · ' + x.txn_id : ''}`, link: `/receipts/${x.id}` }));
   }
   if (hasPerm(req.user, 'vendors', 'view')) {
     add('Vendor', all('SELECT id,name,company,category FROM vendors WHERE name LIKE ? OR company LIKE ? LIMIT 5', like, like), (x) => ({ id: x.id, title: x.name, subtitle: x.category || x.company, link: `/vendors/${x.id}` }));
   }
   if (hasPerm(req.user, 'accounting', 'view')) {
     add('Expense', all(`SELECT id,voucher_no,description,amount FROM expense_vouchers WHERE voucher_no LIKE ? OR description LIKE ? OR reference_no LIKE ? LIMIT 5`, like, like, like),
-      (x) => ({ id: x.id, title: x.voucher_no, subtitle: `${x.description || ''} · PKR ${x.amount.toLocaleString('en-PK')}`, link: `/expenses/${x.id}` }));
+      (x) => ({ id: x.id, title: x.voucher_no, subtitle: `${x.description || ''} · ${moneyText(x.amount)}`, link: `/expenses/${x.id}` }));
   }
   if (hasPerm(req.user, 'hrm', 'view')) {
     add('Employee', all('SELECT id,name,emp_code,designation FROM employees WHERE name LIKE ? OR emp_code LIKE ? OR cnic LIKE ? LIMIT 5', like, like, like), (x) => ({ id: x.id, title: x.name, subtitle: `${x.emp_code} · ${x.designation || ''}`, link: `/hrm/employees/${x.id}` }));

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { all, get } from '../db.js';
 import { can, hasPerm, ownerId, requireStaff } from '../rbac.js';
-import { asyncH, forbidden, notFound, today, addDays } from '../util.js';
+import { asyncH, forbidden, notFound, today, addDays, moneyText } from '../util.js';
 
 /**
  * Read-only "smart" views that stitch existing records together: the role-aware Today feed, the customer 360 timeline
@@ -113,14 +113,14 @@ r.get('/customer/:id(\\d+)', can('customers', 'view'), asyncH((req, res) => {
   const portal = get(`SELECT last_login FROM users WHERE contact_id=?`, c.id);
 
   const ev = [];
-  for (const x of receipts) ev.push({ type: 'receipt', at: x.date, title: `Payment received — PKR ${x.amount.toLocaleString('en-PK')}`, sub: `${x.receipt_no} · ${x.payment_type || ''} · ${x.method}${x.status === 'void' ? ' · VOID' : ''}`, link: `/receipts/${x.id}` });
-  for (const x of sales) ev.push({ type: 'sale', at: x.sale_date, title: `${x.kind === 'construction' ? 'Construction contract' : 'Booked'} ${x.property_title || ''} (${x.sale_no})`, sub: `PKR ${x.net_price.toLocaleString('en-PK')}${x.status !== 'confirmed' ? ` · ${x.status}` : ''}`, link: `/sales/${x.id}` });
+  for (const x of receipts) ev.push({ type: 'receipt', at: x.date, title: `Payment received — ${moneyText(x.amount)}`, sub: `${x.receipt_no} · ${x.payment_type || ''} · ${x.method}${x.status === 'void' ? ' · VOID' : ''}`, link: `/receipts/${x.id}` });
+  for (const x of sales) ev.push({ type: 'sale', at: x.sale_date, title: `${x.kind === 'construction' ? 'Construction contract' : 'Booked'} ${x.property_title || ''} (${x.sale_no})`, sub: `${moneyText(x.net_price)}${x.status !== 'confirmed' ? ` · ${x.status}` : ''}`, link: `/sales/${x.id}` });
   for (const x of notes) ev.push({ type: 'note', at: x.created_at.slice(0, 10), time: x.created_at, title: x.body.length > 140 ? `${x.body.slice(0, 140)}…` : x.body, sub: x.user_name || '' });
   for (const x of acts) ev.push({ type: 'activity', at: x.created_at.slice(0, 10), time: x.created_at, title: `${x.action}${x.field ? ` · ${x.field}` : ''}${x.new_value ? `: ${x.prev_value ? `${x.prev_value} → ` : ''}${x.new_value}` : ''}`, sub: x.user_name || '' });
   for (const x of docs) ev.push({ type: 'document', at: x.created_at.slice(0, 10), time: x.created_at, title: `Document added — ${x.name}`, sub: x.category || '' });
   for (const x of tasks) ev.push({ type: 'task', at: (x.completed_at || x.created_at || x.due_date || '').slice(0, 10), title: `${x.status === 'done' ? 'Task done' : 'Task'}: ${x.title}`, sub: x.due_date ? `due ${x.due_date}` : '' });
-  for (const x of overdue.slice(0, 6)) ev.push({ type: 'overdue', at: x.due_date, title: `Installment overdue — PKR ${(x.amount - x.paid).toLocaleString('en-PK')}`, sub: `${daysBetween(x.due_date, t)} days late · ${x.sale_no}`, link: `/sales/${x.sale_id}` });
-  for (const x of upcoming.slice(0, 3)) ev.push({ type: 'installment', future: true, at: x.due_date, title: `Installment due — PKR ${(x.amount - x.paid).toLocaleString('en-PK')}`, sub: `${x.kind} · ${x.sale_no}`, link: `/sales/${x.sale_id}` });
+  for (const x of overdue.slice(0, 6)) ev.push({ type: 'overdue', at: x.due_date, title: `Installment overdue — ${moneyText((x.amount - x.paid))}`, sub: `${daysBetween(x.due_date, t)} days late · ${x.sale_no}`, link: `/sales/${x.sale_id}` });
+  for (const x of upcoming.slice(0, 3)) ev.push({ type: 'installment', future: true, at: x.due_date, title: `Installment due — ${moneyText((x.amount - x.paid))}`, sub: `${x.kind} · ${x.sale_no}`, link: `/sales/${x.sale_id}` });
   ev.sort((a, b) => (b.at + (b.time || '')).localeCompare(a.at + (a.time || '')));
 
   // ---- next best action: the single most useful thing to do now
@@ -131,9 +131,9 @@ r.get('/customer/:id(\\d+)', can('customers', 'view'), asyncH((req, res) => {
   const hasCnicDoc = docs.some((d) => /cnic|identity|id card/i.test(`${d.category} ${d.name}`));
   const badFile = confirmed.find((s) => s.file_status && s.file_status !== 'Active');
   let nba = { tone: 'ok', title: 'All good — nothing needs attention right now.', kind: 'none' };
-  if (oldest) nba = { tone: 'bad', kind: 'overdue', title: `Installment overdue by ${daysBetween(oldest.due_date, t)} days — PKR ${overdueAmt.toLocaleString('en-PK')} outstanding`, detail: 'Send a friendly reminder, then record the payment as soon as it arrives.', amount: overdueAmt, days: daysBetween(oldest.due_date, t), due_date: oldest.due_date, sale_no: oldest.sale_no, sale_id: oldest.sale_id };
+  if (oldest) nba = { tone: 'bad', kind: 'overdue', title: `Installment overdue by ${daysBetween(oldest.due_date, t)} days — ${moneyText(overdueAmt)} outstanding`, detail: 'Send a friendly reminder, then record the payment as soon as it arrives.', amount: overdueAmt, days: daysBetween(oldest.due_date, t), due_date: oldest.due_date, sale_no: oldest.sale_no, sale_id: oldest.sale_id };
   else if (badFile) nba = { tone: 'bad', kind: 'file', title: `File ${badFile.registration_no || badFile.sale_no} is ${badFile.file_status}`, detail: 'Review the file status with the customer and update it once resolved.', sale_id: badFile.id };
-  else if (upcoming[0] && daysBetween(t, upcoming[0].due_date) <= 7) nba = { tone: 'warn', kind: 'due', title: `Next installment of PKR ${(upcoming[0].amount - upcoming[0].paid).toLocaleString('en-PK')} is due ${upcoming[0].due_date === t ? 'today' : `in ${daysBetween(t, upcoming[0].due_date)} days`}`, detail: 'A heads-up message now avoids a late payment.', amount: upcoming[0].amount - upcoming[0].paid, due_date: upcoming[0].due_date, sale_no: upcoming[0].sale_no, sale_id: upcoming[0].sale_id };
+  else if (upcoming[0] && daysBetween(t, upcoming[0].due_date) <= 7) nba = { tone: 'warn', kind: 'due', title: `Next installment of ${moneyText((upcoming[0].amount - upcoming[0].paid))} is due ${upcoming[0].due_date === t ? 'today' : `in ${daysBetween(t, upcoming[0].due_date)} days`}`, detail: 'A heads-up message now avoids a late payment.', amount: upcoming[0].amount - upcoming[0].paid, due_date: upcoming[0].due_date, sale_no: upcoming[0].sale_no, sale_id: upcoming[0].sale_id };
   else if (confirmed.length && !hasCnicDoc) nba = { tone: 'warn', kind: 'docs', title: 'No CNIC copy on file', detail: 'Add it under Documents so the file is complete.' };
   else if (idle !== null && idle >= 30 && !c.is_customer) nba = { tone: 'warn', kind: 'reach', title: `No contact for ${idle} days`, detail: 'A quick check-in keeps the relationship warm.' };
   else if (confirmed.length && net > 0 && paid >= net) nba = { tone: 'ok', kind: 'complete', title: 'Fully paid — ready for file completion / transfer paperwork.', detail: 'Congratulate the customer and start the handover steps.' };

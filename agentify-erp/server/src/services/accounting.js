@@ -1,5 +1,5 @@
 import { all, get, run, tx, nextNo, val, currentDb } from '../db.js';
-import { now, today, bad, int } from '../util.js';
+import { now, today, bad, int, moneyText } from '../util.js';
 
 /** code -> account id, cached per tenant database (account ids differ between tenants). */
 const codeCaches = new WeakMap();
@@ -98,7 +98,7 @@ export function assertFunds(accountId, amount) {
   const a = assertTreasury(accountId);
   if (a.subtype === 'bank' || a.subtype === 'online') return;
   const bal = accountBalance(accountId);
-  if (bal < amount) throw bad(`Insufficient funds in ${a.name} (balance PKR ${bal.toLocaleString('en-PK')}, needed PKR ${amount.toLocaleString('en-PK')})`);
+  if (bal < amount) throw bad(`Insufficient funds in ${a.name} (balance ${moneyText(bal)}, needed ${moneyText(amount)})`);
 }
 
 /** Post an account's opening balance against Capital. */

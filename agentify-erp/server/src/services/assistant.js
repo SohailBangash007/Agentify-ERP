@@ -1,12 +1,12 @@
 import { all, get, getSetting } from '../db.js';
 import { hasPerm } from '../rbac.js';
-import { today, addDays, dateRange } from '../util.js';
+import { today, addDays, dateRange, moneyText } from '../util.js';
 import { trialBalance, treasuryAccounts, accountBalance } from './accounting.js';
 import { projectFinancials } from './projectFinance.js';
 import { scheduleFor, progressSql } from './schedule.js';
 import { teamView, leaderboard, overview, salesAgents } from './goals.js';
 
-const money = (n) => `PKR ${Math.round(Number(n) || 0).toLocaleString('en-PK')}`;
+const money = (n) => `${moneyText(Math.round(Number(n) || 0))}`;
 const C = (key, label, type) => ({ key, label, type });
 const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
 const STOP = new Set(['expert', 'project', 'projects', 'the', 'and', 'for', 'how', 'much', 'many', 'what', 'which', 'was', 'were', 'did', 'does', 'have', 'has', 'with', 'from', 'this', 'that', 'about', 'show', 'give', 'tell', 'list', 'all', 'are', 'any', 'our', 'their', 'month', 'year', 'week']);

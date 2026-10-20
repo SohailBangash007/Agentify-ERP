@@ -4,7 +4,7 @@ import path from 'node:path';
 import { all, get, run, uploadDir } from '../db.js';
 import { requireVendor } from '../rbac.js';
 import { audit, notifyPerm } from '../audit.js';
-import { asyncH, bad, forbidden, notFound, now, today, jparse } from '../util.js';
+import { asyncH, bad, forbidden, notFound, now, today, jparse, moneyText, curCode } from '../util.js';
 import { sendTable, uploader } from './helpers.js';
 import { loadExpense } from './accounting.js';
 import { expensePdf } from '../services/voucherPdf.js';
@@ -92,7 +92,7 @@ r.get('/ledger', asyncH(async (req, res) => {
   audit(req, 'Vendor portal ledger download', 'vendor', v.id, `${format} ${from || ''}..${to || ''}`);
   return sendTable(res, format, `vendor-ledger-${v.vendor_code || v.id}`, t.columns, t.rows.concat([{ description: t.totals.description, balance: ledger.balance }]), {
     title: 'VENDOR ACCOUNT LEDGER', subtitle: `${v.name}${v.vendor_code ? ` · ${v.vendor_code}` : ''}\n${from || 'Beginning'} to ${to || 'today'}`,
-    summary: [['Opening balance', `PKR ${ledger.opening.toLocaleString('en-PK')}`], ['Total billed', `PKR ${ledger.total_billed.toLocaleString('en-PK')}`], ['Total paid', `PKR ${ledger.total_paid.toLocaleString('en-PK')}`], ['Closing balance (payable to you)', `PKR ${ledger.balance.toLocaleString('en-PK')}`]],
+    summary: [['Opening balance', `${moneyText(ledger.opening)}`], ['Total billed', `${moneyText(ledger.total_billed)}`], ['Total paid', `${moneyText(ledger.total_paid)}`], ['Closing balance (payable to you)', `${moneyText(ledger.balance)}`]],
     totals: t.totals,
   });
 }));
@@ -165,11 +165,11 @@ r.post('/tenders/:id(\\d+)/bid', asyncH((req, res) => {
       t.id, v.id, total, dur, valid, JSON.stringify(rates), proposal, terms, notes, 'submitted', now()).lastInsertRowid);
   }
   notifyStaff(t, v, total, !!bid);
-  audit(req, bid ? 'Updated bid' : 'Submitted bid', 'tender', t.id, `${v.name} PKR ${total}`);
+  audit(req, bid ? 'Updated bid' : 'Submitted bid', 'tender', t.id, `${v.name} ${curCode()} ${total}`);
   res.status(bid ? 200 : 201).json({ id, total_amount: total });
 }));
 function notifyStaff(t, v, total, updated) {
-  notifyPerm('vendors', 'approve', 'tender', updated ? 'Bid updated' : 'New bid received', `${v.name} bid PKR ${total.toLocaleString('en-PK')} on ${t.tender_no} — ${t.title}`, `/vendors/tenders/${t.id}`);
+  notifyPerm('vendors', 'approve', 'tender', updated ? 'Bid updated' : 'New bid received', `${v.name} bid ${moneyText(total)} on ${t.tender_no} — ${t.title}`, `/vendors/tenders/${t.id}`);
 }
 
 r.delete('/tenders/:id(\\d+)/bid', asyncH((req, res) => {

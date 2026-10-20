@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { all, get, getSetting, run, setSetting, tx } from '../db.js';
-import { bad, int, jparse, notFound, now, today } from '../util.js';
+import { bad, int, jparse, notFound, now, today, moneyText } from '../util.js';
 import { audit, notify, notifyPerm } from '../audit.js';
 import { PAYMENT_METHODS, receivePayment } from './payments.js';
 
@@ -19,7 +19,7 @@ export const OPEN = ['pending', 'verifying'];
 const ONLINE = ['Bank Transfer', 'Online Transfer', 'JazzCash', 'Easypaisa'];
 export const claimRef = (id) => `CLM-${String(id).padStart(5, '0')}`;
 export const normTxn = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-const pkr = (n) => `PKR ${Math.round(Number(n || 0)).toLocaleString('en-PK')}`;
+const pkr = (n) => `${moneyText(Math.round(Number(n || 0)))}`;
 const customerUsers = (contactId) => all('SELECT id FROM users WHERE contact_id=? AND active=1', contactId).map((u) => u.id);
 
 /** The company WhatsApp number in international form (0300… → 92300…). */

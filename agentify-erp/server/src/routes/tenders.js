@@ -4,7 +4,7 @@ import path from 'node:path';
 import { all, get, run, tx, nextNo, uploadDir } from '../db.js';
 import { can, requireStaff } from '../rbac.js';
 import { audit } from '../audit.js';
-import { asyncH, bad, notFound, now, today, jparse } from '../util.js';
+import { asyncH, bad, notFound, now, today, jparse, moneyText, curCode } from '../util.js';
 import { cleanBoq, effectiveStatus, vendorsFor, TENDER_STATUS } from '../services/tenders.js';
 import { notifyVendor } from '../services/vendorAccount.js';
 import { sendTable } from './helpers.js';
@@ -142,9 +142,9 @@ r.post('/:id(\\d+)/award', can('vendors', 'approve'), asyncH((req, res) => {
     run("UPDATE tender_bids SET status='rejected', updated_at=? WHERE tender_id=? AND id<>? AND status IN ('submitted','shortlisted')", now(), t.id, bid.id);
     run("UPDATE tenders SET status='awarded', awarded_bid_id=?, award_note=?, updated_at=? WHERE id=?", bid.id, note, now(), t.id);
   });
-  notifyVendor(bid.vendor_id, 'tender', 'Congratulations — contract awarded', `${t.title} was awarded to you (PKR ${bid.total_amount.toLocaleString('en-PK')})${note ? `: ${note}` : ''}`, `/vendor/tenders/${t.id}`);
+  notifyVendor(bid.vendor_id, 'tender', 'Congratulations — contract awarded', `${t.title} was awarded to you (${moneyText(bid.total_amount)})${note ? `: ${note}` : ''}`, `/vendor/tenders/${t.id}`);
   for (const o of all("SELECT vendor_id FROM tender_bids WHERE tender_id=? AND id<>? AND status='rejected'", t.id, bid.id)) notifyVendor(o.vendor_id, 'tender', 'Tender decided', `${t.title} was awarded to another vendor. Thank you for bidding.`, `/vendor/tenders/${t.id}`);
-  audit(req, 'Awarded tender', 'tender', t.id, `${t.tender_no} → vendor ${bid.vendor_id} PKR ${bid.total_amount}`);
+  audit(req, 'Awarded tender', 'tender', t.id, `${t.tender_no} → vendor ${bid.vendor_id} ${curCode()} ${bid.total_amount}`);
   res.json({ ok: true });
 }));
 
