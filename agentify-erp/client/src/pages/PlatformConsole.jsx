@@ -12,6 +12,7 @@ import { Dashboard, HealthPage, NotificationsPage, SetupPage } from './platform/
 import { PlansPage, TransactionsPage, SubscriptionHistoryPage } from './platform/Billing.jsx';
 import { FinancePage } from './platform/Finance.jsx';
 import { AnalyticsPage, WebsitePage, DemoRequestsPage, AnnouncementsPage, IntegrationsPage } from './platform/Content.jsx';
+import { RegionsPage } from "./platform/Regions.jsx";
 
 const A = '/api/platform/admin';
 const SLOT_LABEL = (s) => s.replace('_', ' · ').replace(/^./, (c) => c.toUpperCase());
@@ -295,6 +296,7 @@ function ConsoleRoutes() {
         <Route path="website" element={<Allowed perm="content.manage"><WebsitePage /></Allowed>} />
         <Route path="demo-requests" element={<Allowed perm="workspaces.view"><DemoRequestsPage /></Allowed>} />
         <Route path="announcements" element={<Allowed perm="dashboard.view"><AnnouncementsPage /></Allowed>} />
+        <Route path="regions" element={<Allowed perm="regions.support"><RegionsPage /></Allowed>} />
         <Route path="integrations" element={<Allowed perm="system.view"><IntegrationsPage /></Allowed>} />
         <Route path="finance" element={<Allowed perm="finance.view"><FinancePage /></Allowed>} />
         <Route path="transactions" element={<Allowed perm="billing.view"><TransactionsPage /></Allowed>} />

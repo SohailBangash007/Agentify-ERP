@@ -28,6 +28,7 @@ import { overview, tenantSummaries, tenantDetail, createWorkspace, extendTrial, 
 import { listPlans, savePlan, savePlanSettings } from '../services/plansStore.js';
 import { PLAN_SETTINGS, MODULES, PRODUCTS } from '../services/plans.js';
 import { setSubscription } from '../services/billing.js';
+import { listRegions, setRegionStatus, setRegionFlag, saveRule, reviewRule, listRules, ruleAudit, saveFx, listFx } from '../regions/admin.js';
 import { subscriptionHistory } from '../services/subscriptions.js';
 import { setupNeeded, completeSetup, inviteAdmin, inviteInfo, acceptInvite } from '../services/platformStaff.js';
 
@@ -297,6 +298,35 @@ r.get('/analytics', requireOperator, need('analytics.view'), asyncH((req, res) =
   const range = resolveRange(req.query);
   const report = analyticsReport({ from: utcStart(range.from), to: utcStart(addDays(range.to, 1)), buckets: buckets(range), keyExpr: (c) => keyExpr(c, range) });
   res.json({ range, ...report, ga4: { configured: !!getSetting('ga4_measurement_id') } });
+}));
+// ---- Regions: availability, flags, legal rules (reviewed before use), exchange rates
+const regionErr = (fn) => { try { return fn(); } catch (e) { throw bad(e.message); } };
+r.get('/regions', requireOperator, need('regions.support'), (_req, res) => res.json({ regions: listRegions(platformDb()), fx: listFx(platformDb()) }));
+r.get('/regions/:code/rules', requireOperator, need('regions.support'), (req, res) => res.json({ rules: listRules(platformDb(), req.params.code), audit: ruleAudit(platformDb(), req.params.code) }));
+r.post('/regions/:code/status', requireOperator, need('regions.manage'), asyncH((req, res) => {
+  regionErr(() => setRegionStatus(platformDb(), req.params.code, req.body?.status, req.operator.email));
+  audit(req.operator.email, 'region-status', { region: req.params.code, status: req.body?.status });
+  res.json({ regions: listRegions(platformDb()) });
+}));
+r.post('/regions/:code/flags', requireOperator, need('regions.manage'), asyncH((req, res) => {
+  regionErr(() => setRegionFlag(platformDb(), req.params.code, String(req.body?.flag || ''), !!req.body?.enabled, req.operator.email));
+  audit(req.operator.email, 'region-flag', { region: req.params.code, flag: req.body?.flag, enabled: !!req.body?.enabled });
+  res.json({ regions: listRegions(platformDb()) });
+}));
+r.post('/regions/:code/rules', requireOperator, need('regions.manage'), asyncH((req, res) => {
+  const id = regionErr(() => saveRule(platformDb(), { ...(req.body || {}), region: req.params.code }, req.operator.email));
+  audit(req.operator.email, 'region-rule-created', { region: req.params.code, id });
+  res.status(201).json({ id });
+}));
+r.post('/regions/rules/:id/review', requireOperator, need('regions.manage'), asyncH((req, res) => {
+  regionErr(() => reviewRule(platformDb(), Number(req.params.id), req.operator.email));
+  audit(req.operator.email, 'region-rule-reviewed', { id: Number(req.params.id) });
+  res.json({ ok: true });
+}));
+r.post('/fx', requireOperator, need('regions.manage'), asyncH((req, res) => {
+  regionErr(() => saveFx(platformDb(), req.body || {}, req.operator.email));
+  audit(req.operator.email, 'fx-rate-set', { base: req.body?.base, quote: req.body?.quote });
+  res.status(201).json({ fx: listFx(platformDb()) });
 }));
 // ---- Announcements and release notes, integrations, running version
 r.get('/announcements', requireOperator, need('dashboard.view'), (_req, res) => res.json({ items: listAnnouncements(), version: versionInfo() }));

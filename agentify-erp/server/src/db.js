@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { SCHEMA, SALES_DDL } from './schema.js';
 import { CONSTRUCTION_SCHEMA } from './constructionSchema.js';
+import { IDENTITY_SCHEMA } from './regions/identitySchema.js';
 import { now } from './util.js';
 import { als, currentContext, currentTenant } from './context.js';
 
@@ -29,7 +30,7 @@ export function openDb(file, tenant = null) {
   h.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
   handles.set(abs, h);
   try {
-    als.run({ tenant, db: h }, () => { db.exec(SCHEMA); db.exec(CONSTRUCTION_SCHEMA); migrate(); backfillIds(); });
+    als.run({ tenant, db: h }, () => { db.exec(SCHEMA); db.exec(CONSTRUCTION_SCHEMA); db.exec(IDENTITY_SCHEMA); migrate(); backfillIds(); });
   } catch (e) { handles.delete(abs); h.close(); throw e; }
   return h;
 }

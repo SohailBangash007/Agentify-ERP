@@ -23,10 +23,12 @@ export const PERMISSIONS = {
   'system.view': 'See system health, setup, backups and errors',
   'system.manage': 'Run backups, switch maintenance mode and change platform settings',
   'audit.view': 'See the audit log, sign-in history and sessions',
+  'regions.manage': 'Turn regions on or off, edit region packs, flags, rules and exchange rates',
+  'regions.support': 'See regions, rules and exchange rates (read-only)',
   'admins.manage': 'Invite, change and remove console users and security rules',
 };
 const ALL = Object.keys(PERMISSIONS);
-const VIEW = ['dashboard.view', 'finance.view', 'workspaces.view', 'billing.view', 'system.view'];
+const VIEW = ['dashboard.view', 'finance.view', 'workspaces.view', 'billing.view', 'system.view', 'regions.support'];
 /**
  * Fixed roles (least privilege: give people the smallest role that fits). Platform Owner and Super Admin can do
  * everything; only a Platform Owner can make or remove another Platform Owner.

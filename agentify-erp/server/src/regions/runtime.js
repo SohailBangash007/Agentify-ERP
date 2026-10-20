@@ -45,7 +45,7 @@ export function configFor(tenant) {
 /** Helpers for a tenant row (cached per effective configuration). */
 export function regionFor(tenant) {
   const c = configFor(tenant);
-  const key = JSON.stringify([c.region, c.pack_version, c.currency, c.money_scale, c.locale, c.timezone, c.date_style, c.time_style, c.marla_sqft, c.phone, c.currency_style, c.language, c.units_system, c.terminology]);
+  const key = JSON.stringify([c.region, c.pack_version, c.currency, c.money_scale, c.locale, c.timezone, c.date_style, c.time_style, c.marla_sqft, c.phone, c.currency_style, c.language, c.units_system, c.terminology, c.flags, c.sub_region]);
   let r = cache.get(key);
   if (!r) { r = { ...buildRegion(c), config: c }; cache.set(key, r); }
   return r;
