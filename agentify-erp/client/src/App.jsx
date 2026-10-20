@@ -49,6 +49,10 @@ import Documents from './pages/Documents.jsx';
 import Integrations from './pages/Integrations.jsx';
 import Dialer from './pages/Dialer.jsx';
 import Appointments from './pages/Appointments.jsx';
+import AIStudio from './pages/AIStudio.jsx';
+import Meetings from './pages/Meetings.jsx';
+import Recordings from './pages/Recordings.jsx';
+import MeetingRoom from './meet/MeetingRoom.jsx';
 import { ConstructionOverview, ConstructionProject, EstimatesPage, MaterialsPage, PurchaseOrdersPage, SubcontractsPage } from './pages/Construction.jsx';
 
 /**
@@ -80,6 +84,7 @@ export default function App() {
   const { user } = useAuth();
   const { meta } = useMeta();
   const loc = useLocation();
+  if (loc.pathname.startsWith('/meet/')) return <Routes><Route path="/meet/:code" element={<MeetingRoom />} /></Routes>;
   if (loc.pathname === '/site' || loc.pathname.startsWith('/site/')) return <Routes><Route path="/site/*" element={<SiteApp />} /></Routes>;
   if (loc.pathname.startsWith('/verify-email/')) return <Routes><Route path="/verify-email/:token" element={<VerifyEmail />} /></Routes>;
   if (loc.pathname === '/platform' || loc.pathname.startsWith('/platform/')) return <Routes><Route path="/platform/*" element={<PlatformConsole />} /></Routes>;
@@ -168,6 +173,9 @@ export default function App() {
         <Route path="documents" element={G('crm', <Documents />)} />
         <Route path="dialer" element={G('crm', <Dialer />)} />
         <Route path="appointments" element={G('crm', <Appointments />)} />
+        <Route path="ai-studio" element={G('crm', <AIStudio />)} />
+        <Route path="meetings" element={G('crm', <Meetings />)} />
+        <Route path="recordings" element={G('crm', <Recordings />)} />
         <Route path="settings/integrations" element={G('crm', <Integrations />)} />
         {/* Construction */}
         <Route path="construction" element={G('construction', <ConstructionOverview />)} />

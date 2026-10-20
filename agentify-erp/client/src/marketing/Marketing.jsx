@@ -206,13 +206,38 @@ function Home({ info }) {
   useTitle(c.seo.home.title, c.seo.home.description);
   return (
     <>
-      <div className="lwrap lhero">
-        <h1>{cc.hero_title || c.hero_title}</h1>
-        <p>{cc.hero_subtitle || c.hero_subtitle}</p>
-        <div className="lcta"><Link className="lbtn p" to="/signup">Start your {info.trial_days}-day free trial</Link><Link className="lbtn" to="/contact">Book a demo</Link></div>
-        <div className="lfine">No card needed to start. If you stop paying, your data becomes read-only, never deleted.</div>
-        <div className="lchips">{(cc.chips || ['Separate database per company', 'Role-based access per module', 'Two-factor sign-in', 'Audit trail', 'Automatic backups']).map((x) => <span key={x}>{x}</span>)}</div>
-      </div>
+      <div className="lhero2"><div className="lwrap lhero2g">
+        <div className="lhero2t">
+          <span className="leyebrow">{country.name} · {PRODUCT_LABELS.real_estate}</span>
+          <h1>{cc.hero_title || c.hero_title}</h1>
+          <p>{cc.hero_subtitle || c.hero_subtitle}</p>
+          <div className="lcta" style={{ justifyContent: 'flex-start' }}><Link className="lbtn p lg" to="/signup">Start your {info.trial_days}-day free trial</Link><Link className="lbtn lg" to="/contact">Book a demo</Link></div>
+          <ul className="ltrust"><li>No card needed to start</li><li>Your data stays yours, read-only if you stop paying</li><li>Set up in minutes</li></ul>
+        </div>
+        <HeroVisual />
+      </div></div>
+      <div className="lwrap"><div className="lchips" style={{ marginTop: 28 }}>{(cc.chips || ['Separate database per company', 'Role-based access per module', 'Two-factor sign-in', 'Audit trail', 'Automatic backups']).map((x) => <span key={x}>{x}</span>)}</div></div>
+      <Platform />
+      <section className="alt"><div className="lwrap lsplit" style={{ alignItems: 'center' }}>
+        <div className="lmeetmock" aria-label="Example of a video meeting with a shared screen and the script beside it">
+          <div className="lmm-bar"><i /><i /><i /><span>Site walkthrough · 24:10 left</span></div>
+          <div className="lmm-body"><div className="lmm-stage"><div className="lmm-pen" /><span className="lmm-ptr" /><em>Presenting: floor plan</em></div>
+            <div className="lmm-side"><b>Script</b><p>Thank you for joining. Today I will show you the floor plan, then the payment options.</p><b>Captions</b><p>“…this corner unit faces the park.”</p></div></div>
+          <div className="lmm-ctl"><span>🎤</span><span>📷</span><span className="on">🖥️</span><span>✏️</span><span className="rec">⏺️</span></div>
+        </div>
+        <div>
+          <span className="ltag2">Meetings and calls</span>
+          <h2 style={{ fontSize: 34, margin: '10px 0' }}>Show the property on a call, not just describe it.</h2>
+          <p>Schedule a video meeting, send each person their own link by email, text message or WhatsApp, and start. Share your screen, point and draw on it, switch on live captions, and keep your call script beside you.</p>
+          <ul className="lcheck">
+            <li>Set the date, time and the longest length of every meeting</li>
+            <li>Guests join from a link, with no account</li>
+            <li>Record the meeting and the phone calls; recordings and transcripts stay in your own workspace</li>
+            <li>See calls made, how many connected and the average call length</li>
+          </ul>
+          <p className="lfine">The pointer and pen are drawn on the shared screen. Browsers do not allow one person to take over another person's computer.</p>
+        </div>
+      </div></section>
       <section className="alt"><div className="lwrap">
         <div className="lsh"><h2>Two products, one platform</h2><p>Pick the product your business needs. Shared sign-in, users, billing, reports and notifications; product modules stay separate.</p></div>
         <div className="lprod">
@@ -239,6 +264,43 @@ function Home({ info }) {
       <Faq faqs={[...(c.faqs || []), ...(cc.faqs || [])]} />
       <Band info={info} />
     </>
+  );
+}
+
+/** The product at the top of the page: a real screenshot of the visitor's country when there is one, otherwise a drawn example. */
+function HeroVisual() {
+  const { country } = useCountry();
+  const file = country.code === 'PK' ? 're-dashboard.png' : `re-dashboard-${country.code.toLowerCase()}.png`;
+  const [ok, setOk] = useState(true);
+  useEffect(() => setOk(true), [file]);
+  return (
+    <div className="lhero2v">
+      <div className="lframe" role="img" aria-label="The Agentify dashboard">
+        <div className="lframe-bar"><i /><i /><i /><span>app.agentify</span></div>
+        {ok ? <img src={`/marketing/${file}`} alt="" onError={() => setOk(false)} fetchPriority="high" /> : (
+          <div className="lframe-mock"><b>Today</b><div className="lmk-row"><span>New leads</span><em>12</em></div><div className="lmk-row"><span>Follow-ups due</span><em>7</em></div><div className="lmk-row"><span>Viewings this week</span><em>5</em></div><div className="lmk-bars"><i style={{ height: '40%' }} /><i style={{ height: '65%' }} /><i style={{ height: '50%' }} /><i style={{ height: '85%' }} /><i style={{ height: '70%' }} /></div><small>Example layout</small></div>)}
+      </div>
+      <div className="lfloat lfloat-a" aria-hidden><b>Call next</b><span>Follow-up due 2 days ago</span></div>
+      <div className="lfloat lfloat-b" aria-hidden><b>Meeting at 3:00</b><span>Link sent on WhatsApp</span></div>
+    </div>
+  );
+}
+
+/** What is in the platform, in the order a brokerage uses it. Only things the product really does. */
+const PLATFORM = [
+  ['📞', 'Call next dialer', 'Ranks who to call and why, rings your phone first, logs every call and sets the next follow-up.'],
+  ['🎥', 'Video meetings', 'Screen sharing, pen and pointer, captions, background blur, recording and a script beside you.'],
+  ['🤖', 'Claude and ChatGPT', 'Ask questions about your own numbers and turn a listing into a promotional video script. You bring your own key.'],
+  ['🌐', 'Your property website', 'Included with every plan, on your own domain, with listings, calculators and enquiry forms.'],
+  ['📅', 'Appointments', 'Viewings and site visits go to your Google Calendar, with reminders.'],
+  ['📣', 'Portals and social', 'Publish to the portals of your country and to Facebook, Instagram, LinkedIn and TikTok.'],
+];
+function Platform() {
+  return (
+    <section><div className="lwrap">
+      <div className="lsh"><h2>Everything a brokerage runs on, in one place</h2><p>From the first enquiry to the signed sale, without switching between five tools.</p></div>
+      <div className="lfeat">{PLATFORM.map(([i, t, d]) => <div className="lcard lf" key={t}><span className="lficon" aria-hidden>{i}</span><h3>{t}</h3><p>{d}</p></div>)}</div>
+    </div></section>
   );
 }
 

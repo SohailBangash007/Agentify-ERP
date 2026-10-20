@@ -51,7 +51,7 @@ r.get('/', can('crm', 'view'), asyncH((req, res) => {
   res.json({
     region: reg.region, base: webBase(req),
     items: catalogFor(reg.region).map((c) => {
-      const row = rows[c.id];
+      const row = c.id === 'ai' ? (rows.ai_anthropic || rows.ai_openai) : rows[c.id];
       const info = parseJson(row?.public_info) || {};
       return { ...c, status: row?.status || 'not_connected', connected_at: row?.connected_at || null, last_test_at: row?.last_test_at || null, error: row?.last_error || null, info };
     }),
@@ -200,7 +200,7 @@ r.post('/ai/promo-script', can('content', 'edit'), asyncH(async (req, res) => {
   const p = get('SELECT * FROM properties WHERE id=?', Number(req.body?.property_id));
   if (!p) throw notFound('Property not found');
   const feats = (() => { try { return JSON.parse(p.features || '{}'); } catch { return {}; } })();
-  const photos = all("SELECT id FROM media WHERE entity_type='property' AND entity_id=? AND kind IN ('image','photo','cover')", p.id).length;
+  const photos = all("SELECT id FROM media WHERE entity_type='property' AND entity_id=? AND kind IN ('cover','gallery')", p.id).length;
   const reg = currentRegion().config;
   const facts = { title: p.title, type: p.property_type, purpose: p.purpose, city: p.city, area_name: p.area_name, price: `${reg.currency} ${(p.net_price / 10 ** reg.money_scale).toLocaleString('en')}`, area: p.area_size ? `${p.area_size} ${p.unit}` : null, bedrooms: feats.bedrooms, bathrooms: feats.bathrooms, description: String(p.description || p.short_desc || '').slice(0, 600) };
   const style = ['friendly', 'luxury', 'urgent', 'family'].includes(req.body?.style) ? req.body.style : 'friendly';

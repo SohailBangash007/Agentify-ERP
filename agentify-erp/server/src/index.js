@@ -71,7 +71,7 @@ export function createApp() {
   app.disable('x-powered-by');
   app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], imgSrc: ["'self'", 'data:', 'blob:', 'https:'], mediaSrc: ["'self'", 'blob:', 'https:'], styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
     fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'], // Google Analytics 4 is loaded only after a visitor consents and only when the platform owner configured it
-    scriptSrc: ["'self'", 'https://www.googletagmanager.com'], frameSrc: ["'self'", 'https://www.youtube.com', 'https://www.google.com', 'https://www.openstreetmap.org'], connectSrc: ["'self'", 'https://www.google-analytics.com', 'https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://www.googletagmanager.com'], workerSrc: ["'self'"], manifestSrc: ["'self'"],
+    scriptSrc: ["'self'", "'wasm-unsafe-eval'", 'https://www.googletagmanager.com'], frameSrc: ["'self'", 'https://www.youtube.com', 'https://www.google.com', 'https://www.openstreetmap.org'], connectSrc: ["'self'", 'https://www.google-analytics.com', 'https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://www.googletagmanager.com'], workerSrc: ["'self'", 'blob:'], manifestSrc: ["'self'"],
     // Only force https in production; on plain http://localhost it can break service-worker and asset fetches.
     upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null } }, hsts: process.env.NODE_ENV === 'production', crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   // the billing webhook is signed over the exact bytes, so keep them for that one route

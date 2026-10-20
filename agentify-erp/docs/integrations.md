@@ -69,3 +69,20 @@ Facebook Pages and Instagram business accounts (publish and read likes, comments
 ## Landing page content
 
 Testimonials are shown only when real quotes are entered in the console (the marketing content `testimonials` list; an optional `country` field limits a quote to one country). The site does not contain invented reviews. The "Example: Call next" panel on the landing page is labelled as an example.
+
+## AI (Claude and ChatGPT)
+- Workspace owners paste their own API key under Integrations → Claude and ChatGPT. The key is tested against the provider, stored encrypted and never returned to the browser.
+- **Ask your data** (AI Studio): the model calls read-only tools (sales, leads, calls, listings summaries) limited to what the signed-in user may see. Customer names are hidden unless the owner switches that on.
+- **Promo videos**: the model writes the script and captions from the listing's real facts. Language models do not produce video, so the browser draws the video from the listing photos (canvas and MediaRecorder) and uploads it to the workspace.
+- Speech-to-text for recordings uses OpenAI Whisper (an OpenAI key is needed; files over 25 MB are not transcribed).
+
+## Call recording, scripts and statistics
+- Recording is off until a workspace turns it on in the Dialer. Every recorded call opens with a spoken notice. Recording laws differ by country and state; the workspace owner is responsible for consent.
+- The Dialer board shows calls made, connected, connect rate, average call length, talk time and recordings, and a script window beside Call next. Scripts support placeholders for the contact, agent and company.
+
+## Video meetings
+- Schedule from Meetings; send each person a personal link by email, text message (Twilio) or a ready WhatsApp message (a `wa.me` link opened from the agent's own WhatsApp; there is no WhatsApp Business connection). Staff also get an in-app notification; 15-minute reminders are sent automatically.
+- Platform limits (console → Integrations → Video meetings: limits): longest meeting, people per meeting (peer to peer, keep it small), room-opens-early minutes, days ahead, recording on/off. A meeting ends automatically at its time limit with 5 and 1 minute warnings.
+- In the room: camera, microphone, screen sharing, pen and pointer drawn over the shared screen, live captions (Chrome/Edge speech recognition, saved as the meeting transcript), background blur or colour (MediaPipe, runs on the device), host recording to the workspace, script panel for staff.
+- Not possible in a browser: taking remote control of another person's computer. The pen and pointer replace it.
+- Reliability: set `ERP_ICE_SERVERS` (JSON array) to your TURN server for people behind strict firewalls; the default is a public STUN server only.

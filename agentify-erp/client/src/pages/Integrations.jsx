@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Card, ErrorBox, Field, Loading, PageHead, StatusBadge } from '../components/ui.jsx';
 import { api } from '../api.js';
 import { useAuth, useToast } from '../context.jsx';
+import { AiConnect } from './AIStudio.jsx';
 
 const STATE = { connected: ['active', 'Connected'], not_connected: ['inactive', 'Not connected'], configured: ['pending', 'Saved, not tested'], error: ['danger', 'Needs attention'] };
 const Steps = ({ steps }) => <ol style={{ margin: '8px 0 12px 18px', padding: 0, display: 'grid', gap: 6 }}>{steps.map((s, i) => <li key={i}>{s}</li>)}</ol>;
@@ -184,7 +185,7 @@ export default function Integrations() {
     if (ok || bad) { sp.delete('connected'); sp.delete('oauth_error'); setSp(sp, { replace: true }); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const admin = can('settings', 'edit');
-  const body = (i) => i.id === 'twilio' ? <Twilio item={i} base={d.base} reload={load} can={admin} /> : i.id === 'voice_http' ? <VoiceHttp item={i} reload={load} can={admin} /> : i.id === 'google_calendar' ? <Calendar item={i} /> : i.id === 'domain' ? <Domain can={admin} /> : i.id === 'portals' ? <Portals can={admin} /> : i.id === 'social' ? <Social can={admin} /> : null;
+  const body = (i) => i.id === 'twilio' ? <Twilio item={i} base={d.base} reload={load} can={admin} /> : i.id === 'voice_http' ? <VoiceHttp item={i} reload={load} can={admin} /> : i.id === 'google_calendar' ? <Calendar item={i} /> : i.id === 'domain' ? <Domain can={admin} /> : i.id === 'portals' ? <Portals can={admin} /> : i.id === 'social' ? <Social can={admin} /> : i.id === 'ai' ? <><AiConnect can={admin} /><p><a href="/ai-studio">Open AI Studio</a></p></> : null;
   return (
     <>
       <PageHead title="Integrations" sub="Connect your calls, calendar, listing portals, social accounts and your own web address. Each one shows Connected only after a real test." />
@@ -192,7 +193,7 @@ export default function Integrations() {
       {!d ? (!err && <Loading />) : d.items.map((i) => {
         const [tone, label] = STATE[i.status] || STATE.not_connected;
         const isOpen = open === i.id;
-        const showStatus = ['twilio', 'voice_http', 'google_calendar'].includes(i.id);
+        const showStatus = ['twilio', 'voice_http', 'google_calendar', 'ai'].includes(i.id);
         return (
           <Card key={i.id} title={i.name} actions={<div className="row" style={{ gap: 8 }}>{showStatus && <StatusBadge status={tone} label={label} />}<button className="btn sm" onClick={() => setOpen(isOpen ? '' : i.id)}>{isOpen ? 'Close' : i.status === 'connected' ? 'Manage' : 'Set up'}</button></div>}>
             <div className="muted">{i.group} · {i.purpose}</div>

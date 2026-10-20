@@ -22,7 +22,11 @@ const NAV = [
   { label: 'Content Calendar', icon: 'calendar', to: '/content', module: 'content' },
   { label: 'CRM', icon: 'users', module: 'crm', children: [
     ['Contacts', '/contacts'], ['Leads', '/leads'], ['Smart Lists', '/smart-lists'], ['Sales Pipeline', '/pipeline'], ['Tasks', '/tasks'], ['Notes', '/notes'],
-    ['Dialer', '/dialer'], ['Appointments', '/appointments'], ['Goals & Rewards', '/goals'], ['Sales Agents', '/agents'], ['Commissions', '/commissions', 'commissions'] ] },
+    ['Appointments', '/appointments'], ['Goals & Rewards', '/goals'], ['Sales Agents', '/agents'], ['Commissions', '/commissions', 'commissions'] ] },
+  { label: 'Dialer', icon: 'phone', to: '/dialer', module: 'crm' },
+  { label: 'Meetings', icon: 'calendar', to: '/meetings', module: 'crm' },
+  { label: 'Recordings', icon: 'file', to: '/recordings', module: 'crm' },
+  { label: 'AI Studio', icon: 'star', to: '/ai-studio', module: 'crm' },
   { label: 'Mortgage', icon: 'card', to: '/mortgage', module: 'crm', flag: 'mortgage' },
   { label: 'Documents', icon: 'file', to: '/documents', module: 'crm', flag: 'templates' },
   { label: 'Construction', icon: 'hardhat', module: 'construction', product: 'construction', children: [

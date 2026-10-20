@@ -135,7 +135,20 @@ export function attachStream(room, peer, res) {
   peer.res = res;
   for (const e of peer.queue.splice(0)) res.write(`data: ${JSON.stringify(e)}\n\n`);
   const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch { /* closed */ } }, 20_000);
-  res.on('close', () => { clearInterval(ping); if (peer.res === res) peer.res = null; });
+  clearTimeout(peer.dropTimer);
+  const key = roomKey(room.code);
+  // a closed tab that never said goodbye: drop the person unless they reconnect shortly (a network blip reconnects within seconds)
+  res.on('close', () => {
+    clearInterval(ping);
+    if (peer.res !== res) return;
+    peer.res = null;
+    peer.dropTimer = setTimeout(() => {
+      if (peer.res || room.peers.get(peer.pid) !== peer) return;
+      room.peers.delete(peer.pid);
+      broadcast(room, { type: 'peer-left', pid: peer.pid });
+      if (!room.peers.size) { for (const t of room.timers) clearTimeout(t); rooms.delete(key); }
+    }, 25_000);
+  });
 }
 export function relay(room, from, to, event) {
   const target = room.peers.get(to);
@@ -149,6 +162,7 @@ export function leaveRoom(code, pid) {
   const p = room?.peers.get(pid);
   if (!p) return;
   room.peers.delete(pid);
+  clearTimeout(p.dropTimer);
   try { p.res?.end(); } catch { /* closed */ }
   broadcast(room, { type: 'peer-left', pid });
   if (!room.peers.size) { for (const t of room.timers) clearTimeout(t); rooms.delete(roomKey(code)); }

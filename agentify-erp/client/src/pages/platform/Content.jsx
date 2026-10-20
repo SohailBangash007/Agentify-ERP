@@ -261,7 +261,35 @@ export function AnnouncementsPage() {
   );
 }
 
-// ---------------------------------------------------------------- integrations
+// ---------------------------------------------------------------- video meeting limits (platform-wide ceilings every workspace stays under)
+function MeetingLimits() {
+  const toast = useToast();
+  const can = useCan();
+  const { d, load } = useLoad(`${A}/meetings-settings`);
+  const [f, setF] = useState(null);
+  useEffect(() => { if (d) setF({ ...d }); }, [d]);
+  if (!f) return null;
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
+  const save = async () => { try { await api.put(`${A}/meetings-settings`, f); toast('Saved'); load(); } catch (e) { toast(e.message, 'err'); } };
+  const num = (k, label, hint) => <Field label={label} hint={hint}><input className="input" type="number" value={f[k]} disabled={!can('system.manage')} onChange={set(k)} /></Field>;
+  return (
+    <Card title="Video meetings: limits">
+      <p className="muted" style={{ marginTop: 0 }}>Set from here for the whole platform. A workspace can choose shorter meetings but never go above these. A meeting ends automatically when its time is up.</p>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
+        {num('max_minutes', 'Longest meeting (minutes)', 'Hard stop for every meeting')}
+        {num('max_participants', 'People per meeting', 'Video is peer to peer, so keep this small (2 to 25)')}
+        {num('early_join_minutes', 'Room opens early (minutes)')}
+        {num('max_advance_days', 'Schedule up to (days ahead)')}
+      </div>
+      <div className="row" style={{ gap: 18, margin: '8px 0' }}>
+        <label><input type="checkbox" checked={!!f.enabled} disabled={!can('system.manage')} onChange={set('enabled')} /> Meetings are available</label>
+        <label><input type="checkbox" checked={!!f.recording} disabled={!can('system.manage')} onChange={set('recording')} /> Recording is allowed</label>
+      </div>
+      {can('system.manage') && <button className="btn primary" onClick={save}>Save limits</button>}
+      <p className="muted">Reliable video across home and office networks needs a TURN relay server. Set the ERP_ICE_SERVERS environment variable to its address; without one, some people behind strict firewalls will not connect.</p>
+    </Card>);
+}
+
 const STATE = { connected: ['active', 'Connected'], configured: ['pending', 'Configured, not tested'], error: ['overdue', 'Error'], not_configured: ['inactive', 'Not configured'], not_available: ['inactive', 'Not available yet'] };
 export function IntegrationsPage() {
   const toast = useToast();
@@ -303,6 +331,7 @@ export function IntegrationsPage() {
           </Card>
         );
       })}
+      <MeetingLimits />
       {edit && (
         <Modal title={`Configure · ${edit.name}`} onClose={() => setEdit(null)} footer={<><button className="btn" onClick={() => setEdit(null)}>Cancel</button><button className="btn primary" onClick={save}>Save</button></>}>
           {FORMS[edit.id].map(([k, l, type, hint]) => <Field key={k} label={l} hint={hint}><TextInput type={type} autoComplete="off" value={edit.values[k]} onChange={(v) => setEdit({ ...edit, values: { ...edit.values, [k]: v } })} /></Field>)}

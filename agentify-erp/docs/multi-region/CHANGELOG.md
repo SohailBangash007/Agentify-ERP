@@ -24,3 +24,6 @@ Not yet done: translations of most screens (sign-in and the sidebar groups are d
 - Property portal feeds per country with readiness checks and the UAE advertising-permit rule; RESO API push for MLS boards.
 - Facebook, Instagram, LinkedIn and TikTok connections, scheduled posts and reports.
 - Landing page: call-next section, "included website" message, per-country integration list; testimonials only from real quotes entered in the console.
+
+## AI, call recording, video meetings, dialer board, landing page
+- Claude and ChatGPT per workspace (ask your data, promo video scripts, transcripts); call recording with notice, scripts and statistics; video meetings with limits set from the console; Recordings section; Dialer, Meetings, Recordings and AI Studio in the main menu; redesigned home page (hero with product, feature grid, meeting illustration). Pakistan golden outputs unchanged.
