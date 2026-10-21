@@ -36,6 +36,16 @@ export function initRegions(pdb) {
     ins.run(p.code, v, status, JSON.stringify(p), prev ? `shipped with the release (replaces v${prev.version})` : 'shipped with the release', 'system');
     if (prev) pdb.prepare("UPDATE region_packs SET status='retired' WHERE code=? AND version<?").run(p.code, v);
   }
+  // A server that ran an earlier release still has these countries as drafts. Open them, unless someone in the console
+  // deliberately took the country back to draft (that is recorded in the audit table, so it is never overridden here).
+  for (const p of Object.values(FILE_PACKS)) {
+    if (p.status !== 'active') continue;
+    const top = pdb.prepare('SELECT MAX(version) v FROM region_packs WHERE code=?').get(p.code)?.v;
+    if (!top || pdb.prepare('SELECT status FROM region_packs WHERE code=? AND version=?').get(p.code, top).status !== 'draft') continue;
+    if (pdb.prepare("SELECT 1 FROM region_rule_audit WHERE region=? AND action='status:draft'").get(p.code)) continue;
+    pdb.prepare("UPDATE region_packs SET status='active' WHERE code=? AND version=?").run(p.code, top);
+    pdb.prepare("INSERT INTO region_rule_audit(region, action, actor, after) VALUES(?,?,?,?)").run(p.code, 'status:active', 'system', JSON.stringify({ version: top, reason: 'shipped as open' }));
+  }
   loadOverrides(pdb);
 }
 

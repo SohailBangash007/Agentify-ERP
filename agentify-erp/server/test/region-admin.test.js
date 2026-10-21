@@ -18,14 +18,14 @@ const { openDb, run, get, all } = await import('../src/db.js');
 const { als } = await import('../src/context.js');
 const identity = await import('../src/regions/identity.js');
 
-test('only Pakistan is selectable until another region is switched on', () => {
+test('every country is selectable by default and the console can still close one', () => {
   const pdb = platformDb();
-  assert.deepEqual([...selectableRegions(pdb).keys()], ['PK']);
-  admin.setRegionStatus(pdb, 'US', 'active', 'tester');
-  assert.deepEqual([...selectableRegions(pdb).keys()].sort(), ['PK', 'US']);
+  assert.deepEqual([...selectableRegions(pdb).keys()].sort(), ['AE', 'CA', 'PK', 'UK', 'US']);
   assert.equal(regionFor({ region: 'US', money_scale: 2 }).config.pack_version, 4);
   admin.setRegionStatus(pdb, 'US', 'draft', 'tester');
-  assert.deepEqual([...selectableRegions(pdb).keys()], ['PK']);
+  assert.deepEqual([...selectableRegions(pdb).keys()].sort(), ['AE', 'CA', 'PK', 'UK']);
+  admin.setRegionStatus(pdb, 'US', 'active', 'tester');
+  assert.deepEqual([...selectableRegions(pdb).keys()].sort(), ['AE', 'CA', 'PK', 'UK', 'US']);
   assert.throws(() => admin.setRegionStatus(pdb, 'PK', 'draft', 'tester'), /stays active/);
 });
 
@@ -80,6 +80,7 @@ test('identity numbers are encrypted, masked, validated by region, and reveals a
 test('a workspace can be created in an active region and takes its currency, units and formats', async () => {
   const { createTenant, getTenant } = await import('../src/platform.js');
   const pdb = platformDb();
+  admin.setRegionStatus(pdb, 'US', 'draft', 'tester');
   assert.throws(() => createTenant({ slug: 'us-early', name: 'Early', adminName: 'A', adminEmail: 'a@b.co', adminPassword: 'password1', region: 'US' }), /not available/);
   admin.setRegionStatus(pdb, 'US', 'active', 'tester');
   assert.throws(() => createTenant({ slug: 'us-bad', name: 'Bad', adminName: 'A', adminEmail: 'a@b.co', adminPassword: 'password1', region: 'US', sub_region: 'Atlantis' }), /valid state/i);
