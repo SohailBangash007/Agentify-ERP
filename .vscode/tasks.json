@@ -1,0 +1,38 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Agentify: start server",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/agentify-erp/server",
+        "env": {
+          "PORT": "4000",
+          "ERP_BASE_DOMAIN": "localhost",
+          "PLATFORM_ADMIN_EMAIL": "admin@agentify.local",
+          "PLATFORM_ADMIN_PASSWORD": "ChangeMe-12345"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "group": "agentify" }
+    },
+    {
+      "label": "Agentify: build client",
+      "type": "shell",
+      "command": "npx vite build",
+      "options": { "cwd": "${workspaceFolder}/agentify-erp/client" },
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "group": "agentify" }
+    },
+    {
+      "label": "Agentify: run tests",
+      "type": "shell",
+      "command": "npm test",
+      "options": { "cwd": "${workspaceFolder}/agentify-erp/server" },
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "group": "agentify" }
+    }
+  ]
+}
