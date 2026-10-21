@@ -6,6 +6,7 @@ import { Link, NavLink, useLocation, useNavigate, Navigate } from 'react-router-
 import { api } from '../api.js';
 import { Loading } from '../components/ui.jsx';
 import Flag from '../components/Flag.jsx';
+import { BRANDS } from './brandIcons.js';
 import { track, consent, setConsent, browserOptOut, configureGa4, attributionFields, onConsentChange } from './analytics.js';
 import { setRegion } from '../format.js';
 import { MortgageCalculator, PurchaseCostCalculator, UnitConverter } from '../site/RegionCalculators.jsx';
@@ -211,12 +212,14 @@ function Home({ info }) {
           <span className="leyebrow">{country.name} · {PRODUCT_LABELS.real_estate}</span>
           <h1>{cc.hero_title || c.hero_title}</h1>
           <p>{cc.hero_subtitle || c.hero_subtitle}</p>
-          <div className="lcta" style={{ justifyContent: 'flex-start' }}><Link className="lbtn p lg" to="/signup">Start your {info.trial_days}-day free trial</Link><Link className="lbtn lg" to="/contact">Book a demo</Link></div>
+          <EmailStart trialDays={info.trial_days} where="hero" />
           <ul className="ltrust"><li>No card needed to start</li><li>Your data stays yours, read-only if you stop paying</li><li>Set up in minutes</li></ul>
+          <Link className="llink2" to="/contact" onClick={() => track('cta_book_demo', { where: 'hero' })}>Prefer a walkthrough? Book a demo</Link>
         </div>
         <HeroVisual />
       </div></div>
-      <div className="lwrap"><div className="lchips" style={{ marginTop: 28 }}>{(cc.chips || ['Separate database per company', 'Role-based access per module', 'Two-factor sign-in', 'Audit trail', 'Automatic backups']).map((x) => <span key={x}>{x}</span>)}</div></div>
+      <LogoStrip />
+      <Outcomes />
       <Platform />
       <section className="alt"><div className="lwrap lsplit" style={{ alignItems: 'center' }}>
         <div className="lmeetmock" aria-label="Example of a video meeting with a shared screen and the script beside it">
@@ -236,8 +239,14 @@ function Home({ info }) {
             <li>See calls made, how many connected and the average call length</li>
           </ul>
           <p className="lfine">The pointer and pen are drawn on the shared screen. Browsers do not allow one person to take over another person's computer.</p>
+          <Link className="lbtn p" to="/signup" onClick={() => track('cta_start_trial', { where: 'meetings' })}>Try meetings free for {info.trial_days} days</Link>
         </div>
       </div></section>
+      <CallNextSection />
+      <LeakCalc trialDays={info.trial_days} />
+      <CalcStrip />
+      <Screens product={null} />
+      <Voices testimonials={(c.testimonials || []).filter((t) => !t.country || t.country === country.code)} trialDays={info.trial_days} />
       <section className="alt"><div className="lwrap">
         <div className="lsh"><h2>Two products, one platform</h2><p>Pick the product your business needs. Shared sign-in, users, billing, reports and notifications; product modules stay separate.</p></div>
         <div className="lprod">
@@ -257,13 +266,122 @@ function Home({ info }) {
           {[['Choose your product', 'Real Estate Brokerage or Construction Management. A bundle gives you both.'], ['Create your workspace', 'Your company gets its own address and its own private database straight away.'], ['Invite your team', 'Email invitations with the right role for each person.'], ['Pick a plan when ready', `Use the full ${info.trial_days}-day trial first. Pay by card or local transfer.`]].map(([t, d], i) => <div className="lcard" key={t}><div className="lnum">{i + 1}</div><h3>{t}</h3><p>{d}</p></div>)}
         </div>
       </div></section>
-      <CallNextSection />
-      <CalcStrip />
-      <Screens product={null} />
-      {!!(c.testimonials || []).filter((t) => !t.country || t.country === country.code).length && <section><div className="lwrap"><div className="lsh"><h2>What customers say</h2></div><div className="lgrid">{c.testimonials.filter((t) => !t.country || t.country === country.code).map((t, i) => <blockquote key={i} className="lcard lquote" style={{ margin: 0 }}>“{t.quote}”<footer>{t.name}{t.role ? `, ${t.role}` : ''} · {t.company}</footer></blockquote>)}</div></div></section>}
       <Faq faqs={[...(c.faqs || []), ...(cc.faqs || [])]} />
       <Band info={info} />
+      <StickyCta trialDays={info.trial_days} />
     </>
+  );
+}
+
+/** Email first: one field, and the sign-up form opens with it filled in. Nothing is stored until the person creates a workspace. */
+function EmailStart({ trialDays, where }) {
+  const nav = useNavigate();
+  const [email, setEmail] = useState('');
+  const go = (e) => { e.preventDefault(); track('cta_start_trial', { where }); nav(`/signup${email ? `?email=${encodeURIComponent(email.trim())}` : ''}`); };
+  return (
+    <form className="lstart" onSubmit={go}>
+      <input type="email" inputMode="email" autoComplete="email" aria-label="Your work email" placeholder="Your work email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <button className="lbtn p lg" type="submit">Start your {trialDays}-day free trial</button>
+    </form>
+  );
+}
+
+/** Tools the product really connects with. Shown as compatibility, never as partners or customers. */
+function LogoStrip() {
+  return (
+    <section className="lworks" aria-label="Works with"><div className="lwrap">
+      <p className="lworks-t">Connects with the tools your team already uses</p>
+      <ul className="lworks-l">{BRANDS.map((b) => <li key={b.id}><svg viewBox="0 0 24 24" width="22" height="22" role="img" aria-label={b.name}><path d={b.path} fill="currentColor" /></svg><span>{b.name}</span></li>)}</ul>
+      <p className="lfine lworks-f">Logos belong to their owners and show compatibility only. They do not mean partnership or endorsement.</p>
+    </div></section>
+  );
+}
+
+const OUTCOMES = [
+  ['Leads stop going cold', 'Call next ranks who needs a call and why, and every outcome sets the next follow-up.'],
+  ['Buyers see the property sooner', 'Send a meeting link on WhatsApp, share your screen and draw on the floor plan.'],
+  ['The numbers are one click away', 'Calls made, how many connected and average call length, per agent.'],
+  ['Money in the right place', 'Instalments, receipts and commissions tracked per sale, with an audit trail.'],
+];
+function Outcomes() {
+  return (
+    <section style={{ paddingBottom: 8 }}><div className="lwrap">
+      <div className="lsh"><h2>Where brokerages lose deals, and what changes</h2></div>
+      <div className="lout">{OUTCOMES.map(([t, d]) => <div key={t}><h3>{t}</h3><p>{d}</p></div>)}</div>
+    </div></section>
+  );
+}
+
+const COMMISSION = { PK: 250000, AE: 25000, US: 6000, UK: 4000, CA: 6000 };
+/** An estimate from the visitor's own numbers. The starting values are placeholders to change, not statistics. */
+function LeakCalc({ trialDays }) {
+  const { country } = useCountry();
+  const cur = country.currency || 'USD';
+  const [v, setV] = useState({ leads: 80, lost: 15, close: 3, commission: COMMISSION[country.code] || 5000 });
+  useEffect(() => setV((x) => ({ ...x, commission: COMMISSION[country.code] || 5000 })), [cur, country.code]);
+  const n = (k) => Math.max(0, Number(v[k]) || 0);
+  const lostDeals = (n('leads') * n('lost') / 100) * (n('close') / 100);
+  const money = (x) => new Intl.NumberFormat('en', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(Math.round(x));
+  const field = (k, label, suffix) => <label className="lcalc-f"><span>{label}</span><div><input type="number" min="0" inputMode="decimal" value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />{suffix && <em>{suffix}</em>}</div></label>;
+  return (
+    <section className="alt"><div className="lwrap lcalc">
+      <div>
+        <h2 style={{ fontSize: 32 }}>What do slow follow-ups cost you?</h2>
+        <p>Put in your own numbers. The starting values are only examples.</p>
+        <div className="lcalc-g">
+          {field('leads', 'New leads a month')}
+          {field('lost', 'Leads that never get a proper follow-up', '%')}
+          {field('close', 'Leads that normally become a sale', '%')}
+          {field('commission', `Average commission per sale (${cur})`)}
+        </div>
+      </div>
+      <div className="lcalc-out" aria-live="polite">
+        <span>Your estimate</span>
+        <b>{money(lostDeals * n('commission'))}</b>
+        <small>in commission slipping away each month, about {lostDeals.toFixed(1)} {lostDeals === 1 ? 'sale' : 'sales'}. An estimate from the numbers you entered.</small>
+        <Link className="lbtn p" to="/signup" onClick={() => track('cta_start_trial', { where: 'leak_calc' })}>Start recovering them free for {trialDays} days</Link>
+      </div>
+    </div></section>
+  );
+}
+
+/** Real, permitted customer quotes entered in the console. Until there are some, say what an early customer gets instead. */
+function Voices({ testimonials, trialDays }) {
+  if (testimonials.length) {
+    const [lead, ...rest] = testimonials;
+    return (
+      <section><div className="lwrap">
+        <div className="lsh"><h2>What customers say</h2></div>
+        <figure className="lvoice"><blockquote>“{lead.quote}”</blockquote><figcaption><b>{lead.name}</b>{lead.role ? `, ${lead.role}` : ''}<span>{lead.company}</span></figcaption></figure>
+        {!!rest.length && <div className="lgrid" style={{ marginTop: 18 }}>{rest.map((t, i) => <blockquote key={i} className="lcard lquote" style={{ margin: 0 }}>“{t.quote}”<footer>{t.name}{t.role ? `, ${t.role}` : ''} · {t.company}</footer></blockquote>)}</div>}
+      </div></section>
+    );
+  }
+  return (
+    <section><div className="lwrap">
+      <div className="lfound">
+        <div>
+          <span className="ltag2">Founding customers</span>
+          <h2 style={{ fontSize: 32, margin: '10px 0' }}>Be one of the first teams on it.</h2>
+          <p>We are onboarding our first customers personally. You get the full {trialDays}-day trial, help moving your contacts and listings across, and a direct line to the people who build it.</p>
+          <p className="lfine">When you are happy and say we may, we will publish your story here. Only real, approved quotes are ever shown on this page.</p>
+        </div>
+        <div className="lfound-c"><Link className="lbtn p lg" to="/contact" onClick={() => track('cta_founding_customer', { where: 'voices' })}>Talk to us about onboarding</Link><Link className="lbtn lg" to="/signup" onClick={() => track('cta_start_trial', { where: 'voices' })}>Or start the free trial</Link></div>
+      </div>
+    </div></section>
+  );
+}
+
+/** A slim bar that appears after the visitor has scrolled past the first screen. */
+function StickyCta({ trialDays }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => { const h = () => setShow(window.scrollY > 700); h(); window.addEventListener('scroll', h, { passive: true }); return () => window.removeEventListener('scroll', h); }, []);
+  return (
+    <div className={`lsticky ${show ? 'on' : ''}`} aria-hidden={!show}>
+      <span>Free for {trialDays} days. No card needed.</span>
+      <Link className="lbtn p sm" to="/signup" tabIndex={show ? 0 : -1} onClick={() => track('cta_start_trial', { where: 'sticky' })}>Start free trial</Link>
+      <Link className="lbtn sm" to="/contact" tabIndex={show ? 0 : -1} onClick={() => track('cta_book_demo', { where: 'sticky' })}>Book a demo</Link>
+    </div>
   );
 }
 
@@ -357,7 +475,13 @@ function Faq({ faqs }) {
   return <section id="faq"><div className="lwrap"><div className="lsh"><h2>Questions</h2></div>{faqs.map(([q, a]) => <details key={q}><summary>{q}</summary><p>{a}</p></details>)}</div></section>;
 }
 function Band({ info, product }) {
-  return <section style={{ paddingTop: 0 }}><div className="lwrap"><div className="lband"><h2>Ready to try it with your own data?</h2><p>Free for {info.trial_days} days. Set up in minutes.</p><Link className="lbtn" to={`/signup${product ? `?product=${product}` : ''}`}>Create your workspace</Link></div></div></section>;
+  return (
+    <section style={{ paddingTop: 0 }}><div className="lwrap"><div className="lband">
+      <h2>Ready to try it with your own data?</h2>
+      <p>Free for {info.trial_days} days. No card needed. If you stop, your data becomes read-only and is never deleted.</p>
+      <div className="lcta"><Link className="lbtn lg" to={`/signup${product ? `?product=${product}` : ''}`} onClick={() => track('cta_start_trial', { where: 'band' })}>Create your workspace</Link><Link className="lbtn lg ghost" to="/contact" onClick={() => track('cta_book_demo', { where: 'band' })}>Book a demo</Link></div>
+    </div></div></section>
+  );
 }
 
 function ProductPage({ info, product }) {
@@ -563,7 +687,7 @@ function Signup({ info }) {
   const loc = useLocation();
   const q = new URLSearchParams(loc.search);
   const [product, setProduct] = useState(['real_estate', 'construction'].includes(q.get('product')) ? q.get('product') : '');
-  const [f, setF] = useState({ company_name: '', slug: '', admin_name: '', admin_email: '', admin_password: '', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Karachi', currency: 'PKR', accept_terms: false });
+  const [f, setF] = useState({ company_name: '', slug: '', admin_name: '', admin_email: q.get('email') || '', admin_password: '', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Karachi', currency: 'PKR', accept_terms: false });
   const [slugTouched, setSlugTouched] = useState(false);
   const [avail, setAvail] = useState(null);
   const [err, setErr] = useState('');

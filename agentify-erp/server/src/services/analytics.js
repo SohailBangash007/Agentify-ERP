@@ -20,7 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_an_ts ON analytics_events(ts);
 CREATE INDEX IF NOT EXISTS idx_an_name_ts ON analytics_events(name, ts);
 CREATE INDEX IF NOT EXISTS idx_an_session ON analytics_events(session_id, ts);
 `;
-export const WEB_EVENTS = ['page_view', 'product_page_view', 'pricing_view', 'signup_started', 'demo_form_view'];
+export const WEB_EVENTS = ['page_view', 'product_page_view', 'pricing_view', 'signup_started', 'demo_form_view', 'cta_start_trial', 'cta_book_demo', 'cta_founding_customer'];
 export const SERVER_EVENTS = ['signup_completed', 'demo_requested', 'checkout_started', 'subscription_activated'];
 const ID_RE = /^[A-Za-z0-9_-]{8,40}$/;
 const SEARCH = /(^|\.)(google|bing|yahoo|duckduckgo|baidu|yandex|ecosia)\./i;
@@ -64,7 +64,7 @@ export function collect(req, body, ownHost) {
     const ref = hostOf(e.referrer);
     const utm = { utm_source: clean(e.utm_source, 80), utm_medium: clean(e.utm_medium, 80), utm_campaign: clean(e.utm_campaign, 120) };
     ins.run(e.name, 'web', visitor, session, cleanPath(e.path), cleanPath(e.landing_page), ref, utm.utm_source, utm.utm_medium, utm.utm_campaign, channelOf({ ...utm, referrer_host: ref }, ownHost),
-      ['real_estate', 'construction'].includes(e.product) ? e.product : null, clean(e.plan, 40), null);
+      ['real_estate', 'construction'].includes(e.product) ? e.product : null, clean(e.plan, 40), e.where ? JSON.stringify({ where: clean(e.where, 30) }) : null);
     stored += 1;
   }
   return { stored };
