@@ -181,7 +181,7 @@ test('Gemini connects with a real test, answers with data tools and transcribes'
   };
   try {
     await assert.rejects(connectAi('gemini', { api_key: 'nope' }, 1), /AIza/);
-    await connectAi('gemini', { api_key: 'AIza' + 'a'.repeat(35) }, 1);
+    await connectAi('gemini', { api_key: 'AQ.' + 'a'.repeat(35) }, 1);
     assert.equal(canTranscribe(), true);
     const out = await runWithTools('gemini', { system: 's', question: 'q', tools: [{ name: 'ping', description: 'd', parameters: { type: 'object', additionalProperties: false, properties: {} }, run: async () => ({ ok: true }) }] });
     assert.equal(out.answer, 'pong answer');

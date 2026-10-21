@@ -10,10 +10,10 @@ import { saveIntegration, integrationConfig, integrationRow, markTested, mask } 
 export const AI_PROVIDERS = {
   anthropic: { label: 'Claude (Anthropic)', key_url: 'https://console.anthropic.com/settings/keys', default_model: 'claude-sonnet-5-5', key_hint: 'Starts with sk-ant-' },
   openai: { label: 'ChatGPT (OpenAI)', key_url: 'https://platform.openai.com/api-keys', default_model: 'gpt-4o', key_hint: 'Starts with sk-' },
-  gemini: { label: 'Gemini (Google)', key_url: 'https://aistudio.google.com/apikey', default_model: 'gemini-2.5-flash', key_hint: 'Starts with AIza' },
+  gemini: { label: 'Gemini (Google)', key_url: 'https://aistudio.google.com/apikey', default_model: 'gemini-2.5-flash', key_hint: 'Starts with AIza or AQ.' },
   custom: { label: 'Other model (OpenAI-compatible)', custom: true, key_url: 'https://openrouter.ai/keys', default_model: '', key_hint: 'Works with Groq, Mistral, DeepSeek, OpenRouter, Together, Azure OpenAI and any service that offers an OpenAI-compatible API' },
 };
-const KEY_RE = { anthropic: /^sk-ant-[A-Za-z0-9_-]{20,}$/, openai: /^sk-[A-Za-z0-9_-]{20,}$/, gemini: /^AIza[A-Za-z0-9_-]{30,}$/, custom: /^\S{8,400}$/ };
+const KEY_RE = { anthropic: /^sk-ant-[A-Za-z0-9_-]{20,}$/, openai: /^sk-[A-Za-z0-9_-]{20,}$/, gemini: /^(AIza[A-Za-z0-9_-]{30,}|AQ\.[A-Za-z0-9._-]{20,})$/, custom: /^\S{8,400}$/ };
 const oaBase = (provider, cfg) => (provider === 'custom' ? cfg.base_url : 'https://api.openai.com/v1');
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
 const gHeaders = (key) => ({ 'x-goog-api-key': key, 'Content-Type': 'application/json' });
