@@ -9,6 +9,7 @@
     "seed": "node --disable-warning=ExperimentalWarning src/reset.js",
     "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
     "platform:setup-token": "node --disable-warning=ExperimentalWarning src/cli.js setup-token",
+    "platform:set-owner": "node --disable-warning=ExperimentalWarning src/cli.js set-owner",
     "platform:lifecycle": "node --disable-warning=ExperimentalWarning src/cli.js lifecycle"
   },
   "dependencies": {

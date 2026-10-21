@@ -110,6 +110,7 @@ jobs:
           VAR_ERP_BASE_DOMAIN: ${{ vars.ERP_BASE_DOMAIN }}
           ENV_PLATFORM_ADMIN_EMAIL: ${{ secrets.PLATFORM_ADMIN_EMAIL }}
           ENV_PLATFORM_ADMIN_PASSWORD: ${{ secrets.PLATFORM_ADMIN_PASSWORD }}
+          ENV_PLATFORM_ADMIN_RESET: ${{ secrets.PLATFORM_ADMIN_RESET }}
           SEC_SERVER_DOMAIN: ${{ secrets.SERVER_DOMAIN }}
           VAR_SERVER_DOMAIN: ${{ vars.SERVER_DOMAIN }}
         run: |
@@ -309,6 +310,15 @@ jobs:
 
           echo "==> Installing and restarting"
           remote "bash -s" -- "$APP_DIR" "$SERVICE" < .github/scripts/remote-release.sh
+
+          # Console owner: only when the secret PLATFORM_ADMIN_RESET is exactly "yes" (together with PLATFORM_ADMIN_EMAIL and
+          # PLATFORM_ADMIN_PASSWORD). It creates the Platform Owner, or resets that account's password. Remove the
+          # PLATFORM_ADMIN_RESET secret afterwards so later deploys leave the password alone.
+          if [ "$(trim "${ENV_PLATFORM_ADMIN_RESET:-}")" = "yes" ] && [ -n "${ENV_PLATFORM_ADMIN_EMAIL:-}" ] && [ -n "${ENV_PLATFORM_ADMIN_PASSWORD:-}" ]; then
+            echo "==> Setting the console owner account (PLATFORM_ADMIN_RESET=yes)"
+            printf '%s\n%s\n' "$(trim "$ENV_PLATFORM_ADMIN_EMAIL")" "$ENV_PLATFORM_ADMIN_PASSWORD" | remote "cd $APP_DIR/server && /opt/node22/bin/node --disable-warning=ExperimentalWarning src/cli.js set-owner"
+            echo "    Done. Now delete the PLATFORM_ADMIN_RESET secret so the next deploy does not reset the password again."
+          fi
 
           echo "Deployed: https://$DOMAIN (and http://$HOST:4000)"
           for u in "https://$DOMAIN/health" "http://$DOMAIN/health" "http://$HOST:4000/health"; do
