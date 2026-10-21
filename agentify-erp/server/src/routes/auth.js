@@ -167,7 +167,7 @@ r.post('/sso/exchange', loginLimiter, asyncH((req, res) => {
   const u = loadUser(row.user_id);
   if (!u || u.portal) throw new HttpError(401, 'This account cannot sign in this way.');
   if (u.totp_enabled) return res.json({ mfa_required: true, mfa_token: signMfaToken(u) });
-  audit(req, 'Signed in with ' + row.provider, 'user', u.id, u.email);
+  audit(req, row.provider === 'signup' ? 'Signed in after creating the workspace' : 'Signed in with ' + row.provider, 'user', u.id, u.email);
   finishLogin(req, res, u);
 }));
 

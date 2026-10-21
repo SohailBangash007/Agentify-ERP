@@ -1,4 +1,5 @@
 // Control-plane API (not tenant-scoped): self-serve signup and the platform operator's tenant administration.
+import { issueLoginCode } from '../services/oauthFlow.js';
 import express, { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { asyncH, bad, HttpError } from '../util.js';
@@ -77,15 +78,19 @@ r.post('/signup', signupLimiter, asyncH(async (req, res) => {
   const url = urlFor(tenant.slug, req);
   const origin = url || `${req.protocol}://${req.get('host')}`;
   // the owner confirms the address with the link in the welcome email; until then they cannot invite others (stops the form being used to mail strangers)
+  let ownerId = null;
   const token = withTenant(tenant, () => {
     const owner = get('SELECT id FROM users WHERE lower(email)=lower(?)', tenant.owner_email);
+    ownerId = owner.id;
     run('UPDATE users SET email_verified=0 WHERE id=?', owner.id);
     return issueVerification(owner.id);
   });
   const mail = layout({ heading: `Your ${tenant.name} workspace is ready`, lines: [`Confirm ${tenant.owner_email} with the button below, then sign in to start setting up your company.`, tenant.trial_ends_at ? `Your ${PLAN_SETTINGS.default_trial_days}-day free trial runs until ${tenant.trial_ends_at.slice(0, 10)} (UTC).` : tenant.trial_note ? `${tenant.trial_note}. Choose a plan in Settings > Plan & Billing to start.` : ''].filter(Boolean), button: { label: 'Confirm email and open workspace', url: `${origin}/verify-email/${token}` } });
   await sendMail({ to: tenant.owner_email, subject: `Welcome: ${tenant.name} is ready`, ...mail });
   recordServerEvent('signup_completed', { ...(b.analytics || {}), product: tenant.product, tenant_id: tenant.id });
-  res.status(201).json({ tenant: publicView(tenant), login_url: url });
+  // the browser is sent into the new workspace already signed in (one-time code, valid two minutes), not to its sign-in page
+  const enter = url && ownerId ? `${url}/login?sso=${issueLoginCode(tenant.id, ownerId, 'signup')}` : null;
+  res.status(201).json({ tenant: publicView(tenant), login_url: url, enter_url: enter });
 }));
 
 r.get('/tenants', requireOperator, need('workspaces.view'), (_req, res) => res.json(listTenants().map(publicView)));

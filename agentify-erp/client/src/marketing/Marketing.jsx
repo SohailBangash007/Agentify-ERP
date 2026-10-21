@@ -709,6 +709,8 @@ function Signup({ info }) {
     setBusy(true);
     try { setDone(await api.post('/api/platform/signup', { ...f, region: country.code, currency: country.currency, timezone: (country.timezones || []).includes(f.timezone) ? f.timezone : (country.timezones || [f.timezone])[0], language: f.language || null, sample_data: !!f.sample_data, product, analytics: attributionFields() })); } catch (x) { setErr(x.message); } finally { setBusy(false); }
   };
+  // straight into the new workspace, already signed in (the one-time code lasts two minutes, so do it now)
+  useEffect(() => { if (done?.enter_url) window.location.replace(done.enter_url); }, [done]);
   if (done) {
     const t = done.tenant;
     return (
@@ -718,7 +720,7 @@ function Signup({ info }) {
         {t.trial_ends_at ? <p>Your free trial runs until <b>{new Date(t.trial_ends_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</b> (your local time).</p>
           : <p>{t.trial_note ? `${t.trial_note}. ` : ''}Choose a plan in Settings › Plan &amp; Billing to start working.</p>}
         <p className="lmini">We emailed {t.owner_email} a link to confirm the address.</p>
-        <a className="lbtn p" href={`${done.login_url}/login`}>Open your workspace</a>
+        <a className="lbtn p" href={done.enter_url || `${done.login_url}/login`}>Open your workspace</a>
       </div></div></section>
     );
   }

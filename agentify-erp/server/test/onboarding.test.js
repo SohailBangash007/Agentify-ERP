@@ -38,6 +38,12 @@ async function loginAs(host, identifier, password) {
 test('signup sends a welcome email to the new owner', async () => {
   const r = await call('erp.test', 'POST', '/api/platform/signup', { accept_terms: true, slug: 'acme', company_name: 'Acme Realty', admin_name: 'Amir', admin_email: 'amir@acme.test', admin_password: PW });
   assert.equal(r.status, 201, JSON.stringify(r.data));
+  // the owner is taken into the workspace already signed in, not to its sign-in page
+  assert.match(r.data.enter_url, /^https:\/\/acme\.erp\.test\/login\?sso=/);
+  const sso = new URL(r.data.enter_url).searchParams.get('sso');
+  const exchanged = await call('acme.erp.test', 'POST', '/api/auth/sso/exchange', { code: sso });
+  assert.equal(exchanged.status, 200, JSON.stringify(exchanged.data));
+  assert.equal((await call('acme.erp.test', 'POST', '/api/auth/sso/exchange', { code: sso })).status, 401, 'the code works once');
   await call('erp.test', 'POST', '/api/platform/signup', { accept_terms: true, slug: 'beta', company_name: 'Beta Homes', admin_name: 'Bilal', admin_email: 'bilal@beta.test', admin_password: PW });
   const m = lastMail('amir@acme.test');
   assert.match(m.subject, /Acme Realty is ready/);
