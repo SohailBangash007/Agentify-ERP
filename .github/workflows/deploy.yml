@@ -111,6 +111,7 @@ jobs:
           ENV_PLATFORM_ADMIN_EMAIL: ${{ secrets.PLATFORM_ADMIN_EMAIL }}
           ENV_PLATFORM_ADMIN_PASSWORD: ${{ secrets.PLATFORM_ADMIN_PASSWORD }}
           ENV_PLATFORM_ADMIN_RESET: ${{ secrets.PLATFORM_ADMIN_RESET }}
+          ENV_TLS_PROXY: ${{ secrets.TLS_PROXY }}
           SEC_SERVER_DOMAIN: ${{ secrets.SERVER_DOMAIN }}
           VAR_SERVER_DOMAIN: ${{ vars.SERVER_DOMAIN }}
         run: |
@@ -310,6 +311,9 @@ jobs:
 
           echo "==> Installing and restarting"
           remote "bash -s" -- "$APP_DIR" "$SERVICE" < .github/scripts/remote-release.sh
+
+          echo "==> Checking workspace addresses and certificates"
+          remote "ERP_BASE_DOMAIN=$(q "$BASE_DOMAIN") TLS_PROXY=$(q "$(trim "${ENV_TLS_PROXY:-}")") bash -s" -- "$DOMAIN" < .github/scripts/remote-tls.sh || echo "::warning::the certificate check did not finish; the site itself is deployed"
 
           # Console owner: only when the secret PLATFORM_ADMIN_RESET is exactly "yes" (together with PLATFORM_ADMIN_EMAIL and
           # PLATFORM_ADMIN_PASSWORD). It creates the Platform Owner, or resets that account's password. Remove the

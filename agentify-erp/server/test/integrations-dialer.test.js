@@ -171,6 +171,7 @@ test('custom domain: DNS records are shown, verification needs both records, the
   assert.equal((await call('erp.test', 'GET', '/api/platform/domain-check?domain=www.dialrealty.com')).status, 200);
   assert.equal((await call('erp.test', 'GET', '/api/platform/domain-check?domain=evil.example.com')).status, 404);
   assert.equal((await call('erp.test', 'GET', '/api/platform/domain-check?domain=dial.erp.test')).status, 200);
+  assert.equal((await call('erp.test', 'GET', '/api/platform/domain-check?domain=nobody-here.erp.test')).status, 404, 'no certificate for a workspace that does not exist');
   // removing it stops serving it
   assert.equal((await call(HOST, 'DELETE', '/api/integrations/domain', null, { cookie: c })).status, 200);
   assert.equal((await call('www.dialrealty.com', 'GET', '/api/auth/brand')).status, 404);

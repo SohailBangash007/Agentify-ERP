@@ -89,7 +89,12 @@ export function removeDomain(tenant) {
 export function mayIssueCertificate(domain) {
   const d = String(domain || '').toLowerCase();
   if (!d) return false;
-  if (BASE_DOMAIN && (d === BASE_DOMAIN || d.endsWith(`.${BASE_DOMAIN}`))) return true;
+  if (BASE_DOMAIN && d === BASE_DOMAIN) return true;
+  // our own subdomains: only for workspaces that exist, so strangers cannot make the server request certificates for made-up names
+  if (BASE_DOMAIN && d.endsWith(`.${BASE_DOMAIN}`)) {
+    const slug = d.slice(0, -(BASE_DOMAIN.length + 1));
+    return /^[a-z0-9-]{1,63}$/.test(slug) && !!pdb().prepare('SELECT 1 FROM tenants WHERE slug=?').get(slug);
+  }
   return !!pdb().prepare("SELECT 1 FROM domain_requests WHERE domain=? AND status='verified'").get(d);
 }
 export { HttpError };

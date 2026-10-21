@@ -648,12 +648,22 @@ function Legal({ info, slug }) {
   );
 }
 
+/** Does this address open at all (DNS and certificate)? A cross-origin request that fails to connect means no. */
+const reachable = (url) => fetch(`${String(url).replace(/\/$/, '')}/health`, { mode: 'no-cors', cache: 'no-store' }).then(() => true, () => false);
 const WS_KEY = 'agentify_workspace';
 const rememberWorkspace = (s) => { try { localStorage.setItem(WS_KEY, s); } catch { /* storage blocked */ } };
 const lastWorkspace = () => { try { return localStorage.getItem(WS_KEY) || ''; } catch { return ''; } };
 function FindWorkspace({ info }) {
   const last = lastWorkspace();
-  const open = (s) => { rememberWorkspace(s); const { protocol, port } = window.location; window.location.assign(`${protocol}//${s}.${info.base_domain}${port ? `:${port}` : ''}/login`); };
+  const [blocked, setBlocked] = useState('');
+  const open = async (s) => {
+    const { protocol, port } = window.location;
+    const base = `${protocol}//${s}.${info.base_domain}${port ? `:${port}` : ''}`;
+    setBlocked('');
+    if (!(await reachable(base))) { setBlocked(`${s}.${info.base_domain} cannot be reached right now. Check the spelling of the address. If it is right, the address is still being connected on our side: try again shortly.`); return; }
+    rememberWorkspace(s);
+    window.location.assign(`${base}/login`);
+  };
   const [slug, setSlug] = useState('');
   const [email, setEmail] = useState('');
   const [msg, setMsg] = useState('');
@@ -668,6 +678,7 @@ function FindWorkspace({ info }) {
   return (
     <section><div className="lwrap">
       <div className="lsh"><h1 style={{ fontSize: 38 }}>Sign in to your workspace</h1><p>Each company has its own address.</p></div>
+      {blocked && <div className="lerr" role="alert" style={{ maxWidth: 560, margin: '0 auto 14px' }}>{blocked}</div>}
       {last && <div className="lform" style={{ marginBottom: 18, textAlign: 'center' }}><button type="button" className="lbtn p lg" onClick={() => open(last)}>Continue to {last}.{info.base_domain}</button><div className="lmini">The workspace you used last on this device.</div></div>}
       <form className="lform" onSubmit={go}>
         <label>Workspace address<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="your-company" aria-label="Workspace address" /><span className="lmini">.{info.base_domain}</span></div></label>
@@ -715,7 +726,14 @@ function Signup({ info }) {
     try { setDone(await api.post('/api/platform/signup', { ...f, region: country.code, currency: country.currency, timezone: (country.timezones || []).includes(f.timezone) ? f.timezone : (country.timezones || [f.timezone])[0], language: f.language || null, sample_data: !!f.sample_data, product, analytics: attributionFields() })); } catch (x) { setErr(x.message); } finally { setBusy(false); }
   };
   // straight into the new workspace, already signed in (the one-time code lasts two minutes, so do it now)
-  useEffect(() => { if (done?.tenant?.slug) rememberWorkspace(done.tenant.slug); if (done?.enter_url) window.location.replace(done.enter_url); }, [done]);
+  const [unreachable, setUnreachable] = useState(false);
+  useEffect(() => {
+    if (!done) return;
+    if (done.tenant?.slug) rememberWorkspace(done.tenant.slug);
+    if (!done.enter_url) return;
+    // only go there if the workspace address actually opens; otherwise say so instead of showing a browser error page
+    reachable(done.login_url).then((ok) => { if (ok) window.location.replace(done.enter_url); else setUnreachable(true); });
+  }, [done]);
   if (done) {
     const t = done.tenant;
     return (
@@ -725,6 +743,7 @@ function Signup({ info }) {
         {t.trial_ends_at ? <p>Your free trial runs until <b>{new Date(t.trial_ends_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</b> (your local time).</p>
           : <p>{t.trial_note ? `${t.trial_note}. ` : ''}Choose a plan in Settings › Plan &amp; Billing to start working.</p>}
         <p className="lmini">We emailed {t.owner_email} a link to confirm the address.</p>
+        {unreachable && <div className="lerr" role="alert" style={{ textAlign: 'left', margin: '12px 0' }}>Your workspace was created at <b>{done.login_url.replace(/^https?:\/\//, '')}</b>, but that address cannot be reached yet. This is a setup step on our side (the website address for workspaces is still being connected). Your data is safe. Please try the button below again in a little while, or contact us.</div>}
         <a className="lbtn p" href={done.enter_url || `${done.login_url}/login`}>Open your workspace</a>
       </div></div></section>
     );
