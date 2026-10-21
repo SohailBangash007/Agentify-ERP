@@ -8,6 +8,11 @@ on:
       - '.github/workflows/deploy.yml'
       - '.github/scripts/**'
   workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: Deploy without running the server tests first
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy
@@ -38,8 +43,22 @@ jobs:
           path: agentify-erp/client/dist
           retention-days: 1
 
+  test:
+    if: ${{ !inputs.skip_tests }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: agentify-erp/server/package-lock.json
+      - run: npm --prefix agentify-erp/server ci
+      - run: npm --prefix agentify-erp/server test
+
   deploy:
-    needs: build
+    needs: [build, test]
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -105,6 +124,9 @@ jobs:
           # what is running: shown in the platform console (System > Releases); never typed by hand
           printf '{"commit":"%s","ref":"%s","deployed_at":"%s"}\n' "$GITHUB_SHA" "$GITHUB_REF_NAME" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > agentify-erp/server/release.json
 
+          echo "==> Backing up data and the current release"
+          sshpass -e $SSH -p "$PORT" "$REMOTE" "bash -s" -- "$APP_DIR" < .github/scripts/remote-snapshot.sh
+
           echo "==> Uploading server code"
           sshpass -e rsync -az --delete -e "$SSH -p $PORT" \
             --exclude 'node_modules' --exclude '.env' --exclude '.env.*' \
@@ -124,3 +146,6 @@ jobs:
             -- "$APP_DIR" "$SERVICE" < .github/scripts/remote-release.sh
 
           echo "Deployed: https://$DOMAIN (and http://$HOST:4000)"
+          for u in "https://$DOMAIN/health" "http://$DOMAIN/health" "http://$HOST:4000/health"; do
+            if curl -fsS -m 15 "$u" >/dev/null 2>&1; then echo "public check ok: $u"; break; else echo "public check not reachable yet: $u"; fi
+          done
