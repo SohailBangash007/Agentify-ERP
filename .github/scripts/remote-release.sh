@@ -3,21 +3,31 @@ set -euo pipefail
 
 APP_DIR="${1:-/opt/agentify-erp}"
 SERVICE="${2:-agentify-erp}"
-NODE=/opt/node22/bin/node
-NPM=/opt/node22/bin/npm
+NODE_DIR=/opt/node22
+NODE="$NODE_DIR/bin/node"
+NPM="$NODE_DIR/bin/npm"
+PM2="$NODE_DIR/bin/pm2"
+
+# a non-interactive ssh session has a minimal PATH: /opt/node22/bin is not in it
+export PATH="$NODE_DIR/bin:$PATH"
 
 if [ ! -x "$NODE" ]; then
   echo "Node 22 not found at $NODE (bootstrap did not run?)"
   exit 1
 fi
 
+if [ ! -x "$PM2" ]; then
+  echo "pm2 not found at $PM2 (bootstrap did not install it?)"
+  exit 1
+fi
+
 start_service() {
   cd "$APP_DIR/server"
   "$NPM" install --omit=dev --no-audit --no-fund
-  pm2 delete "$SERVICE" >/dev/null 2>&1 || true
-  pm2 start src/index.js --name "$SERVICE" \
+  "$PM2" delete "$SERVICE" >/dev/null 2>&1 || true
+  "$PM2" start src/index.js --name "$SERVICE" \
     --interpreter "$NODE" --node-args "--disable-warning=ExperimentalWarning"
-  pm2 save
+  "$PM2" save
 }
 
 healthy() {
@@ -32,7 +42,7 @@ start_service
 
 if ! healthy; then
   echo "health check failed"
-  pm2 logs "$SERVICE" --lines 60 --nostream || true
+  "$PM2" logs "$SERVICE" --lines 60 --nostream || true
   if [ -d "$APP_DIR/server.prev/src" ]; then
     echo "restoring the previous release"
     rsync -a --delete --exclude node_modules --exclude data --exclude uploads --exclude .env "$APP_DIR/server.prev/" "$APP_DIR/server/"
@@ -43,8 +53,8 @@ if ! healthy; then
 fi
 
 # start again after a reboot of the server (installs the system service once; harmless to repeat)
-pm2 startup systemd -u "$(id -un)" --hp "$HOME" >/dev/null 2>&1 || true
-pm2 save >/dev/null 2>&1 || true
+"$PM2" startup systemd -u "$(id -un)" --hp "$HOME" >/dev/null 2>&1 || true
+"$PM2" save >/dev/null 2>&1 || true
 
 curl -fsS http://127.0.0.1:4000/health
 echo

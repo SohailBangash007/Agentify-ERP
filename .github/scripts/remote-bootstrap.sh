@@ -8,12 +8,14 @@ NODE_DIR=/opt/node22
 NODE_VERSION=v22.23.3
 
 export DEBIAN_FRONTEND=noninteractive
+# a non-interactive ssh session has a minimal PATH: /opt/node22/bin is not in it
+export PATH="$NODE_DIR/bin:$PATH"
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
-if ! have curl || ! have rsync || ! have git; then
+if ! have curl || ! have rsync || ! have git || ! have tar; then
   apt-get update -y -qq
-  apt-get install -y -qq curl rsync git ca-certificates
+  apt-get install -y -qq curl rsync git ca-certificates xz-utils
 fi
 
 if [ ! -x "$NODE_DIR/bin/node" ]; then
@@ -25,9 +27,11 @@ if [ ! -x "$NODE_DIR/bin/node" ]; then
 fi
 echo "node: $("$NODE_DIR/bin/node" -v)"
 
-if ! have pm2; then
+# pm2 lives in $NODE_DIR/bin, which is not on the PATH of a non-interactive session
+if [ ! -x "$NODE_DIR/bin/pm2" ]; then
   "$NODE_DIR/bin/npm" install -g pm2
 fi
+echo "pm2: $("$NODE_DIR/bin/pm2" --version 2>/dev/null || echo unknown)"
 
 mkdir -p "$APP_DIR/server" "$APP_DIR/client"
 
@@ -50,6 +54,11 @@ if [ ! -f "$APP_DIR/server/.env" ]; then
   echo "created $APP_DIR/server/.env"
 else
   echo "keeping existing $APP_DIR/server/.env"
+fi
+
+if ! have nginx; then
+  echo "installing nginx"
+  apt-get update -y -qq && apt-get install -y -qq nginx || echo "nginx install failed; the app will only be reachable on port 4000"
 fi
 
 if have nginx && [ ! -f /etc/nginx/sites-available/agentify-erp ]; then
@@ -80,12 +89,18 @@ NGINXCONF
   sed -i "s/__SERVER_NAMES__/$NAMES/g" /etc/nginx/sites-available/agentify-erp
   ln -sf /etc/nginx/sites-available/agentify-erp /etc/nginx/sites-enabled/agentify-erp
   if nginx -t; then
-    systemctl reload nginx
+    systemctl enable nginx >/dev/null 2>&1 || true
+    systemctl reload nginx >/dev/null 2>&1 || systemctl restart nginx || true
     echo "nginx configured for $DOMAIN"
   else
     rm -f /etc/nginx/sites-enabled/agentify-erp
     echo "nginx config test failed; skipped (site still on port 4000)"
   fi
+fi
+
+if have nginx; then
+  systemctl enable nginx >/dev/null 2>&1 || true
+  systemctl start nginx >/dev/null 2>&1 || true
 fi
 
 if have certbot && [ -f /etc/nginx/sites-available/agentify-erp ] && [ ! -d "/etc/letsencrypt/live/$DOMAIN" ]; then

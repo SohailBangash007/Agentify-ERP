@@ -29,7 +29,7 @@ jobs:
       run:
         working-directory: agentify-erp
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -47,7 +47,7 @@ jobs:
     if: ${{ !inputs.skip_tests }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -61,8 +61,8 @@ jobs:
     if: ${{ !cancelled() && needs.build.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
         with:
           name: client-dist
           path: agentify-erp/client/dist
@@ -72,79 +72,243 @@ jobs:
 
       - name: Deploy to server
         env:
-          SSHPASS: ${{ secrets.SSH_PASSWORD || secrets.SECRETKEY }}
-          HOST: ${{ secrets.SSH_HOST || secrets.ACCESSKEY }}
-          DUSER: ${{ secrets.SSH_USER }}
-          PORT: ${{ secrets.SSH_PORT }}
+          # --- server host: every known name is read, first usable one wins ---
+          SEC_SSH_HOST: ${{ secrets.SSH_HOST }}
+          SEC_ACCESSKEY: ${{ secrets.ACCESSKEY }}
+          SEC_ACCESS_KEY: ${{ secrets.ACCESS_KEY }}
+          SEC_VPS_IP: ${{ secrets.VPS_IP }}
+          SEC_VPS_HOST: ${{ secrets.VPS_HOST }}
+          SEC_HOST: ${{ secrets.HOST }}
+          SEC_HOSTNAME: ${{ secrets.HOSTNAME }}
+          VAR_SSH_HOST: ${{ vars.SSH_HOST }}
+          VAR_ACCESSKEY: ${{ vars.ACCESSKEY }}
+          VAR_VPS_IP: ${{ vars.VPS_IP }}
+          # --- ssh password ---
+          SEC_SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+          SEC_SECRETKEY: ${{ secrets.SECRETKEY }}
+          SEC_SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          SEC_VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+          SEC_ROOT_PASSWORD: ${{ secrets.ROOT_PASSWORD }}
+          SEC_PASSWORD: ${{ secrets.PASSWORD }}
+          VAR_SSH_PASSWORD: ${{ vars.SSH_PASSWORD }}
+          # --- ssh user ---
+          SEC_SSH_USER: ${{ secrets.SSH_USER }}
+          SEC_SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          SEC_DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SEC_USER: ${{ secrets.USER }}
+          VAR_SSH_USER: ${{ vars.SSH_USER }}
+          # --- ssh port ---
+          SEC_SSH_PORT: ${{ secrets.SSH_PORT }}
+          SEC_PORT: ${{ secrets.PORT }}
+          VAR_SSH_PORT: ${{ vars.SSH_PORT }}
+          # --- optional private key (recommended: no password, no lockout) ---
+          SEC_SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          # --- app configuration ---
           ENV_JWT_SECRET: ${{ secrets.JWT_SECRET }}
           ENV_ERP_SECRETS_KEY: ${{ secrets.ERP_SECRETS_KEY }}
           ENV_ERP_BASE_DOMAIN: ${{ secrets.ERP_BASE_DOMAIN }}
+          VAR_ERP_BASE_DOMAIN: ${{ vars.ERP_BASE_DOMAIN }}
           ENV_PLATFORM_ADMIN_EMAIL: ${{ secrets.PLATFORM_ADMIN_EMAIL }}
           ENV_PLATFORM_ADMIN_PASSWORD: ${{ secrets.PLATFORM_ADMIN_PASSWORD }}
-          SERVER_DOMAIN: ${{ secrets.SERVER_DOMAIN }}
+          SEC_SERVER_DOMAIN: ${{ secrets.SERVER_DOMAIN }}
+          VAR_SERVER_DOMAIN: ${{ vars.SERVER_DOMAIN }}
         run: |
           set -euo pipefail
-          if [ -z "${HOST:-}" ] || [ -z "${SSHPASS:-}" ]; then
-            echo "Missing required secrets: SSH_HOST and SSH_PASSWORD"; exit 1
+
+          # ---------- helpers -------------------------------------------------------
+          trim() { printf '%s' "${1-}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
+          is_ipv4() {
+            local ip="${1-}" a b c d o
+            case "$ip" in
+              [0-9]*.[0-9]*.[0-9]*.[0-9]*) ;;
+              *) return 1 ;;
+            esac
+            case "$ip" in *[!0-9.]*) return 1 ;; esac
+            local IFS=.
+            read -r a b c d <<<"$ip"
+            for o in "$a" "$b" "$c" "$d"; do
+              case "$o" in ""|*[!0-9]*) return 1 ;; esac
+              if [ "$o" -gt 255 ]; then return 1; fi
+            done
+            return 0
+          }
+          is_domain() {
+            case "${1-}" in ""|*[!a-zA-Z0-9.-]*) return 1 ;; esac
+            case "${1-}" in *.*) return 0 ;; *) return 1 ;; esac
+          }
+
+          # ---------- 1. resolve the server host ------------------------------------
+          HOST_NAMES=(SSH_HOST SSH_HOST_VARIABLE ACCESSKEY ACCESSKEY_VARIABLE ACCESS_KEY VPS_IP VPS_IP_VARIABLE VPS_HOST HOST HOSTNAME)
+          HOST_VALUES=("$SEC_SSH_HOST" "$VAR_SSH_HOST" "$SEC_ACCESSKEY" "$VAR_ACCESSKEY" "$SEC_ACCESS_KEY" "$SEC_VPS_IP" "$VAR_VPS_IP" "$SEC_VPS_HOST" "$SEC_HOST" "$SEC_HOSTNAME")
+          HOST=""; HOST_FROM=""
+          for i in "${!HOST_NAMES[@]}"; do
+            v="$(trim "${HOST_VALUES[$i]-}")"
+            if [ -z "$v" ]; then continue; fi
+            if is_ipv4 "$v" || is_domain "$v"; then
+              HOST="$v"; HOST_FROM="${HOST_NAMES[$i]}"
+              break
+            fi
+            echo "::warning::${HOST_NAMES[$i]} is not an IP address or a domain - it is ignored as the server host"
+          done
+          if [ -z "$HOST" ]; then
+            echo "::error::No server host found. Add the server IP as a secret named SSH_HOST (or as a variable named SSH_HOST)."
+            echo "::error::Secrets: https://github.com/asadrealestatewala/Agentify-ERP/settings/secrets/actions"
+            exit 1
           fi
-          HOST="$(printf '%s' "${HOST:-}" | tr -d '[:space:]')"   # a pasted secret often carries a trailing space or newline
-          PORT="$(printf '%s' "${PORT:-22}" | tr -d '[:space:]')"
-          DUSER="${DUSER:-root}"
-          DOMAIN="${SERVER_DOMAIN:-agentifyerp.biztrack.uk}"
-          SSH="ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=25 -o ServerAliveInterval=20"
+          echo "==> server host taken from: $HOST_FROM"
+
+          # ---------- 2. resolve the ssh password(s) ----------------------------------
+          PASS_NAMES=(SSH_PASSWORD SECRETKEY SECRET_KEY VPS_PASSWORD ROOT_PASSWORD PASSWORD SSH_PASSWORD_VARIABLE)
+          PASS_VALUES=("$SEC_SSH_PASSWORD" "$SEC_SECRETKEY" "$SEC_SECRET_KEY" "$SEC_VPS_PASSWORD" "$SEC_ROOT_PASSWORD" "$SEC_PASSWORD" "$VAR_SSH_PASSWORD")
+          PASSWORDS=(); PASS_FROM=()
+          for i in "${!PASS_NAMES[@]}"; do
+            v="$(trim "${PASS_VALUES[$i]-}")"
+            if [ -z "$v" ]; then continue; fi
+            PASSWORDS+=("$v"); PASS_FROM+=("${PASS_NAMES[$i]}")
+            echo "::add-mask::$v"
+          done
+
+          # ---------- 3. resolve user, port and domain --------------------------------
+          USER_NAMES=(SSH_USER SSH_USERNAME DEPLOY_USER USER SSH_USER_VARIABLE)
+          USER_VALUES=("$SEC_SSH_USER" "$SEC_SSH_USERNAME" "$SEC_DEPLOY_USER" "$SEC_USER" "$VAR_SSH_USER")
+          USERS=()
+          for i in "${!USER_NAMES[@]}"; do
+            v="$(trim "${USER_VALUES[$i]-}")"
+            if [ -z "$v" ]; then continue; fi
+            USERS+=("$v")
+          done
+          if [ ${#USERS[@]} -eq 0 ]; then USERS=(root); fi
+
+          PORT="$(trim "${SEC_SSH_PORT:-}")"
+          if [ -z "$PORT" ]; then PORT="$(trim "${SEC_PORT:-}")"; fi
+          if [ -z "$PORT" ]; then PORT="$(trim "${VAR_SSH_PORT:-}")"; fi
+          if [ -z "$PORT" ]; then PORT=22; fi
+
+          DOMAIN="$(trim "${SEC_SERVER_DOMAIN:-}")"
+          if [ -z "$DOMAIN" ]; then DOMAIN="$(trim "${VAR_SERVER_DOMAIN:-}")"; fi
+          if [ -z "$DOMAIN" ]; then DOMAIN="agentifyerp.biztrack.uk"; fi
+
+          BASE_DOMAIN="$(trim "${ENV_ERP_BASE_DOMAIN:-}")"
+          if [ -z "$BASE_DOMAIN" ]; then BASE_DOMAIN="$(trim "${VAR_ERP_BASE_DOMAIN:-}")"; fi
+
           JWT_SECRET="${ENV_JWT_SECRET:-$(openssl rand -hex 32)}"
           ERP_SECRETS_KEY="${ENV_ERP_SECRETS_KEY:-$(openssl rand -hex 32)}"
           echo "::add-mask::${JWT_SECRET}"
           echo "::add-mask::${ERP_SECRETS_KEY}"
           if [ -n "${ENV_PLATFORM_ADMIN_PASSWORD:-}" ]; then echo "::add-mask::${ENV_PLATFORM_ADMIN_PASSWORD}"; fi
+
+          # ---------- 4. optional private key -----------------------------------------
+          KEYFILE=""
+          KEY_RAW="$(trim "${SEC_SSH_PRIVATE_KEY:-}")"
+          if [ -n "$KEY_RAW" ]; then
+            KEYFILE="$RUNNER_TEMP/agentify-deploy-key"
+            printf '%s\n' "$KEY_RAW" > "$KEYFILE"
+            chmod 600 "$KEYFILE"
+            echo "==> using the SSH private key from the SSH_PRIVATE_KEY secret"
+          fi
+
+          SSH_OPTS="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=25 -o ServerAliveInterval=20 -o NumberOfPasswordPrompts=1"
+
+          ssh_try() {   # $1 = user, $2 = password
+            if [ -n "$KEYFILE" ]; then
+              ssh -i "$KEYFILE" -o IdentitiesOnly=yes $SSH_OPTS -p "$PORT" "$1@$HOST" "echo connected" 2>&1
+            else
+              SSHPASS="$2" sshpass -e ssh $SSH_OPTS -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive -p "$PORT" "$1@$HOST" "echo connected" 2>&1
+            fi
+          }
+
+          # ---------- 5. log in ------------------------------------------------------
+          LOGGED_IN=0; DUSER=""; USED_PASS=""
+          if [ -n "$KEYFILE" ]; then
+            for u in "${USERS[@]}"; do
+              echo "==> SSH login attempt: user=$u (private key)"
+              out="$(ssh_try "$u" "")" && ok=1 || ok=0
+              printf '%s\n' "$out" | sed 's/^/    /'
+              if [ "$ok" = "1" ]; then LOGGED_IN=1; DUSER="$u"; break; fi
+            done
+          else
+            if [ ${#PASSWORDS[@]} -eq 0 ]; then
+              echo "::error::No SSH password found. Add the VPS password as a secret named SSH_PASSWORD (SECRETKEY is read as well)."
+              echo "::error::Secrets: https://github.com/asadrealestatewala/Agentify-ERP/settings/secrets/actions"
+              exit 1
+            fi
+            MAX_TRIES=4; tries=0
+            for u in "${USERS[@]}"; do
+              for pi in "${!PASSWORDS[@]}"; do
+                if [ "$tries" -ge "$MAX_TRIES" ]; then break 2; fi
+                tries=$((tries + 1))
+                echo "==> SSH login attempt $tries/$MAX_TRIES: user=$u, password from ${PASS_FROM[$pi]}"
+                out="$(ssh_try "$u" "${PASSWORDS[$pi]}")" && ok=1 || ok=0
+                printf '%s\n' "$out" | sed 's/^/    /'
+                if [ "$ok" = "1" ]; then LOGGED_IN=1; DUSER="$u"; USED_PASS="${PASSWORDS[$pi]}"; break; fi
+                sleep 3
+              done
+              if [ "$LOGGED_IN" = "1" ]; then break; fi
+            done
+          fi
+
+          if [ "$LOGGED_IN" != "1" ]; then
+            echo "::error::SSH login to $HOST:$PORT failed (user(s): ${USERS[*]}, password from: ${PASS_FROM[*]})."
+            echo "::error::The server answers on port $PORT and allows password logins, so the password stored in the secret does not match the server."
+            echo "::error::Fix it: copy the root password exactly from the VPS panel (no trailing space or line break) and update the secret SSH_PASSWORD."
+            echo "::error::Or add a secret SSH_PRIVATE_KEY with a key that is installed in /root/.ssh/authorized_keys - that removes the password and any lockout risk."
+            exit 1
+          fi
+          echo "==> SSH login ok as $DUSER"
+
           REMOTE="$DUSER@$HOST"
+
+          remote() {   # runs a command on the server, stdin is forwarded
+            if [ -n "$KEYFILE" ]; then
+              ssh -i "$KEYFILE" -o IdentitiesOnly=yes $SSH_OPTS -p "$PORT" "$REMOTE" "$@"
+            else
+              SSHPASS="$USED_PASS" sshpass -e ssh $SSH_OPTS -p "$PORT" "$REMOTE" "$@"
+            fi
+          }
+
+          rsync_run() {   # rsync runs here, ssh is only the transport
+            local transport="ssh $SSH_OPTS -p $PORT"
+            if [ -n "$KEYFILE" ]; then
+              transport="ssh -i $KEYFILE -o IdentitiesOnly=yes $SSH_OPTS -p $PORT"
+              rsync -az --delete -e "$transport" "$@"
+            else
+              SSHPASS="$USED_PASS" sshpass -e rsync -az --delete -e "$transport" "$@"
+            fi
+          }
 
           q() { printf '%q' "$1"; }
           REMOTE_ENV="JWT_SECRET=$(q "$JWT_SECRET")"
           REMOTE_ENV="$REMOTE_ENV ERP_SECRETS_KEY=$(q "$ERP_SECRETS_KEY")"
-          REMOTE_ENV="$REMOTE_ENV ERP_BASE_DOMAIN=$(q "${ENV_ERP_BASE_DOMAIN:-}")"
+          REMOTE_ENV="$REMOTE_ENV ERP_BASE_DOMAIN=$(q "$BASE_DOMAIN")"
           REMOTE_ENV="$REMOTE_ENV PLATFORM_ADMIN_EMAIL=$(q "${ENV_PLATFORM_ADMIN_EMAIL:-}")"
           REMOTE_ENV="$REMOTE_ENV PLATFORM_ADMIN_PASSWORD=$(q "${ENV_PLATFORM_ADMIN_PASSWORD:-}")"
 
-          case "$HOST" in
-            *.*) : ;;
-            *) echo "ERROR: the host secret is not an IP address or domain (its length is ${#HOST} characters). Set the secret SSH_HOST to the server IP only, for example 169.58.191.84. SSH_HOST is used before ACCESSKEY, so a wrong ACCESSKEY value no longer matters."; exit 1 ;;
-          esac
-
-          echo "==> Testing SSH login to $HOST:$PORT as $DUSER"
-          if ! sshpass -e $SSH -p "$PORT" "$REMOTE" "echo connected"; then
-            echo "ERROR: SSH login failed. Check the password secret (SECRETKEY / SSH_PASSWORD) and SSH_USER."
-            exit 1
-          fi
-
+          # ---------- 6. bootstrap, upload, release -----------------------------------
           echo "==> Bootstrapping server ($HOST)"
-          sshpass -e $SSH -p "$PORT" "$REMOTE" \
-            "$REMOTE_ENV bash -s" \
-            -- "$APP_DIR" "$SERVICE" "$DOMAIN" < .github/scripts/remote-bootstrap.sh
+          remote "$REMOTE_ENV bash -s" -- "$APP_DIR" "$SERVICE" "$DOMAIN" < .github/scripts/remote-bootstrap.sh
 
           # what is running: shown in the platform console (System > Releases); never typed by hand
           printf '{"commit":"%s","ref":"%s","deployed_at":"%s"}\n' "$GITHUB_SHA" "$GITHUB_REF_NAME" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > agentify-erp/server/release.json
 
           echo "==> Backing up data and the current release"
-          sshpass -e $SSH -p "$PORT" "$REMOTE" "bash -s" -- "$APP_DIR" < .github/scripts/remote-snapshot.sh
+          remote "bash -s" -- "$APP_DIR" < .github/scripts/remote-snapshot.sh
 
           echo "==> Uploading server code"
-          sshpass -e rsync -az --delete -e "$SSH -p $PORT" \
+          rsync_run \
             --exclude 'node_modules' --exclude '.env' --exclude '.env.*' \
             --exclude 'data' --exclude 'uploads' \
             agentify-erp/server/ "$REMOTE:$APP_DIR/server/"
 
           echo "==> Uploading shared"
-          sshpass -e rsync -az --delete -e "$SSH -p $PORT" \
+          rsync_run \
             agentify-erp/shared/ "$REMOTE:$APP_DIR/shared/"
 
           echo "==> Uploading built client"
-          sshpass -e rsync -az --delete -e "$SSH -p $PORT" \
+          rsync_run \
             agentify-erp/client/dist/ "$REMOTE:$APP_DIR/client/dist/"
 
           echo "==> Installing and restarting"
-          sshpass -e $SSH -p "$PORT" "$REMOTE" "bash -s" \
-            -- "$APP_DIR" "$SERVICE" < .github/scripts/remote-release.sh
+          remote "bash -s" -- "$APP_DIR" "$SERVICE" < .github/scripts/remote-release.sh
 
           echo "Deployed: https://$DOMAIN (and http://$HOST:4000)"
           for u in "https://$DOMAIN/health" "http://$DOMAIN/health" "http://$HOST:4000/health"; do
