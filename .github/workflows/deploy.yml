@@ -87,7 +87,8 @@ jobs:
           if [ -z "${HOST:-}" ] || [ -z "${SSHPASS:-}" ]; then
             echo "Missing required secrets: SSH_HOST and SSH_PASSWORD"; exit 1
           fi
-          PORT="${PORT:-22}"
+          HOST="$(printf '%s' "${HOST:-}" | tr -d '[:space:]')"   # a pasted secret often carries a trailing space or newline
+          PORT="$(printf '%s' "${PORT:-22}" | tr -d '[:space:]')"
           DUSER="${DUSER:-root}"
           DOMAIN="${SERVER_DOMAIN:-agentifyerp.biztrack.uk}"
           SSH="ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=25 -o ServerAliveInterval=20"
@@ -107,7 +108,7 @@ jobs:
 
           case "$HOST" in
             *.*) : ;;
-            *) echo "ERROR: the SSH host secret does not look like an IP or domain (expected something like 81.17.101.93). Update ACCESSKEY (or add SSH_HOST)."; exit 1 ;;
+            *) echo "ERROR: the host secret is not an IP address or domain (its length is ${#HOST} characters). Set the secret SSH_HOST to the server IP only, for example 169.58.191.84. SSH_HOST is used before ACCESSKEY, so a wrong ACCESSKEY value no longer matters."; exit 1 ;;
           esac
 
           echo "==> Testing SSH login to $HOST:$PORT as $DUSER"
