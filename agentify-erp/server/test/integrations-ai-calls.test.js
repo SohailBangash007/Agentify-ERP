@@ -187,7 +187,7 @@ test('Gemini connects with a real test, answers with data tools and transcribes'
     assert.equal(out.answer, 'pong answer');
     assert.deepEqual(out.tools_used, ['ping']);
     const sent = calls.find((c) => c.body?.tools);
-    assert.equal(sent.headers['x-goog-api-key'].startsWith('AIza'), true);
+    assert.equal(sent.headers['x-goog-api-key'].startsWith('AQ.'), true);
     assert.equal(JSON.stringify(sent.body.tools).includes('additionalProperties'), false);
     assert.equal(await transcribe(Buffer.from('abc'), 'a.mp3'), 'Speaker 1: hello');
   } finally { globalThis.fetch = realFetch; }
