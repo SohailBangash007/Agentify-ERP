@@ -11,6 +11,18 @@ DOMAIN="${1:-agentifyerp.biztrack.uk}"
 export DEBIAN_FRONTEND=noninteractive
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# The base domain normally comes from the ERP_BASE_DOMAIN secret. When that secret was never added the deploy would
+# print "single-company mode" and skip certificates forever, even though the running application is multi-tenant.
+# Ask the app what its base domain is, so a missing secret cannot silently disable this step.
+if [ -z "${ERP_BASE_DOMAIN:-}" ] && have curl; then
+  from_app="$(curl -fsS -m 10 http://127.0.0.1:4000/api/platform/site 2>/dev/null \
+    | tr -d '\n' | sed -n 's/.*"base_domain"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
+  if [ -n "$from_app" ]; then
+    echo "tls: ERP_BASE_DOMAIN is not set for this deploy; taking the base domain from the running app: $from_app"
+    ERP_BASE_DOMAIN="$from_app"
+  fi
+fi
+
 if [ -z "${ERP_BASE_DOMAIN:-}" ]; then echo "tls: single-company mode, nothing to do"; exit 0; fi
 if [ "${TLS_PROXY:-auto}" = "nginx" ]; then echo "tls: TLS_PROXY=nginx, leaving nginx in charge"; exit 0; fi
 
