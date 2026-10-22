@@ -124,29 +124,285 @@ function CountrySwitch({ compact }) {
 }
 const SITE_VARS = { '--s-primary': '#0f766e', '--s-accent': '#f59e0b', '--s-dark': '#17202e', '--s-bg': '#ffffff', '--s-soft': '#f4f7f6', '--s-radius': '12px', '--s-font-h': 'inherit', '--s-font-b': 'inherit' };
 /** Live calculators for the chosen country, so a visitor can try the numbers before signing up. */
+
 function CalcStrip() {
   const { country } = useCountry();
   const c = country.config || {};
   const copy = country.copy || {};
+
   const tabs = [
-    ...(c.calculators?.mortgage ? [['mortgage', 'Mortgage calculator', MortgageCalculator]] : []),
-    ...(c.calculators?.purchase_costs ? [['costs', c.calculators.purchase_costs === 'sdlt' ? 'Stamp Duty' : c.calculators.purchase_costs === 'dld' ? 'Purchase fees' : 'Closing costs', PurchaseCostCalculator]] : []),
-    ...(c.calculators?.unit_converter ? [['units', 'Area converter', UnitConverter]] : []),
+    ...(c.calculators?.mortgage
+      ? [["mortgage", "Mortgage calculator", MortgageCalculator]]
+      : []),
+
+    ...(c.calculators?.purchase_costs
+      ? [[
+          "costs",
+          c.calculators.purchase_costs === "sdlt"
+            ? "Stamp Duty"
+            : c.calculators.purchase_costs === "dld"
+              ? "Purchase fees"
+              : "Closing costs",
+          PurchaseCostCalculator,
+        ]]
+      : []),
+
+    ...(c.calculators?.unit_converter
+      ? [["units", "Area converter", UnitConverter]]
+      : []),
   ];
+
   const [tab, setTab] = useState(tabs[0]?.[0]);
-  useEffect(() => { setTab(tabs[0]?.[0]); }, [country.code]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [hoveredTab, setHoveredTab] = useState(null);
+
+  useEffect(() => {
+    setTab(tabs[0]?.[0]);
+  }, [country.code]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!tabs.length) return null;
-  const Active = (tabs.find(([k]) => k === tab) || tabs[0])[2];
+
+  const Active = (tabs.find(([key]) => key === tab) || tabs[0])[2];
+
+  const styles = {
+    section: {
+      padding: "clamp(48px, 7vw, 90px) 20px",
+      background:
+        "radial-gradient(ellipse at 10% 5%, rgba(129,140,248,0.13), transparent 38%), radial-gradient(ellipse at 90% 90%, rgba(56,189,248,0.12), transparent 35%), #f7f8fc",
+      position: "relative",
+      overflow: "hidden",
+    },
+
+    container: {
+      width: "100%",
+      maxWidth: "1120px",
+      margin: "0 auto",
+    },
+
+    heading: {
+      textAlign: "center",
+      margin: "0 auto 36px",
+      maxWidth: "700px",
+    },
+
+    eyebrow: {
+      display: "inline-block",
+      padding: "8px 14px",
+      marginBottom: "17px",
+      borderRadius: "30px",
+      background: "#e9eaff",
+      color: "#5145cd",
+      fontSize: "11px",
+      fontWeight: 800,
+      letterSpacing: "1.6px",
+      textTransform: "uppercase",
+    },
+
+    title: {
+      fontSize: "clamp(30px, 4.5vw, 48px)",
+      lineHeight: 1.12,
+      letterSpacing: "-1.8px",
+      fontWeight: 800,
+      color: "#151b35",
+      margin: "0 0 16px",
+    },
+
+    gradientText: {
+      background: "linear-gradient(100deg, #635bdf, #3989e8)",
+      WebkitBackgroundClip: "text",
+      WebkitTextFillColor: "transparent",
+      backgroundClip: "text",
+    },
+
+    subtitle: {
+      fontSize: "16px",
+      lineHeight: 1.8,
+      color: "#69738a",
+      margin: 0,
+    },
+
+    card: {
+      background: "rgba(255,255,255,0.96)",
+      border: "1px solid #e6e9f2",
+      borderRadius: "24px",
+      padding: "clamp(16px, 3vw, 32px)",
+      boxShadow:
+        "0 20px 60px rgba(31,41,85,0.07), 0 3px 12px rgba(31,41,85,0.03)",
+    },
+
+    tabs: {
+      display: "flex",
+      flexWrap: "wrap",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "8px",
+      padding: "7px",
+      background: "#f2f4fa",
+      border: "1px solid #e9ecf4",
+      borderRadius: "15px",
+      marginBottom: "30px",
+    },
+
+    calculator: {
+      minWidth: 0,
+      width: "100%",
+    },
+
+    footer: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexWrap: "wrap",
+      gap: "8px",
+      marginTop: "24px",
+      color: "#788198",
+      fontSize: "12px",
+      textAlign: "center",
+    },
+  };
+
   return (
-    <section className="alt"><div className="lwrap">
-      <div className="lsh"><h2>{copy.calc_title || 'Try the numbers'}</h2><p>{copy.calc_sub}</p></div>
-      <div className="site" style={{ ...SITE_VARS, background: 'transparent', minHeight: 0 }} key={country.code}>
-        <div className="tabs-pill">{tabs.map(([k, l]) => <button type="button" key={k} className={(tab || tabs[0][0]) === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}</div>
-        <Active />
+    <section className="alt" style={styles.section}>
+      <div className="lwrap" style={styles.container}>
+
+        {/* Section Heading */}
+        <div className="lsh" style={styles.heading}>
+          <span style={styles.eyebrow}>
+            ✦ Smart property tools
+          </span>
+
+          <h2 style={styles.title}>
+            {copy.calc_title || "Make your next move"}
+            <br />
+            <span style={styles.gradientText}>
+              with confidence.
+            </span>
+          </h2>
+
+          <p style={styles.subtitle}>
+            {copy.calc_sub ||
+              "Explore your options, estimate your costs, and plan your property journey with simple, easy-to-use tools."}
+          </p>
+        </div>
+
+        {/* Calculator Card */}
+        <div
+          className="site"
+          style={{
+            ...SITE_VARS,
+            background: "transparent",
+            minHeight: 0,
+            width: "100%",
+            maxWidth: "100%",
+            boxSizing: "border-box",
+          }}
+          key={country.code}
+        >
+          {/* Calculator Tabs */}
+          <div style={styles.card}>
+            <div
+              className="tabs-pill"
+              style={styles.tabs}
+              role="tablist"
+              aria-label="Choose a calculator"
+            >
+              {tabs.map(([key, label]) => {
+                const isActive = (tab || tabs[0][0]) === key;
+                const isHovered = hoveredTab === key;
+
+                return (
+                  <button
+                    type="button"
+                    key={key}
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => setTab(key)}
+                    onMouseEnter={() => setHoveredTab(key)}
+                    onMouseLeave={() => setHoveredTab(null)}
+                    style={{
+                      flex: "1 1 180px",
+                      minWidth: 0,
+                      maxWidth: "100%",
+                      padding: "14px 18px",
+                      border: isActive
+                        ? "1px solid transparent"
+                        : "1px solid transparent",
+                      borderRadius: "11px",
+                      background: isActive
+                        ? "linear-gradient(110deg, #5145cd, #7168ee)"
+                        : isHovered
+                          ? "#ffffff"
+                          : "transparent",
+                      color: isActive ? "#ffffff" : "#59627a",
+                      fontSize: "13px",
+                      fontWeight: isActive ? 750 : 600,
+                      fontFamily: "inherit",
+                      cursor: "pointer",
+                      boxShadow: isActive
+                        ? "0 5px 14px rgba(81,69,205,0.24)"
+                        : isHovered
+                          ? "0 2px 8px rgba(31,41,85,0.05)"
+                          : "none",
+                      transition:
+                        "background 200ms ease, color 200ms ease, box-shadow 200ms ease, transform 200ms ease",
+                      transform:
+                        isHovered && !isActive
+                          ? "translateY(-1px)"
+                          : "translateY(0)",
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "9px",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          fontSize: "16px",
+                          lineHeight: 1,
+                        }}
+                      >
+                        {key === "mortgage"
+                          ? "⌂"
+                          : key === "costs"
+                            ? "◈"
+                            : "↔"}
+                      </span>
+                      {label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Existing Calculator */}
+            <div
+              key={`${country.code}-${tab}`}
+              role="tabpanel"
+              style={styles.calculator}
+            >
+              <Active />
+            </div>
+
+            {/* Trust Note */}
+            <div style={styles.footer}>
+              <span aria-hidden="true" style={{ color: "#5145cd" }}>
+                ✦
+              </span>
+              <span>
+                Simple tools to help you plan with confidence.
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
-    </div></section>
+    </section>
   );
 }
+
 
 function Header({ info }) {
   const [open, setOpen] = useState(false);
@@ -964,36 +1220,902 @@ function Outcomes() {
 
 const COMMISSION = { PK: 250000, AE: 25000, US: 6000, UK: 4000, CA: 6000 };
 /** An estimate from the visitor's own numbers. The starting values are placeholders to change, not statistics. */
+
+
+
+
+
+
+
 function LeakCalc({ trialDays }) {
   const { country } = useCountry();
-  const cur = country.currency || 'USD';
-  const [v, setV] = useState({ leads: 80, lost: 15, close: 3, commission: COMMISSION[country.code] || 5000 });
-  useEffect(() => setV((x) => ({ ...x, commission: COMMISSION[country.code] || 5000 })), [cur, country.code]);
+  const cur = country?.currency || "USD";
+
+  const [v, setV] = useState({
+    leads: 80,
+    lost: 15,
+    close: 3,
+    commission: COMMISSION[country?.code] || 5000,
+  });
+
+  useEffect(() => {
+    setV((x) => ({
+      ...x,
+      commission: COMMISSION[country?.code] || 5000,
+    }));
+  }, [cur, country?.code]);
+
   const n = (k) => Math.max(0, Number(v[k]) || 0);
-  const lostDeals = (n('leads') * n('lost') / 100) * (n('close') / 100);
-  const money = (x) => new Intl.NumberFormat('en', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(Math.round(x));
-  const field = (k, label, suffix) => <label className="lcalc-f"><span>{label}</span><div><input type="number" min="0" inputMode="decimal" value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />{suffix && <em>{suffix}</em>}</div></label>;
+
+  const lostDeals =
+    ((n("leads") * n("lost")) / 100) * (n("close") / 100);
+
+  const missedLeads = (n("leads") * n("lost")) / 100;
+  const monthlyLoss = lostDeals * n("commission");
+
+  const money = (x) =>
+    new Intl.NumberFormat("en", {
+      style: "currency",
+      currency: cur,
+      maximumFractionDigits: 0,
+    }).format(Math.round(x));
+
+  const field = (k, label, suffix, hint) => (
+    <label key={k} htmlFor={`leak-${k}`} className="leak-field">
+      <span className="leak-label">{label}</span>
+
+      <div className="leak-input-wrap">
+        <input
+          id={`leak-${k}`}
+          type="number"
+          min="0"
+          step="any"
+          inputMode="decimal"
+          value={v[k]}
+          onChange={(e) =>
+            setV((prev) => ({
+              ...prev,
+              [k]: e.target.value,
+            }))
+          }
+        />
+
+        {suffix && <span className="leak-suffix">{suffix}</span>}
+      </div>
+
+      {hint && <span className="leak-hint">{hint}</span>}
+    </label>
+  );
+
+  const metrics = [
+    {
+      icon: "↗",
+      value: missedLeads.toFixed(1),
+      label: "Leads missed monthly",
+    },
+    {
+      icon: "◎",
+      value: lostDeals.toFixed(1),
+      label: "Potential lost sales",
+    },
+  ];
+
   return (
-    <section className="alt"><div className="lwrap lcalc">
-      <div>
-        <h2 style={{ fontSize: 32 }}>What do slow follow-ups cost you?</h2>
-        <p>Put in your own numbers. The starting values are only examples.</p>
-        <div className="lcalc-g">
-          {field('leads', 'New leads a month')}
-          {field('lost', 'Leads that never get a proper follow-up', '%')}
-          {field('close', 'Leads that normally become a sale', '%')}
-          {field('commission', `Average commission per sale (${cur})`)}
+    <section className="leak-section">
+      <style>{`
+        .leak-section {
+          --purple: #6d5dfc;
+          --purple-dark: #5141dc;
+          --purple-light: #eeeaff;
+          --ink: #111827;
+          --muted: #596579;
+          --card: #e5e7eb;
+          --border: #d1d5db;
+
+          position: relative;
+          isolation: isolate;
+          overflow: hidden;
+          padding: clamp(55px, 8vw, 100px) 20px;
+          background:
+            radial-gradient(ellipse at 0% 0%, #f0edff 0%, transparent 32%),
+            radial-gradient(ellipse at 100% 90%, #f0edff 0%, transparent 30%),
+            #ffffff;
+          color: var(--ink);
+          font-family: inherit;
+        }
+
+        .leak-section *,
+        .leak-section *::before,
+        .leak-section *::after {
+          box-sizing: border-box;
+        }
+
+        .leak-container {
+          width: 100%;
+          max-width: 1120px;
+          margin: 0 auto;
+        }
+
+        /* Heading */
+
+        .leak-heading {
+          max-width: 760px;
+          margin: 0 auto 48px;
+          text-align: center;
+          animation: leakEnter .7s ease both;
+        }
+
+        .leak-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 16px;
+          border: 1px solid #ddd6fe;
+          border-radius: 50px;
+          background: #f5f3ff;
+          color: #5141dc;
+          font-size: 10px;
+          font-weight: 850;
+          letter-spacing: 1.7px;
+          transition: transform .3s ease, box-shadow .3s ease;
+        }
+
+        .leak-eyebrow:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 22px rgba(109, 93, 252, .13);
+        }
+
+        .leak-dot {
+          width: 8px;
+          height: 8px;
+          flex-shrink: 0;
+          border-radius: 50%;
+          background: var(--purple);
+          box-shadow: 0 0 0 4px rgba(109, 93, 252, .13);
+          animation: leakPulse 2s infinite;
+        }
+
+        .leak-title {
+          margin: 23px 0 17px;
+          color: #111827;
+          font-size: clamp(32px, 5vw, 54px);
+          font-weight: 850;
+          line-height: 1.12;
+          letter-spacing: -1.8px;
+        }
+
+        .leak-title span {
+          display: block;
+          margin-top: 7px;
+          background: linear-gradient(100deg, #5141dc, #8b5cf6, #6d5dfc);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .leak-description {
+          max-width: 610px;
+          margin: 0 auto;
+          color: #596579;
+          font-size: 15px;
+          line-height: 1.9;
+        }
+
+        /* Main cards */
+
+        .leak-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          align-items: stretch;
+          gap: 24px;
+        }
+
+        .leak-card {
+          min-width: 0;
+          padding: clamp(21px, 3vw, 32px);
+          border: 1px solid #d1d5db;
+          border-radius: 22px;
+          color: #111827;
+          animation: leakCardEnter .75s ease both;
+          transition:
+            transform .35s ease,
+            border-color .35s ease,
+            box-shadow .35s ease;
+        }
+
+        .leak-input-card {
+          background: linear-gradient(145deg, #f3f4f6 0%, #e5e7eb 100%);
+          box-shadow:
+            0 12px 32px rgba(31, 41, 55, .07),
+            inset 0 1px 0 rgba(255, 255, 255, .9);
+        }
+
+        .leak-result-card {
+          display: flex;
+          flex-direction: column;
+          background:
+            radial-gradient(
+              ellipse at 100% 0%,
+              rgba(196, 181, 253, .35),
+              transparent 45%
+            ),
+            linear-gradient(145deg, #f3f4f6 0%, #e5e7eb 100%);
+          box-shadow:
+            0 12px 32px rgba(31, 41, 55, .08),
+            inset 0 1px 0 rgba(255, 255, 255, .9);
+          animation-delay: .12s;
+        }
+
+        .leak-card:hover {
+          transform: translateY(-6px);
+          border-color: #a5a0ff;
+          box-shadow:
+            0 22px 45px rgba(31, 41, 55, .12),
+            0 0 0 3px rgba(109, 93, 252, .05);
+        }
+
+        .leak-card-header {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          margin-bottom: 30px;
+        }
+
+        .leak-icon-box,
+        .leak-result-icon {
+          display: grid;
+          place-items: center;
+          flex-shrink: 0;
+          color: #5b4be7;
+          border: 1px solid #d8d1ff;
+          background: linear-gradient(135deg, #f1eeff, #e4deff);
+          transition: transform .35s ease, box-shadow .35s ease;
+        }
+
+        .leak-icon-box {
+          width: 48px;
+          height: 48px;
+          border-radius: 15px;
+        }
+
+        .leak-card:hover .leak-icon-box,
+        .leak-card:hover .leak-result-icon {
+          transform: rotate(-4deg) scale(1.06);
+          box-shadow: 0 7px 18px rgba(109, 93, 252, .16);
+        }
+
+        .leak-card-title {
+          margin: 0;
+          color: #111827;
+          font-size: 18px;
+          font-weight: 800;
+        }
+
+        .leak-card-subtitle {
+          margin: 5px 0 0;
+          color: #596579;
+          font-size: 12px;
+          line-height: 1.7;
+        }
+
+        /* Input fields */
+
+        .leak-fields {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 24px 18px;
+        }
+
+        .leak-field {
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+          min-width: 0;
+        }
+
+        .leak-label {
+          color: #1f2937;
+          font-size: 13px;
+          font-weight: 750;
+          line-height: 1.5;
+        }
+
+        .leak-input-wrap {
+          display: flex;
+          align-items: center;
+          min-width: 0;
+          height: 52px;
+          padding: 0 14px;
+          border: 1.5px solid #d1d5db;
+          border-radius: 12px;
+          background: #ffffff;
+          transition:
+            border-color .25s ease,
+            box-shadow .25s ease,
+            transform .25s ease;
+        }
+
+        .leak-input-wrap:hover {
+          border-color: #a5a0ff;
+        }
+
+        .leak-input-wrap:focus-within {
+          border-color: var(--purple);
+          box-shadow: 0 0 0 4px rgba(109, 93, 252, .12);
+          transform: translateY(-2px);
+        }
+
+        .leak-input-wrap input {
+          width: 100%;
+          min-width: 0;
+          border: none;
+          outline: none;
+          background: transparent;
+          color: #111827;
+          font-size: 16px;
+          font-weight: 750;
+          font-family: inherit;
+        }
+
+        .leak-input-wrap input:focus {
+          outline: none;
+        }
+
+        .leak-input-wrap input::-webkit-inner-spin-button,
+        .leak-input-wrap input::-webkit-outer-spin-button {
+          opacity: .7;
+        }
+
+        .leak-suffix {
+          margin-left: 8px;
+          color: #5141dc;
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .leak-hint {
+          color: #687386;
+          font-size: 11px;
+          line-height: 1.6;
+        }
+
+        .leak-note {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          margin-top: 28px;
+          padding: 15px;
+          border: 1px solid #d9d3ff;
+          border-radius: 13px;
+          background: linear-gradient(120deg, #f5f3ff, #f9f8ff);
+          color: #4b5563;
+          font-size: 11px;
+          line-height: 1.8;
+        }
+
+        .leak-note-icon {
+          flex-shrink: 0;
+          color: #5b4be7;
+          font-size: 16px;
+        }
+
+        /* Results */
+
+        .leak-result-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .leak-result-label {
+          color: #596579;
+          font-size: 10px;
+          font-weight: 850;
+          letter-spacing: 1.3px;
+          line-height: 1.7;
+        }
+
+        .leak-result-icon {
+          width: 43px;
+          height: 43px;
+          border-radius: 13px;
+        }
+
+        .leak-amount {
+          margin-top: 24px;
+          overflow-wrap: anywhere;
+          color: #111827;
+          font-size: clamp(34px, 4.5vw, 48px);
+          font-weight: 850;
+          line-height: 1.15;
+          letter-spacing: -1.5px;
+          font-variant-numeric: tabular-nums;
+          animation: leakAmountEnter .35s ease both;
+        }
+
+        .leak-result-description {
+          max-width: 340px;
+          margin: 13px 0 0;
+          color: #596579;
+          font-size: 12px;
+          line-height: 1.9;
+        }
+
+        .leak-divider {
+          height: 1px;
+          margin: 27px 0 22px;
+          background: linear-gradient(90deg, #a5a0ff, #d1d5db, transparent);
+        }
+
+        /* Metrics */
+
+        .leak-metrics {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .leak-metric-card {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          min-width: 0;
+          padding: 15px 12px;
+          border: 1px solid #d1d5db;
+          border-radius: 13px;
+          background: linear-gradient(145deg, #f9fafb, #e5e7eb);
+          transition:
+            transform .3s ease,
+            box-shadow .3s ease,
+            border-color .3s ease,
+            background .3s ease;
+        }
+
+        .leak-metric-card:hover {
+          transform: translateY(-4px);
+          border-color: #aaa1ff;
+          background: #ffffff;
+          box-shadow: 0 10px 22px rgba(31, 41, 55, .08);
+        }
+
+        .leak-metric-icon {
+          display: grid;
+          place-items: center;
+          width: 29px;
+          height: 29px;
+          flex-shrink: 0;
+          border-radius: 9px;
+          background: #ede9fe;
+          color: #5b4be7;
+          font-size: 16px;
+          font-weight: 800;
+        }
+
+        .leak-metric-value {
+          display: block;
+          overflow-wrap: anywhere;
+          color: #111827;
+          font-size: 20px;
+          font-weight: 800;
+          line-height: 1.3;
+        }
+
+        .leak-metric-label {
+          display: block;
+          margin-top: 5px;
+          color: #596579;
+          font-size: 10px;
+          line-height: 1.6;
+        }
+
+        /* Insight */
+
+        .leak-insight {
+          display: flex;
+          align-items: flex-start;
+          gap: 11px;
+          margin-top: 22px;
+          padding: 15px;
+          border: 1px solid #d9d3ff;
+          border-radius: 13px;
+          background: linear-gradient(120deg, #f5f3ff, #eeebff);
+          transition: border-color .25s ease, transform .25s ease;
+        }
+
+        .leak-insight:hover {
+          transform: translateY(-2px);
+          border-color: #aaa1ff;
+        }
+
+        .leak-check {
+          display: grid;
+          place-items: center;
+          width: 22px;
+          height: 22px;
+          flex-shrink: 0;
+          border-radius: 50%;
+          background: #6d5dfc;
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .leak-insight p {
+          margin: 0;
+          color: #374151;
+          font-size: 11px;
+          line-height: 1.8;
+        }
+
+        /* CTA */
+
+        .leak-cta {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          width: 100%;
+          min-height: 55px;
+          margin-top: 24px;
+          padding: 12px 16px;
+          border: 1px solid #8d81ff;
+          border-radius: 13px;
+          background: linear-gradient(110deg, #7565f5, #5141dc, #806bff);
+          background-size: 200% 100%;
+          color: #ffffff;
+          font-size: 13px;
+          font-weight: 750;
+          line-height: 1.5;
+          text-decoration: none;
+          box-shadow: 0 8px 22px rgba(109, 93, 252, .22);
+          transition:
+            transform .3s ease,
+            box-shadow .3s ease,
+            background-position .4s ease;
+        }
+
+        .leak-cta:hover {
+          transform: translateY(-3px);
+          background-position: 100% 0;
+          box-shadow: 0 14px 28px rgba(109, 93, 252, .32);
+        }
+
+        .leak-cta:active {
+          transform: scale(.985);
+        }
+
+        .leak-cta:focus-visible {
+          outline: 3px solid #b9b0ff;
+          outline-offset: 4px;
+        }
+
+        .leak-cta-arrow {
+          display: grid;
+          place-items: center;
+          width: 30px;
+          height: 30px;
+          flex-shrink: 0;
+          border-radius: 9px;
+          background: rgba(255, 255, 255, .18);
+          font-size: 19px;
+          transition: transform .3s ease;
+        }
+
+        .leak-cta:hover .leak-cta-arrow {
+          transform: translateX(5px);
+        }
+
+        .leak-cta-caption {
+          margin: 12px 0 0;
+          color: #687386;
+          font-size: 10px;
+          line-height: 1.7;
+          text-align: center;
+        }
+
+        /* Disclaimer */
+
+        .leak-disclaimer {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-top: 34px;
+          color: #687386;
+          font-size: 11px;
+          font-weight: 500;
+          line-height: 1.8;
+          text-align: center;
+        }
+
+        .leak-disclaimer-line {
+          width: 25px;
+          height: 1px;
+          background: #c4c8d2;
+        }
+
+        /* Animations */
+
+        @keyframes leakEnter {
+          from {
+            opacity: 0;
+            transform: translateY(18px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes leakCardEnter {
+          from {
+            opacity: 0;
+            transform: translateY(22px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes leakAmountEnter {
+          from {
+            opacity: .4;
+            transform: translateY(6px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes leakPulse {
+          0%, 100% {
+            box-shadow: 0 0 0 3px rgba(109, 93, 252, .15);
+          }
+          50% {
+            box-shadow: 0 0 0 7px rgba(109, 93, 252, .04);
+          }
+        }
+
+        /* Tablet */
+
+        @media (max-width: 760px) {
+          .leak-grid {
+            grid-template-columns: minmax(0, 1fr);
+          }
+
+          .leak-heading {
+            margin-bottom: 32px;
+          }
+
+          .leak-title {
+            letter-spacing: -1px;
+          }
+        }
+
+        /* Mobile */
+
+        @media (max-width: 460px) {
+          .leak-section {
+            padding-right: 14px;
+            padding-left: 14px;
+          }
+
+          .leak-card {
+            padding: 19px 16px;
+            border-radius: 18px;
+          }
+
+          .leak-fields {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 19px;
+          }
+
+          .leak-metrics {
+            gap: 8px;
+          }
+
+          .leak-metric-card {
+            flex-direction: column;
+            padding: 12px 10px;
+          }
+
+          .leak-metric-value {
+            font-size: 18px;
+          }
+
+          .leak-result-label {
+            font-size: 9px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .leak-section *,
+          .leak-section *::before,
+          .leak-section *::after {
+            animation: none !important;
+            transition: none !important;
+          }
+        }
+      `}</style>
+
+      <div className="leak-container">
+        <div className="leak-heading">
+          <span className="leak-eyebrow">
+            <span className="leak-dot" />
+            KNOW YOUR NUMBERS
+          </span>
+
+          <h2 className="leak-title">
+            How much are slow
+            <span>follow-ups costing you?</span>
+          </h2>
+
+          <p className="leak-description">
+            Every missed follow-up could mean a missed commission.
+            Enter your numbers and see your estimated monthly impact
+            in real time.
+          </p>
+        </div>
+
+        <div className="leak-grid">
+          {/* Input card */}
+          <div className="leak-card leak-input-card">
+            <div className="leak-card-header">
+              <div className="leak-icon-box">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  aria-hidden="true"
+                >
+                  <rect x="4" y="3" width="16" height="18" rx="3" />
+                  <path d="M8 7h8M8 11h2m4 0h2M8 15h2m4 0h2" />
+                </svg>
+              </div>
+
+              <div>
+                <h3 className="leak-card-title">Your business numbers</h3>
+                <p className="leak-card-subtitle">
+                  Adjust the values to match your business.
+                </p>
+              </div>
+            </div>
+
+            <div className="leak-fields">
+              {field(
+                "leads",
+                "New leads per month",
+                "",
+                "Total enquiries received monthly"
+              )}
+
+              {field(
+                "lost",
+                "Leads missed or not followed up",
+                "%",
+                "Estimated percentage of leads"
+              )}
+
+              {field(
+                "close",
+                "Typical conversion rate",
+                "%",
+                "Percentage of leads that become sales"
+              )}
+
+              {field(
+                "commission",
+                "Average commission per sale",
+                cur,
+                "Your average commission amount"
+              )}
+            </div>
+
+            <div className="leak-note">
+              <span className="leak-note-icon">ⓘ</span>
+              <span>
+                Starting values are examples. Use your own numbers
+                for a more relevant estimate.
+              </span>
+            </div>
+          </div>
+
+          {/* Results card */}
+          <div className="leak-card leak-result-card" aria-live="polite">
+            <div className="leak-result-top">
+              <span className="leak-result-label">
+                YOUR ESTIMATED MONTHLY LOSS
+              </span>
+
+              <span className="leak-result-icon">
+                <svg
+                  width="23"
+                  height="23"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  aria-hidden="true"
+                >
+                  <path d="M3 17l6-6 4 4 8-9" />
+                  <path d="M15 6h6v6" />
+                </svg>
+              </span>
+            </div>
+
+            <div className="leak-amount" key={`${cur}-${monthlyLoss}`}>
+              {money(monthlyLoss)}
+            </div>
+
+            <p className="leak-result-description">
+              Estimated commission potentially slipping away every
+              month due to missed follow-ups.
+            </p>
+
+            <div className="leak-divider" />
+
+            <div className="leak-metrics">
+              {metrics.map((item) => (
+                <div className="leak-metric-card" key={item.label}>
+                  <span className="leak-metric-icon">{item.icon}</span>
+
+                  <div style={{ minWidth: 0 }}>
+                    <strong className="leak-metric-value">
+                      {item.value}
+                    </strong>
+                    <span className="leak-metric-label">{item.label}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="leak-insight">
+              <span className="leak-check">✓</span>
+              <p>
+                Consistent follow-ups help your team keep track of
+                leads and follow-up opportunities.
+              </p>
+            </div>
+
+            <Link
+              to="/signup"
+              className="leak-cta"
+              onClick={() =>
+                track("cta_start_trial", {
+                  where: "leak_calc",
+                })
+              }
+            >
+              <span>Start your {trialDays}-day free trial</span>
+              <span className="leak-cta-arrow">→</span>
+            </Link>
+
+            <p className="leak-cta-caption">
+              Explore a smarter way to manage your leads.
+            </p>
+          </div>
+        </div>
+
+        <div className="leak-disclaimer">
+          <span className="leak-disclaimer-line" />
+          An estimate based on the numbers you enter — not a guarantee.
+          <span className="leak-disclaimer-line" />
         </div>
       </div>
-      <div className="lcalc-out" aria-live="polite">
-        <span>Your estimate</span>
-        <b>{money(lostDeals * n('commission'))}</b>
-        <small>in commission slipping away each month, about {lostDeals.toFixed(1)} {lostDeals === 1 ? 'sale' : 'sales'}. An estimate from the numbers you entered.</small>
-        <Link className="lbtn p" to="/signup" onClick={() => track('cta_start_trial', { where: 'leak_calc' })}>Start recovering them free for {trialDays} days</Link>
-      </div>
-    </div></section>
+    </section>
   );
 }
+
+
+
+
 
 /** Real, permitted customer quotes entered in the console. Until there are some, say what an early customer gets instead. */
 function Voices({ testimonials, trialDays }) {
@@ -1405,12 +2527,12 @@ function CallNextSection() {
             You pay for the CRM.
             <span>Your property website is included.</span>
           </h2>
-
+{/* 
           <p className="property-center-description">
             Every plan comes with a public website for your listings,
             your own domain, and the calculators your buyers expect.
             No separate website bill.
-          </p>
+          </p> */}
 
           {Array.isArray(cc.works_with) &&
             cc.works_with.length > 0 && (
