@@ -635,15 +635,181 @@ function EmailStart({ trialDays, where }) {
 }
 
 /** Tools the product really connects with. Shown as compatibility, never as partners or customers. */
+
+
 function LogoStrip() {
   return (
-    <section className="lworks" aria-label="Works with"><div className="lwrap">
-      <p className="lworks-t">Connects with the tools your team already uses</p>
-      <ul className="lworks-l">{BRANDS.map((b) => <li key={b.id}><svg viewBox="0 0 24 24" width="22" height="22" role="img" aria-label={b.name}><path d={b.path} fill="currentColor" /></svg><span>{b.name}</span></li>)}</ul>
-      <p className="lfine lworks-f">Logos belong to their owners and show compatibility only. They do not mean partnership or endorsement.</p>
-    </div></section>
+    <section className="logo-marquee-section">
+      <div className="logo-marquee-heading">
+        <span>INTEGRATIONS</span>
+        <h2>Works with your favorite tools</h2>
+      </div>
+
+      <div className="logo-marquee">
+        <div className="logo-marquee-track">
+          {[...BRANDS, ...BRANDS].map((b, index) => (
+            <div className="logo-marquee-item" key={`${b.id}-${index}`}>
+              <svg
+                viewBox="0 0 24 24"
+                width="26"
+                height="26"
+                role="img"
+                aria-label={b.name}
+              >
+                <path d={b.path} fill="currentColor" />
+              </svg>
+
+              <span>{b.name}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <style>{`
+        .logo-marquee-section {
+          overflow: hidden;
+          width: 100%;
+          padding: 55px 0 45px;
+          color: #fff;
+          background: #000;
+        }
+
+        .logo-marquee-heading {
+          text-align: center;
+          padding: 0 20px;
+          margin-bottom: 35px;
+        }
+
+        .logo-marquee-heading > span {
+          display: block;
+          margin-bottom: 12px;
+          color: #aaa;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 3px;
+        }
+
+        .logo-marquee-heading h2 {
+          margin: 0;
+          color: #fff;
+          font-size: clamp(22px, 3vw, 34px);
+          font-weight: 700;
+          letter-spacing: -0.7px;
+        }
+
+        .logo-marquee {
+          position: relative;
+          overflow: hidden;
+          width: 100%;
+          background: #000;
+
+          /* Fade at both edges */
+          -webkit-mask-image: linear-gradient(
+            90deg,
+            transparent 0%,
+            #000 8%,
+            #000 92%,
+            transparent 100%
+          );
+          mask-image: linear-gradient(
+            90deg,
+            transparent 0%,
+            #000 8%,
+            #000 92%,
+            transparent 100%
+          );
+        }
+
+        .logo-marquee-track {
+          display: flex;
+          align-items: center;
+          width: max-content;
+          animation: logoMarqueeMove 35s linear infinite;
+          will-change: transform;
+        }
+
+        .logo-marquee-item {
+          display: inline-flex;
+          flex: 0 0 auto;
+          align-items: center;
+          justify-content: center;
+          gap: 13px;
+          min-width: 190px;
+          padding: 24px 30px;
+          color: #fff;
+          white-space: nowrap;
+          transition: opacity .25s ease;
+        }
+
+        .logo-marquee-item svg {
+          flex-shrink: 0;
+          color: #fff;
+          transition: transform .25s ease;
+        }
+
+        .logo-marquee-item span {
+          color: #fff;
+          font-size: 16px;
+          font-weight: 600;
+        }
+
+        .logo-marquee-item:hover {
+          opacity: .7;
+        }
+
+        .logo-marquee-item:hover svg {
+          transform: scale(1.15);
+        }
+
+        .logo-marquee:hover .logo-marquee-track {
+          animation-play-state: paused;
+        }
+
+        @keyframes logoMarqueeMove {
+          from {
+            transform: translateX(0);
+          }
+
+          to {
+            transform: translateX(-50%);
+          }
+        }
+
+        @media (max-width: 600px) {
+          .logo-marquee-section {
+            padding: 40px 0 32px;
+          }
+
+          .logo-marquee-heading {
+            margin-bottom: 22px;
+          }
+
+          .logo-marquee-item {
+            min-width: 145px;
+            gap: 10px;
+            padding: 18px 20px;
+          }
+
+          .logo-marquee-item svg {
+            width: 22px;
+            height: 22px;
+          }
+
+          .logo-marquee-item span {
+            font-size: 14px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .logo-marquee-track {
+            animation-duration: 80s;
+          }
+        }
+      `}</style>
+    </section>
   );
 }
+
 
 const OUTCOMES = [
   ['Leads stop going cold', 'Call next ranks who needs a call and why, and every outcome sets the next follow-up.'],
