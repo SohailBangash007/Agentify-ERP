@@ -1055,22 +1055,252 @@ function HeroVisual() {
 }
 
 /** What is in the platform, in the order a brokerage uses it. Only things the product really does. */
+
 const PLATFORM = [
-  ['📞', 'Call next dialer', 'Ranks who to call and why, rings your phone first, logs every call and sets the next follow-up.'],
-  ['🎥', 'Video meetings', 'Screen sharing, pen and pointer, captions, background blur, recording and a script beside you.'],
-  ['🤖', 'Claude and ChatGPT', 'Ask questions about your own numbers and turn a listing into a promotional video script. You bring your own key.'],
-  ['🌐', 'Your property website', 'Included with every plan, on your own domain, with listings, calculators and enquiry forms.'],
-  ['📅', 'Appointments', 'Viewings and site visits go to your Google Calendar, with reminders.'],
-  ['📣', 'Portals and social', 'Publish to the portals of your country and to Facebook, Instagram, LinkedIn and TikTok.'],
+  [
+    "📞",
+    "Call next dialer",
+    "Prioritize leads, log calls and schedule follow-ups.",
+  ],
+  [
+    "🎥",
+    "Video meetings",
+    "Meet buyers with screen sharing and live annotations.",
+  ],
+  [
+    "✦",
+    "AI assistants",
+    "Use Claude and ChatGPT to explore data and create listing content.",
+  ],
+  [
+    "🌐",
+    "Property website",
+    "Showcase listings and capture enquiries on your own domain.",
+  ],
+  [
+    "📅",
+    "Appointments",
+    "Manage viewings and sync meetings with Google Calendar.",
+  ],
+  [
+    "↗",
+    "Portals & social",
+    "Share properties across social media and supported portals.",
+  ],
 ];
+
 function Platform() {
   return (
-    <section><div className="lwrap">
-      <div className="lsh"><h2>Everything a brokerage runs on, in one place</h2><p>From the first enquiry to the signed sale, without switching between five tools.</p></div>
-      <div className="lfeat">{PLATFORM.map(([i, t, d]) => <div className="lcard lf" key={t}><span className="lficon" aria-hidden>{i}</span><h3>{t}</h3><p>{d}</p></div>)}</div>
-    </div></section>
+    <section
+      style={{
+        padding: "90px 0",
+        background: "#ffffff",
+        color: "#111827",
+      }}
+    >
+      <div className="lwrap">
+        {/* Heading */}
+        <div
+          style={{
+            maxWidth: "650px",
+            marginBottom: "42px",
+          }}
+        >
+          <span
+            style={{
+              display: "inline-block",
+              marginBottom: "15px",
+              color: "#4f46e5",
+              fontSize: "11px",
+              fontWeight: 700,
+              letterSpacing: "2px",
+            }}
+          >
+            ONE CONNECTED PLATFORM
+          </span>
+
+          <h2
+            style={{
+              margin: "0 0 14px",
+              color: "#111827",
+              fontSize: "clamp(32px, 4vw, 48px)",
+              fontWeight: 750,
+              letterSpacing: "-1.8px",
+              lineHeight: 1.15,
+            }}
+          >
+            Everything your  Needs.
+            <span style={{ color: "#4f46e5" }}>
+              {" "}All in one place.
+            </span>
+          </h2>
+
+          <p
+            style={{
+              margin: 0,
+              maxWidth: "520px",
+              color: "#6b7280",
+              fontSize: "15px",
+              lineHeight: 1.8,
+            }}
+          >
+            Manage conversations, appointments, marketing and property
+            enquiries from one connected workspace.
+          </p>
+        </div>
+
+        {/* Features */}
+        <div className="platform-grid">
+          {PLATFORM.map(([icon, title, description], index) => (
+            <article
+              className="platform-card"
+              key={title}
+            >
+              <div className="platform-card-top">
+                <span className="platform-icon">
+                  {icon}
+                </span>
+
+                <span className="platform-index">
+                  0{index + 1}
+                </span>
+              </div>
+
+              <h3>{title}</h3>
+
+              <p>{description}</p>
+
+              <div className="platform-card-bottom">
+                <span>Explore feature</span>
+                <span className="platform-arrow">↗</span>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <style>{`
+        .platform-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 18px;
+        }
+
+        .platform-card {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          padding: 25px;
+          border: 1px solid #000000;
+          border-radius: 14px;
+          background: #ffffff;
+          transition:
+            border-color 0.25s ease,
+            transform 0.25s ease,
+            box-shadow 0.25s ease;
+        }
+
+        .platform-card:hover {
+          transform: translateY(-4px);
+          border-color: #c7d2fe;
+          box-shadow: 0 12px 30px rgba(30, 41, 59, 0.07);
+        }
+
+        .platform-card-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 25px;
+        }
+
+        .platform-icon {
+          display: grid;
+          place-items: center;
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          background: #eef2ff;
+          color: #4f46e5;
+          font-size: 21px;
+        }
+
+        .platform-index {
+          color: #9ca3af;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 1px;
+        }
+
+        .platform-card h3 {
+          margin: 0 0 9px;
+          color: #111827;
+          font-size: 18px;
+          font-weight: 650;
+          letter-spacing: -0.4px;
+        }
+
+        .platform-card p {
+          flex: 1;
+          margin: 0 0 22px;
+          color: #6b7280;
+          font-size: 13px;
+          line-height: 1.8;
+        }
+
+        .platform-card-bottom {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          padding-top: 15px;
+          border-top: 1px solid #f0f1f4;
+          color: #4f46e5;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .platform-arrow {
+          font-size: 17px;
+          transition: transform 0.25s ease;
+        }
+
+        .platform-card:hover .platform-arrow {
+          transform: translate(3px, -3px);
+        }
+
+        @media (max-width: 900px) {
+          .platform-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+          }
+        }
+
+        @media (max-width: 560px) {
+          .platform-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+
+          .platform-card {
+            padding: 21px;
+          }
+
+          .platform-card-top {
+            margin-bottom: 19px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .platform-card,
+          .platform-arrow {
+            transition: none;
+          }
+        }
+      `}</style>
+    </section>
   );
 }
+
 
 // Screenshots come from a demo workspace in each country, so a visitor never sees another country's currency.
 const COUNTRY_SCREENS = (code) => ({
@@ -1078,39 +1308,770 @@ const COUNTRY_SCREENS = (code) => ({
   construction: [],
 });
 /** What the CRM does for every lead, and the free website. No customer quotes or numbers are made up here. */
+
+
+
+
 function CallNextSection() {
   const { country } = useCountry();
-  const cc = country.copy || {};
-  const rows = [['Priya Shah', 'Follow-up was due 2 days ago', 'High priority'], ['Daniel Brooks', 'New lead, not called yet', ''], ['Omar Haddad', 'No contact for 9 days', '']];
+  const cc = country?.copy || {};
+
+  const rows = [
+    ["PS", "Priya Shah", "Follow-up was due 2 days ago", "High priority"],
+    ["DB", "Daniel Brooks", "New lead, not called yet", ""],
+    ["OH", "Omar Haddad", "No contact for 9 days", ""],
+  ];
+
   return (
     <>
-      <section><div className="lwrap lsplit" style={{ alignItems: 'center' }}>
-        <div>
-          <span className="ltag2">Never lose a lead</span>
-          <h2 style={{ fontSize: 34, margin: '10px 0' }}>No lead goes cold. Every buyer gets a follow-up.</h2>
-          <p>A real estate CRM with a call-next assistant: it ranks the people who most need a phone call right now and tells you why, so the first call goes to the lead that matters most.</p>
-          <ul className="lcheck">
-            <li>New inquiries from your website, portals and WhatsApp land in one list</li>
-            <li>Call from the CRM in one press; every call and outcome is logged</li>
-            <li>The outcome sets the next follow-up, so nothing slips through</li>
-            <li>Appointments and viewings go to your Google Calendar</li>
-          </ul>
-          <p className="lfine">{cc.calls}</p>
+      {/* TOP SECTION — CALL NEXT */}
+      <section className="call-next-section">
+        <div className="lwrap lsplit call-next-layout">
+          <div className="call-next-copy">
+            <span className="call-next-eyebrow">
+              <span className="call-next-dot" />
+              NEVER LOSE A LEAD
+            </span>
+
+            <h2 className="call-next-title">
+              No lead goes cold.
+              <span>Every buyer gets a follow-up.</span>
+            </h2>
+
+            <p className="call-next-description">
+              A real estate CRM with a call-next assistant: it ranks
+              the people who most need a phone call right now and tells
+              you why, so the first call goes to the lead that matters most.
+            </p>
+
+            <div className="call-next-note">
+              <span className="call-next-check">✓</span>
+              Calls, outcomes and follow-ups in one place
+            </div>
+
+            {cc.calls && (
+              <p className="call-next-fine">{cc.calls}</p>
+            )}
+          </div>
+
+          {/* LEADS DASHBOARD */}
+          <div
+            className="call-dashboard"
+            aria-label="Example of the call-next list"
+          >
+            <div className="call-dashboard-heading">
+              <div>
+                <strong>Call next</strong>
+                <span>Your priority leads</span>
+              </div>
+              <span className="call-count">3 leads</span>
+            </div>
+
+            {rows.map(([initials, name, reason, tag]) => (
+              <div className="call-lead-row" key={name}>
+                <div className="call-avatar">{initials}</div>
+
+                <div className="call-lead-info">
+                  <strong>{name}</strong>
+                  <span>{reason}</span>
+                </div>
+
+                {tag ? (
+                  <span className="call-priority">{tag}</span>
+                ) : (
+                  <span className="call-action">Call ↗</span>
+                )}
+              </div>
+            ))}
+
+            <div className="call-dashboard-footer">
+              <span>✓</span>
+              Every outcome sets the next follow-up
+            </div>
+          </div>
         </div>
-        <div className="lcard" aria-label="Example of the call-next list">
-          <div className="lfine" style={{ marginBottom: 8 }}>Example: Call next</div>
-          {rows.map(([n, why, tag]) => <div key={n} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '10px 0', borderTop: '1px solid #eef0f3' }}><div><b>{n}</b><div className="lfine">{why}</div></div>{tag ? <span className="ltag">{tag}</span> : <span className="lbtn sm" aria-hidden>Call</span>}</div>)}
+      </section>
+
+      {/* BOTTOM SECTION — DARK THEME */}
+      <section className="property-website-section">
+        <div className="lwrap property-center-content">
+          <span className="property-center-eyebrow">
+            <span className="property-eyebrow-line" />
+            INCLUDED WITH EVERY PLAN
+            <span className="property-eyebrow-line" />
+          </span>
+
+          <h2 className="property-center-title">
+            You pay for the CRM.
+            <span>Your property website is included.</span>
+          </h2>
+
+          <p className="property-center-description">
+            Every plan comes with a public website for your listings,
+            your own domain, and the calculators your buyers expect.
+            No separate website bill.
+          </p>
+
+          {Array.isArray(cc.works_with) &&
+            cc.works_with.length > 0 && (
+              <div className="property-center-chips">
+                {cc.works_with.map((item, index) => (
+                  <span
+                    className="property-center-chip"
+                    key={item}
+                    style={{ "--chip-index": index }}
+                  >
+                    <span className="property-chip-check">✓</span>
+                    {item}
+                  </span>
+                ))}
+              </div>
+            )}
+
+          <div className="property-center-signin">
+            <span className="property-signin-icon">✓</span>
+            <div>
+              <strong>Simple and secure sign-in</strong>
+              <span>Sign in with email, Google or Apple.</span>
+            </div>
+          </div>
+
+          <div className="property-center-footer">
+            <span />
+            Built for modern real estate teams
+            <span />
+          </div>
         </div>
-      </div></section>
-      <section className="alt"><div className="lwrap" style={{ textAlign: 'center' }}>
-        <h2 style={{ fontSize: 30 }}>You pay for the CRM. Your property website is included.</h2>
-        <p style={{ maxWidth: 640, margin: '8px auto 18px' }}>Every plan comes with a public website for your listings, your own domain, and the calculators your buyers expect. No separate website bill.</p>
-        <div className="lchips" style={{ justifyContent: 'center' }}>{(cc.works_with || []).map((x) => <span key={x}>{x}</span>)}</div>
-        <p className="lfine" style={{ marginTop: 12 }}>Sign in with email, Google or Apple.</p>
-      </div></section>
+      </section>
+
+      {/* STYLES */}
+      <style>{`
+        /* =========================
+           TOP SECTION — UNCHANGED
+        ========================= */
+
+        .call-next-section {
+          padding: 90px 0;
+          overflow: hidden;
+          background: #ffffff;
+          color: #111827;
+        }
+
+        .call-next-layout {
+          align-items: center;
+          gap: 50px;
+        }
+
+        .call-next-copy {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .call-next-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
+          color: #4f46e5;
+          font-size: 11px;
+          font-weight: 750;
+          letter-spacing: 1.8px;
+        }
+
+        .call-next-dot {
+          width: 8px;
+          height: 8px;
+          flex-shrink: 0;
+          border-radius: 50%;
+          background: #4f46e5;
+          box-shadow: 0 0 0 4px #eef2ff;
+        }
+
+        .call-next-title {
+          margin: 20px 0 18px;
+          color: #111827;
+          font-size: clamp(34px, 4vw, 48px);
+          font-weight: 750;
+          line-height: 1.13;
+          letter-spacing: -1.8px;
+        }
+
+        .call-next-title span {
+          display: block;
+          color: #4f46e5;
+        }
+
+        .call-next-description {
+          max-width: 490px;
+          margin: 0;
+          color: #6b7280;
+          font-size: 15px;
+          line-height: 1.9;
+        }
+
+        .call-next-note {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-top: 25px;
+          color: #374151;
+          font-size: 13px;
+        }
+
+        .call-next-check {
+          display: grid;
+          place-items: center;
+          width: 24px;
+          height: 24px;
+          flex-shrink: 0;
+          border-radius: 50%;
+          background: #eef2ff;
+          color: #4f46e5;
+          font-weight: 700;
+        }
+
+        .call-next-fine {
+          margin-top: 18px;
+          color: #9ca3af;
+          font-size: 12px;
+        }
+
+        /* Dashboard */
+
+        .call-dashboard {
+          flex: 1;
+          min-width: 0;
+          padding: 22px;
+          border: 1.5px solid #111827;
+          border-radius: 18px;
+          background: #ffffff;
+          box-shadow: 0 16px 45px rgba(15, 23, 42, 0.07);
+          animation: callFadeUp 0.7s ease both;
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .call-dashboard:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 25px 55px rgba(15, 23, 42, 0.13);
+        }
+
+        .call-dashboard-heading {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 18px;
+        }
+
+        .call-dashboard-heading strong {
+          display: block;
+          color: #111827;
+          font-size: 17px;
+          font-weight: 750;
+        }
+
+        .call-dashboard-heading > div > span {
+          display: block;
+          margin-top: 5px;
+          color: #6b7280;
+          font-size: 12px;
+        }
+
+        .call-count {
+          padding: 7px 10px;
+          border-radius: 7px;
+          background: #eef2ff;
+          color: #4f46e5;
+          font-size: 11px;
+          font-weight: 650;
+          white-space: nowrap;
+        }
+
+        .call-lead-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 16px 0;
+          border-top: 1px solid #e5e7eb;
+          transition: padding 0.25s ease, background 0.25s ease;
+        }
+
+        .call-lead-row:hover {
+          padding-right: 7px;
+          padding-left: 7px;
+          background: #fafaff;
+        }
+
+        .call-avatar {
+          display: grid;
+          place-items: center;
+          width: 42px;
+          height: 42px;
+          flex-shrink: 0;
+          border: 1px solid #d1d5db;
+          border-radius: 12px;
+          background: #f3f4f6;
+          color: #111827;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .call-lead-info {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .call-lead-info strong {
+          display: block;
+          margin-bottom: 5px;
+          color: #111827;
+          font-size: 13px;
+          font-weight: 650;
+        }
+
+        .call-lead-info > span {
+          display: block;
+          color: #6b7280;
+          font-size: 11px;
+          line-height: 1.5;
+        }
+
+        .call-priority {
+          padding: 6px 8px;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          color: #374151;
+          font-size: 10px;
+          white-space: nowrap;
+        }
+
+        .call-action {
+          color: #4f46e5;
+          font-size: 12px;
+          font-weight: 650;
+          white-space: nowrap;
+          transition: transform 0.2s ease;
+        }
+
+        .call-lead-row:hover .call-action {
+          transform: translateX(3px);
+        }
+
+        .call-dashboard-footer {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          margin-top: 8px;
+          padding: 13px 12px;
+          border-radius: 9px;
+          background: #f8fafc;
+          color: #4b5563;
+          font-size: 11px;
+        }
+
+        .call-dashboard-footer > span {
+          color: #4f46e5;
+        }
+
+        /* =========================
+           BOTTOM SECTION — DARK
+        ========================= */
+
+        .property-website-section {
+          position: relative;
+          padding: 100px 20px;
+          overflow: hidden;
+          border-top: 1px solid #252b43;
+          background:
+            radial-gradient(
+              ellipse at 50% 0%,
+              rgba(99, 102, 241, 0.22),
+              transparent 60%
+            ),
+            linear-gradient(
+              135deg,
+              #101426 0%,
+              #171b32 55%,
+              #0c1020 100%
+            );
+          color: #f8fafc;
+        }
+
+        .property-center-content {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          max-width: 850px;
+          margin: 0 auto;
+          text-align: center;
+          animation: propertyCenterReveal 0.8s ease both;
+        }
+
+        .property-center-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          color: #a5b4fc;
+          font-size: 11px;
+          font-weight: 750;
+          letter-spacing: 2px;
+        }
+
+        .property-eyebrow-line {
+          display: inline-block;
+          width: 24px;
+          height: 2px;
+          border-radius: 10px;
+          background: #818cf8;
+          transition: width 0.3s ease;
+        }
+
+        .property-center-eyebrow:hover .property-eyebrow-line {
+          width: 38px;
+        }
+
+        .property-center-title {
+          max-width: 800px;
+          margin: 24px 0 18px;
+          color: #f8fafc;
+          font-size: clamp(34px, 5vw, 54px);
+          font-weight: 800;
+          line-height: 1.12;
+          letter-spacing: -2px;
+        }
+
+        .property-center-title span {
+          display: block;
+          margin-top: 7px;
+          background: linear-gradient(
+            90deg,
+            #a5b4fc,
+            #818cf8,
+            #c4b5fd
+          );
+          background-clip: text;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .property-center-description {
+          max-width: 620px;
+          margin: 0;
+          color: #cbd5e1;
+          font-size: 15px;
+          line-height: 1.9;
+        }
+
+        .property-center-chips {
+          display: flex;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-top: 30px;
+        }
+
+        .property-center-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 11px 16px;
+          border: 1px solid #343b58;
+          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.045);
+          color: #e2e8f0;
+          font-size: 12px;
+          font-weight: 550;
+          box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
+          animation: propertyChipReveal 0.5s ease both;
+          animation-delay: calc(var(--chip-index, 0) * 80ms);
+          transition:
+            transform 0.25s ease,
+            border-color 0.25s ease,
+            background 0.25s ease,
+            box-shadow 0.25s ease;
+        }
+
+        .property-center-chip:hover {
+          transform: translateY(-5px);
+          border-color: #818cf8;
+          background: rgba(99, 102, 241, 0.16);
+          box-shadow: 0 12px 24px rgba(79, 70, 229, 0.18);
+        }
+
+        .property-chip-check {
+          display: grid;
+          place-items: center;
+          width: 19px;
+          height: 19px;
+          border-radius: 50%;
+          background: rgba(99, 102, 241, 0.2);
+          color: #c7d2fe;
+          font-size: 11px;
+          font-weight: 800;
+          transition: color 0.25s ease, background 0.25s ease;
+        }
+
+        .property-center-chip:hover .property-chip-check {
+          background: #6366f1;
+          color: #ffffff;
+        }
+
+        .property-center-signin {
+          display: inline-flex;
+          align-items: center;
+          gap: 13px;
+          margin-top: 32px;
+          padding: 15px 22px;
+          border: 1px solid #343b58;
+          border-radius: 13px;
+          background: rgba(255, 255, 255, 0.045);
+          text-align: left;
+          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+          transition:
+            transform 0.25s ease,
+            border-color 0.25s ease,
+            background 0.25s ease,
+            box-shadow 0.25s ease;
+        }
+
+        .property-center-signin:hover {
+          transform: translateY(-4px);
+          border-color: #818cf8;
+          background: rgba(99, 102, 241, 0.1);
+          box-shadow: 0 15px 35px rgba(79, 70, 229, 0.18);
+        }
+
+        .property-signin-icon {
+          display: grid;
+          place-items: center;
+          width: 38px;
+          height: 38px;
+          flex-shrink: 0;
+          border-radius: 11px;
+          background: rgba(99, 102, 241, 0.2);
+          color: #c7d2fe;
+          font-size: 16px;
+          font-weight: 800;
+        }
+
+        .property-center-signin > div {
+          display: grid;
+          gap: 5px;
+        }
+
+        .property-center-signin strong {
+          color: #f8fafc;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .property-center-signin > div > span {
+          color: #cbd5e1;
+          font-size: 12px;
+        }
+
+        .property-center-footer {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          margin-top: 28px;
+          color: #94a3b8;
+          font-size: 11px;
+          letter-spacing: 0.5px;
+        }
+
+        .property-center-footer span {
+          width: 25px;
+          height: 1px;
+          background: #6366f1;
+        }
+
+        /* ANIMATIONS */
+
+        @keyframes callFadeUp {
+          from {
+            opacity: 0;
+            transform: translateY(16px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes propertyCenterReveal {
+          from {
+            opacity: 0;
+            transform: translateY(22px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes propertyChipReveal {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        /* RESPONSIVE */
+
+        @media (max-width: 900px) {
+          .call-next-section {
+            padding: 70px 0;
+          }
+
+          .call-next-layout {
+            gap: 32px;
+          }
+
+          .property-website-section {
+            padding: 80px 20px;
+          }
+        }
+
+        @media (max-width: 700px) {
+          .call-next-section {
+            padding: 55px 0;
+          }
+
+          .call-next-layout {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+          }
+
+          .call-next-title {
+            font-size: clamp(32px, 8vw, 42px);
+          }
+
+          .call-dashboard {
+            padding: 17px;
+          }
+
+          .call-lead-row {
+            gap: 9px;
+          }
+
+          .call-avatar {
+            width: 36px;
+            height: 36px;
+          }
+
+          .call-priority {
+            padding: 5px;
+            font-size: 9px;
+          }
+
+          .property-website-section {
+            padding: 70px 18px;
+          }
+
+          .property-center-title {
+            font-size: clamp(32px, 8vw, 42px);
+            letter-spacing: -1.3px;
+          }
+
+          .property-center-description {
+            font-size: 14px;
+          }
+
+          .property-center-chips {
+            gap: 9px;
+            margin-top: 24px;
+          }
+
+          .property-center-chip {
+            padding: 9px 12px;
+            font-size: 11px;
+          }
+
+          .property-center-signin {
+            width: 100%;
+            max-width: 340px;
+            padding: 13px;
+          }
+
+          .property-center-footer {
+            gap: 7px;
+            font-size: 10px;
+          }
+
+          .property-center-footer span {
+            width: 15px;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .call-dashboard {
+            padding: 13px;
+          }
+
+          .call-lead-row {
+            gap: 7px;
+          }
+
+          .call-lead-info strong {
+            font-size: 12px;
+          }
+
+          .call-lead-info > span {
+            font-size: 10px;
+          }
+
+          .call-priority {
+            max-width: 84px;
+            white-space: normal;
+            text-align: center;
+          }
+
+          .property-center-eyebrow {
+            gap: 7px;
+            font-size: 9px;
+            letter-spacing: 1.2px;
+          }
+
+          .property-eyebrow-line {
+            width: 15px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .call-dashboard,
+          .property-center-content,
+          .property-center-chip {
+            animation: none !important;
+          }
+
+          .call-dashboard,
+          .call-lead-row,
+          .call-action,
+          .property-center-chip,
+          .property-center-signin,
+          .property-eyebrow-line,
+          .property-chip-check {
+            transition: none !important;
+          }
+        }
+      `}</style>
     </>
   );
 }
+
+
+
+
+
+
 
 function Screens({ product }) {
   const { country } = useCountry();
