@@ -14,6 +14,9 @@ import '../site/site.css';
 import '../pages/landing.css';
 import './marketing.css';
 
+
+import { motion } from "framer-motion";
+
 const PRODUCT_PATH = { real_estate: '/real-estate', construction: '/construction' };
 const METHOD = { raast: 'Raast', easypaisa: 'Easypaisa', jazzcash: 'JazzCash', sadapay: 'SadaPay', nayapay: 'NayaPay', bank: 'Bank transfer' };
 const fmt = (amount, cur) => new Intl.NumberFormat('en', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(amount);
@@ -200,78 +203,423 @@ function ConsentBanner({ show, onClose }) {
 }
 
 // ---------------------------------------------------------------- pages
+
 function Home({ info }) {
   const c = info.content;
   const { country } = useCountry();
   const cc = country.copy || {};
+
   useTitle(c.seo.home.title, c.seo.home.description);
+
   return (
     <>
-      <div className="lhero2"><div className="lwrap lhero2g">
-        <div className="lhero2t">
-          <span className="leyebrow">{country.name} · {PRODUCT_LABELS.real_estate}</span>
-          <h1>{cc.hero_title || c.hero_title}</h1>
-          <p>{cc.hero_subtitle || c.hero_subtitle}</p>
-          <EmailStart trialDays={info.trial_days} where="hero" />
-          <ul className="ltrust"><li>No card needed to start</li><li>Your data stays yours, read-only if you stop paying</li><li>Set up in minutes</li></ul>
-          <Link className="llink2" to="/contact" onClick={() => track('cta_book_demo', { where: 'hero' })}>Prefer a walkthrough? Book a demo</Link>
+      {/* Premium Hero Section */}
+      <section
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          padding: "clamp(48px, 7vw, 85px) 0",
+          background:
+            "radial-gradient(ellipse at 82% 45%, rgba(59,130,246,0.12), transparent 48%)",
+        }}
+      >
+        <div
+          className="lwrap home-premium-grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 0.88fr) minmax(0, 1.12fr)",
+            alignItems: "center",
+            gap: "clamp(35px, 6vw, 90px)",
+          }}
+        >
+          {/* LEFT CONTENT */}
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "470px",
+              position: "relative",
+              zIndex: 2,
+              padding: "5px 0",
+            }}
+          >
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "9px",
+                padding: "8px 13px",
+                marginBottom: "20px",
+                border: "1px solid rgba(59,130,246,0.22)",
+                borderRadius: "30px",
+                background: "rgba(59,130,246,0.07)",
+                fontSize: "12px",
+                fontWeight: 600,
+                letterSpacing: "0.3px",
+              }}
+            >
+              <span
+                style={{
+                  width: "7px",
+                  height: "7px",
+                  borderRadius: "50%",
+                  background: "#34d399",
+                  boxShadow: "0 0 10px rgba(52,211,153,0.5)",
+                }}
+              />
+              Smart tools for modern businesses
+            </div>
+
+            <h1
+              style={{
+                fontSize: "clamp(32px, 3.6vw, 48px)",
+                lineHeight: 1.14,
+                letterSpacing: "-1.5px",
+                fontWeight: 750,
+                margin: "0 0 18px",
+                maxWidth: "450px",
+                textWrap: "balance",
+              }}
+            >
+              {cc.hero_title || c.hero_title}
+            </h1>
+
+            <p
+              style={{
+                fontSize: "15px",
+                lineHeight: 1.8,
+                opacity: 0.76,
+                maxWidth: "410px",
+                margin: "0 0 24px",
+              }}
+            >
+              Manage properties, clients, and projects — all from one
+              simple, powerful platform.
+            </p>
+
+            {/* Existing signup form */}
+            <div style={{ maxWidth: "420px", width: "100%" }}>
+              <EmailStart
+                trialDays={info.trial_days}
+                where="hero"
+              />
+            </div>
+
+            {/* Short trust points */}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "10px 18px",
+                marginTop: "17px",
+                fontSize: "12px",
+                lineHeight: 1.6,
+                opacity: 0.78,
+              }}
+            >
+              <span>✓ No credit card needed</span>
+              <span>✓ Quick setup</span>
+            </div>
+
+            <Link
+              className="llink2"
+              to="/contact"
+              onClick={() =>
+                track("cta_book_demo", { where: "hero" })
+              }
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                marginTop: "22px",
+                fontSize: "14px",
+                fontWeight: 600,
+                textDecoration: "none",
+                transition: "gap 0.2s ease",
+              }}
+            >
+              Book a personal demo <span>→</span>
+            </Link>
+          </div>
+
+          {/* RIGHT VISUAL */}
+          <div
+            className="home-premium-visual"
+            style={{
+              position: "relative",
+              width: "100%",
+              minWidth: 0,
+              transform: "translateX(12px)",
+              animation: "homeVisualFloat 5s ease-in-out infinite",
+            }}
+          >
+            {/* Soft background glow */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                inset: "10% -3% 5% 8%",
+                borderRadius: "45%",
+                background:
+                  "radial-gradient(ellipse, rgba(59,130,246,0.18), transparent 70%)",
+                filter: "blur(35px)",
+                pointerEvents: "none",
+              }}
+            />
+
+            {/* Keep your existing visual */}
+            <div
+              style={{
+                position: "relative",
+                zIndex: 1,
+                width: "100%",
+              }}
+            >
+              <HeroVisual />
+            </div>
+          </div>
         </div>
-        <HeroVisual />
-      </div></div>
+
+        {/* Responsive styling */}
+        <style>{`
+          @keyframes homeVisualFloat {
+            0%, 100% {
+              transform: translate3d(12px, 0, 0);
+            }
+            50% {
+              transform: translate3d(12px, -7px, 0);
+            }
+          }
+
+          .home-premium-grid {
+            box-sizing: border-box;
+          }
+
+          .home-premium-grid > * {
+            min-width: 0;
+          }
+
+          @media (max-width: 800px) {
+            .home-premium-grid {
+              grid-template-columns: minmax(0, 1fr) !important;
+              gap: 34px !important;
+            }
+
+            .home-premium-visual {
+              transform: none !important;
+              animation: none !important;
+              width: 100%;
+            }
+          }
+
+          @media (max-width: 480px) {
+            .home-premium-grid {
+              gap: 24px !important;
+            }
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .home-premium-visual {
+              animation: none !important;
+            }
+          }
+        `}</style>
+      </section>
+
+      {/* Existing sections — preserved */}
       <LogoStrip />
       <Outcomes />
       <Platform />
-      <section className="alt"><div className="lwrap lsplit" style={{ alignItems: 'center' }}>
-        <div className="lmeetmock" aria-label="Example of a video meeting with a shared screen and the script beside it">
-          <div className="lmm-bar"><i /><i /><i /><span>Site walkthrough · 24:10 left</span></div>
-          <div className="lmm-body"><div className="lmm-stage"><div className="lmm-pen" /><span className="lmm-ptr" /><em>Presenting: floor plan</em></div>
-            <div className="lmm-side"><b>Script</b><p>Thank you for joining. Today I will show you the floor plan, then the payment options.</p><b>Captions</b><p>“…this corner unit faces the park.”</p></div></div>
-          <div className="lmm-ctl"><span>🎤</span><span>📷</span><span className="on">🖥️</span><span>✏️</span><span className="rec">⏺️</span></div>
+
+      <section className="alt">
+        <div
+          className="lwrap lsplit"
+          style={{ alignItems: "center" }}
+        >
+          <div
+            className="lmeetmock"
+            aria-label="Example of a video meeting with a shared screen and the script beside it"
+          >
+            <div className="lmm-bar">
+              <i />
+              <i />
+              <i />
+              <span>Site walkthrough · 24:10 left</span>
+            </div>
+
+            <div className="lmm-body">
+              <div className="lmm-stage">
+                <div className="lmm-pen" />
+                <span className="lmm-ptr" />
+                <em>Presenting: floor plan</em>
+              </div>
+
+              <div className="lmm-side">
+                <b>Script</b>
+                <p>
+                  Thank you for joining. Today I will show you the
+                  floor plan, then the payment options.
+                </p>
+                <b>Captions</b>
+                <p>“…this corner unit faces the park.”</p>
+              </div>
+            </div>
+
+            <div className="lmm-ctl">
+              <span>🎤</span>
+              <span>📷</span>
+              <span className="on">🖥️</span>
+              <span>✏️</span>
+              <span className="rec">⏺️</span>
+            </div>
+          </div>
+
+          <div>
+            <span className="ltag2">Meetings and calls</span>
+            <h2 style={{ fontSize: 34, margin: "10px 0" }}>
+              Show the property on a call, not just describe it.
+            </h2>
+            <p>
+              Schedule a video meeting, send each person their own
+              link by email, text message or WhatsApp, and start.
+              Share your screen, point and draw on it, switch on
+              live captions, and keep your call script beside you.
+            </p>
+            <ul className="lcheck">
+              <li>
+                Set the date, time and the longest length of every
+                meeting
+              </li>
+              <li>Guests join from a link, with no account</li>
+              <li>
+                Record the meeting and the phone calls; recordings
+                and transcripts stay in your own workspace
+              </li>
+              <li>
+                See calls made, how many connected and the average
+                call length
+              </li>
+            </ul>
+            <p className="lfine">
+              The pointer and pen are drawn on the shared screen.
+              Browsers do not allow one person to take over another
+              person's computer.
+            </p>
+            <Link
+              className="lbtn p"
+              to="/signup"
+              onClick={() =>
+                track("cta_start_trial", { where: "meetings" })
+              }
+            >
+              Try meetings free for {info.trial_days} days
+            </Link>
+          </div>
         </div>
-        <div>
-          <span className="ltag2">Meetings and calls</span>
-          <h2 style={{ fontSize: 34, margin: '10px 0' }}>Show the property on a call, not just describe it.</h2>
-          <p>Schedule a video meeting, send each person their own link by email, text message or WhatsApp, and start. Share your screen, point and draw on it, switch on live captions, and keep your call script beside you.</p>
-          <ul className="lcheck">
-            <li>Set the date, time and the longest length of every meeting</li>
-            <li>Guests join from a link, with no account</li>
-            <li>Record the meeting and the phone calls; recordings and transcripts stay in your own workspace</li>
-            <li>See calls made, how many connected and the average call length</li>
-          </ul>
-          <p className="lfine">The pointer and pen are drawn on the shared screen. Browsers do not allow one person to take over another person's computer.</p>
-          <Link className="lbtn p" to="/signup" onClick={() => track('cta_start_trial', { where: 'meetings' })}>Try meetings free for {info.trial_days} days</Link>
-        </div>
-      </div></section>
+      </section>
+
       <CallNextSection />
       <LeakCalc trialDays={info.trial_days} />
       <CalcStrip />
       <Screens product={null} />
-      <Voices testimonials={(c.testimonials || []).filter((t) => !t.country || t.country === country.code)} trialDays={info.trial_days} />
-      <section className="alt"><div className="lwrap">
-        <div className="lsh"><h2>Two products, one platform</h2><p>Pick the product your business needs. Shared sign-in, users, billing, reports and notifications; product modules stay separate.</p></div>
-        <div className="lprod">
-          {['real_estate', 'construction'].map((p) => (
-            <Link key={p} className="lcard" to={PRODUCT_PATH[p]} onClick={() => track('product_page_view', { product: p })}>
-              <span className="ltag2">{p === 'real_estate' ? 'For agencies & developers' : 'For contractors & builders'}</span>
-              <h3>{c[p].title}</h3><p>{c[p].subtitle}</p>
-              <ul className="lcheck">{c[p].features.slice(0, 4).map(([t]) => <li key={t}>{t}</li>)}</ul>
-              <span className="lgo">Explore {p === 'real_estate' ? 'Real Estate' : 'Construction'} →</span>
-            </Link>
-          ))}
+
+      <Voices
+        testimonials={(c.testimonials || []).filter(
+          (t) => !t.country || t.country === country.code
+        )}
+        trialDays={info.trial_days}
+      />
+
+      <section className="alt">
+        <div className="lwrap">
+          <div className="lsh">
+            <h2>Two products, one platform</h2>
+            <p>
+              Pick the product your business needs. Shared sign-in,
+              users, billing, reports and notifications; product
+              modules stay separate.
+            </p>
+          </div>
+
+          <div className="lprod">
+            {["real_estate", "construction"].map((p) => (
+              <Link
+                key={p}
+                className="lcard"
+                to={PRODUCT_PATH[p]}
+                onClick={() =>
+                  track("product_page_view", { product: p })
+                }
+              >
+                <span className="ltag2">
+                  {p === "real_estate"
+                    ? "For agencies & developers"
+                    : "For contractors & builders"}
+                </span>
+
+                <h3>{c[p].title}</h3>
+                <p>{c[p].subtitle}</p>
+
+                <ul className="lcheck">
+                  {c[p].features.slice(0, 4).map(([t]) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+
+                <span className="lgo">
+                  Explore{" "}
+                  {p === "real_estate"
+                    ? "Real Estate"
+                    : "Construction"}{" "}
+                  →
+                </span>
+              </Link>
+            ))}
+          </div>
         </div>
-      </div></section>
-      <section><div className="lwrap">
-        <div className="lsh"><h2>Up and running today</h2></div>
-        <div className="lgrid">
-          {[['Choose your product', 'Real Estate Brokerage or Construction Management. A bundle gives you both.'], ['Create your workspace', 'Your company gets its own address and its own private database straight away.'], ['Invite your team', 'Email invitations with the right role for each person.'], ['Pick a plan when ready', `Use the full ${info.trial_days}-day trial first. Pay by card or local transfer.`]].map(([t, d], i) => <div className="lcard" key={t}><div className="lnum">{i + 1}</div><h3>{t}</h3><p>{d}</p></div>)}
+      </section>
+
+      <section>
+        <div className="lwrap">
+          <div className="lsh">
+            <h2>Up and running today</h2>
+          </div>
+
+          <div className="lgrid">
+            {[
+              [
+                "Choose your product",
+                "Real Estate Brokerage or Construction Management. A bundle gives you both.",
+              ],
+              [
+                "Create your workspace",
+                "Your company gets its own address and its own private database straight away.",
+              ],
+              [
+                "Invite your team",
+                "Email invitations with the right role for each person.",
+              ],
+              [
+                "Pick a plan when ready",
+                `Use the full ${info.trial_days}-day trial first. Pay by card or local transfer.`,
+              ],
+            ].map(([t, d], i) => (
+              <div className="lcard" key={t}>
+                <div className="lnum">{i + 1}</div>
+                <h3>{t}</h3>
+                <p>{d}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div></section>
+      </section>
+
       <Faq faqs={[...(c.faqs || []), ...(cc.faqs || [])]} />
       <Band info={info} />
       <StickyCta trialDays={info.trial_days} />
     </>
   );
 }
+
 
 /** Email first: one field, and the sign-up form opens with it filled in. Nothing is stored until the person creates a workspace. */
 function EmailStart({ trialDays, where }) {

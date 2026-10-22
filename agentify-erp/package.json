@@ -9,5 +9,8 @@
     "build": "npm --prefix client run build",
     "start": "npm --prefix server start",
     "test": "npm --prefix server test"
+  },
+  "dependencies": {
+    "framer-motion": "^14.5.0"
   }
 }
