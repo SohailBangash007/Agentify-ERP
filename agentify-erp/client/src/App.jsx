@@ -99,9 +99,9 @@ export default function App() {
         <Route path="/vendor/login" element={<Login portal vendor />} />
         <Route path="/login" element={<MainGate fallback={<Login />} />} />
         <Route path="/signup" element={<MainGate fallback={<Signup />} />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password/:token" element={<ResetPassword />} />
-        <Route path="/invite/:token" element={<AcceptInvite />} />
+        <Route path="/forgot-password" element={<MainGate fallback={<ForgotPassword />} />} />
+        <Route path="/reset-password/:token" element={<MainGate fallback={<ResetPassword />} />} />
+        <Route path="/invite/:token" element={<MainGate fallback={<AcceptInvite />} />} />
         <Route path="*" element={<Navigate to={loc.pathname.startsWith('/portal') ? `/portal/login?next=${encodeURIComponent(loc.pathname)}` : loc.pathname.startsWith('/vendor') ? `/vendor/login?next=${encodeURIComponent(loc.pathname)}` : '/login'} replace />} />
       </Routes>
     );

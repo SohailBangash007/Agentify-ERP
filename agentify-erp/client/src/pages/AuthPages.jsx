@@ -27,13 +27,14 @@ const slugify = (s) => String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/
 
 /** Self-serve signup: creates a new company workspace with its own database. */
 export function Signup() {
-  const [f, setF] = useState({ company_name: '', slug: '', admin_name: '', admin_email: '', admin_password: '', timezone: 'Asia/Karachi', currency: 'PKR' });
+  const [f, setF] = useState({ company_name: '', slug: '', admin_name: '', admin_email: '', admin_password: '', timezone: 'Asia/Karachi', currency: 'PKR', accept_terms: false });
   const [slugTouched, setSlugTouched] = useState(false);
   const [avail, setAvail] = useState(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(null);
-  const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
+  const [unreachable, setUnreachable] = useState(false);
+  const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
   const timer = useRef();
   const [regions, setRegions] = useState([]);
   const [mode, setMode] = useState(null); // null while checking, false when the server runs in single-company mode
@@ -45,15 +46,24 @@ export function Signup() {
     return () => clearTimeout(timer.current);
   }, [f.slug]);
   const submit = async (e) => {
-    e.preventDefault(); setBusy(true); setErr('');
+    e.preventDefault(); setErr('');
+    if (!f.accept_terms) { setErr('Please accept the Terms of Service and Privacy Policy to create a workspace'); return; }
+    setBusy(true);
     try { setDone(await api.post('/api/platform/signup', f)); } catch (er) { setErr(/^Endpoint not found$/i.test(er.message) ? 'This server is an older version without workspace signup. Stop it and start the new project with run-agentify-erp.bat, then open http://localhost:4000/signup.' : er.message); } finally { setBusy(false); }
   };
+  // straight into the new workspace, already signed in (the one-time code lasts two minutes, so do it now)
+  useEffect(() => {
+    if (!done?.enter_url) return;
+    fetch(`${done.login_url}/health`, { mode: 'no-cors', cache: 'no-store' })
+      .then(() => { window.location.replace(done.enter_url); }, () => setUnreachable(true));
+  }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
   if (done) {
     return (
       <Shell eyebrow="You’re in" title={<>Your workspace is <em>ready.</em></>} lead="Your company has its own private database. Sign in with the email and password you just chose.">
         <h2>{done.tenant.name}</h2>
-        <div className="muted">Free trial until {done.tenant.trial_ends_at}. We emailed you a link to confirm your address.</div>
-        {done.login_url ? <a className="btn primary" href={`${done.login_url}/login`}>Open your workspace</a> : <Link className="btn primary" to="/login">Go to sign in</Link>}
+        <div className="muted">Free trial until {String(done.tenant.trial_ends_at || '').slice(0, 10)}. We emailed you a link to confirm your address.</div>
+        {unreachable && <div className="alert warn" role="alert">Your workspace was created at <b>{String(done.login_url || '').replace(/^https?:\/\//, '')}</b>, but that address cannot be opened from this browser yet. Check that a wildcard address (like <b>*.localhost</b>) points at this computer, or open it by its IP. Your data is safe.</div>}
+        {done.login_url ? <a className="btn primary" href={done.enter_url || `${done.login_url}/login`}>Open your workspace</a> : <Link className="btn primary" to="/login">Go to sign in</Link>}
       </Shell>
     );
   }
@@ -91,6 +101,10 @@ export function Signup() {
             <Field label="Currency"><select className="input" value={f.currency} onChange={set('currency')}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select></Field>
           </div>
         )}
+        <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontWeight: 400 }}>
+          <input type="checkbox" checked={!!f.accept_terms} onChange={set('accept_terms')} style={{ width: 'auto', marginTop: 4 }} />
+          <span>I agree to the <Link to="/legal/terms" target="_blank">Terms of Service</Link>, <Link to="/legal/subscription" target="_blank">Subscription Terms</Link> and <Link to="/legal/privacy" target="_blank">Privacy Policy</Link>.</span>
+        </label>
         <button className="btn primary" disabled={busy || (avail && !avail.available)}>{busy ? 'Creating…' : 'Create workspace'}</button>
         <div className="center muted">Already have one? <Link to="/login">Sign in</Link></div>
       </form>
