@@ -1,7 +1,7 @@
 // Public website on the main domain: home, the two product pages, pricing, contact/demo, legal documents, sign-up and
 // "find my workspace". Texts, plans, prices, trial terms and legal documents come from /api/platform/marketing and are
 // edited by platform staff in the console. Nothing here invents customers, counts, testimonials or integrations.
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useRef } from 'react';
 import { Link, NavLink, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { Loading } from '../components/ui.jsx';
@@ -137,14 +137,14 @@ function CalcStrip() {
 
     ...(c.calculators?.purchase_costs
       ? [[
-          "costs",
-          c.calculators.purchase_costs === "sdlt"
-            ? "Stamp Duty"
-            : c.calculators.purchase_costs === "dld"
-              ? "Purchase fees"
-              : "Closing costs",
-          PurchaseCostCalculator,
-        ]]
+        "costs",
+        c.calculators.purchase_costs === "sdlt"
+          ? "Stamp Duty"
+          : c.calculators.purchase_costs === "dld"
+            ? "Purchase fees"
+            : "Closing costs",
+        PurchaseCostCalculator,
+      ]]
       : []),
 
     ...(c.calculators?.unit_converter
@@ -464,6 +464,7 @@ function Home({ info }) {
   const c = info.content;
   const { country } = useCountry();
   const cc = country.copy || {};
+  const stepsSliderRef = useRef(null);
 
   useTitle(c.seo.home.title, c.seo.home.description);
 
@@ -834,40 +835,403 @@ function Home({ info }) {
         </div>
       </section>
 
-      <section>
+
+      <section
+        style={{
+          padding: "80px 20px",
+          overflow: "hidden",
+          background:
+            "radial-gradient(ellipse at 5% 0%, rgba(99,102,241,0.10), transparent 40%), #f8f9fd",
+        }}
+      >
+        <style>{`
+    .steps-slider {
+      display: flex;
+      gap: 22px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 8px 3px 24px;
+      scroll-snap-type: x mandatory;
+      scroll-behavior: smooth;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .steps-slider::-webkit-scrollbar {
+      display: none;
+    }
+
+    .steps-slide-card {
+      flex: 0 0 calc((100% - 44px) / 3);
+      min-width: 0;
+      box-sizing: border-box;
+      scroll-snap-align: start;
+      position: relative;
+      overflow: hidden;
+      padding: 28px 25px;
+      min-height: 290px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      border: 1px solid #e7e9f2;
+      border-radius: 22px;
+      background: #fff;
+      box-shadow: 0 8px 25px rgba(31,41,85,.05);
+      transition: transform .25s ease, box-shadow .25s ease;
+    }
+
+    .steps-slide-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--step-color);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform .25s ease;
+    }
+
+    .steps-slide-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 18px 35px rgba(31,41,85,.10);
+    }
+
+    .steps-slide-card:hover::before {
+      transform: scaleX(1);
+    }
+
+    .steps-slide-top {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 26px;
+    }
+
+    .steps-slide-icon {
+      display: grid;
+      place-items: center;
+      width: 56px;
+      height: 56px;
+      border-radius: 17px;
+      background: var(--step-light);
+      color: var(--step-color);
+      font-size: 26px;
+      font-weight: 800;
+    }
+
+    .steps-slide-number {
+      padding: 7px 10px;
+      border-radius: 30px;
+      background: #f4f5fa;
+      color: #7a8398;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    .steps-slide-card h3 {
+      margin: 0 0 12px;
+      color: #1c223b;
+      font-size: 20px;
+      line-height: 1.4;
+      font-weight: 750;
+    }
+
+    .steps-slide-card p {
+      margin: 0;
+      color: #737c91;
+      font-size: 14px;
+      line-height: 1.85;
+    }
+
+    .steps-slide-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      margin-top: auto;
+      padding-top: 24px;
+      color: var(--step-color);
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .steps-slide-arrow {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--step-light);
+      font-size: 19px;
+    }
+
+    .steps-slide-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 15px;
+      margin-top: 8px;
+    }
+
+    .steps-slide-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .steps-slide-buttons button {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border: 1px solid #e1e5ef;
+      border-radius: 14px;
+      background: white;
+      color: #252b45;
+      font-size: 22px;
+      cursor: pointer;
+      transition: .2s ease;
+    }
+
+    .steps-slide-buttons button:hover {
+      background: #5b55dc;
+      border-color: #5b55dc;
+      color: white;
+    }
+
+    .steps-slide-dots {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .steps-slide-dots span {
+      width: 7px;
+      height: 7px;
+      border-radius: 20px;
+      background: #d6daea;
+    }
+
+    .steps-slide-dots span:first-child {
+      width: 22px;
+      background: #635bdf;
+    }
+
+    @media (max-width: 900px) {
+      .steps-slide-card {
+        flex-basis: calc((100% - 22px) / 2);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .steps-slide-card {
+        flex-basis: 100%;
+        min-height: 275px;
+        padding: 25px 22px;
+      }
+
+      .steps-slider {
+        gap: 14px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .steps-slider {
+        scroll-behavior: auto;
+      }
+
+      .steps-slide-card,
+      .steps-slide-card::before {
+        transition: none;
+      }
+    }
+  `}</style>
+
         <div className="lwrap">
-          <div className="lsh">
-            <h2>Up and running today</h2>
+          <div
+            className="lsh"
+            style={{ marginBottom: "32px" }}
+          >
+            <span
+              style={{
+                display: "inline-block",
+                padding: "8px 13px",
+                marginBottom: "12px",
+                borderRadius: "30px",
+                background: "#eeebff",
+                color: "#6355d9",
+                fontSize: "11px",
+                fontWeight: 800,
+                letterSpacing: "1px",
+              }}
+            >
+              ✦ SIMPLE SETUP · FOUR STEPS
+            </span>
+
+            <h2
+              style={{
+                fontSize: "clamp(30px, 4vw, 44px)",
+                lineHeight: 1.15,
+                letterSpacing: "-1.3px",
+                fontWeight: 800,
+                color: "#1c223b",
+                margin: "0 0 12px",
+              }}
+            >
+              Up and running{" "}
+              <span style={{ color: "#635bdf" }}>today.</span>
+            </h2>
+
+            <p style={{ color: "#737c91", lineHeight: 1.8 }}>
+              Four simple steps to set up your workspace and bring
+              your team together.
+            </p>
           </div>
 
-          <div className="lgrid">
+          <div
+            className="steps-slider"
+            ref={stepsSliderRef}
+          >
             {[
-              [
-                "Choose your product",
-                "Real Estate Brokerage or Construction Management. A bundle gives you both.",
-              ],
-              [
-                "Create your workspace",
-                "Your company gets its own address and its own private database straight away.",
-              ],
-              [
-                "Invite your team",
-                "Email invitations with the right role for each person.",
-              ],
-              [
-                "Pick a plan when ready",
-                `Use the full ${info.trial_days}-day trial first. Pay by card or local transfer.`,
-              ],
-            ].map(([t, d], i) => (
-              <div className="lcard" key={t}>
-                <div className="lnum">{i + 1}</div>
-                <h3>{t}</h3>
-                <p>{d}</p>
-              </div>
+              {
+                title: "Choose your product",
+                description:
+                  "Real Estate Brokerage or Construction Management. A bundle gives you both.",
+                icon: "◈",
+                color: "#6757e8",
+                light: "#f0edff",
+              },
+              {
+                title: "Create your workspace",
+                description:
+                  "Your company gets its own address and its own private database straight away.",
+                icon: "⌘",
+                color: "#1685e7",
+                light: "#eaf5ff",
+              },
+              {
+                title: "Invite your team",
+                description:
+                  "Email invitations with the right role for each person.",
+                icon: "♧",
+                color: "#0eaa83",
+                light: "#e7faf4",
+              },
+              {
+                title: "Pick a plan when ready",
+                description: `Use the full ${info.trial_days}-day trial first. Pay by card or local transfer.`,
+                icon: "✦",
+                color: "#ed8b32",
+                light: "#fff3e5",
+              },
+            ].map((step, i) => (
+              <article
+                className="steps-slide-card"
+                key={step.title}
+                style={{
+                  "--step-color": step.color,
+                  "--step-light": step.light,
+                }}
+              >
+                <div className="steps-slide-top">
+                  <div className="steps-slide-icon">
+                    {step.icon}
+                  </div>
+
+                  <span className="steps-slide-number">
+                    STEP 0{i + 1}
+                  </span>
+                </div>
+
+                <h3>{step.title}</h3>
+                <p>{step.description}</p>
+
+                <div className="steps-slide-bottom">
+                  <span>
+                    {i === 3
+                      ? "You're in control"
+                      : "Easy to get started"}
+                  </span>
+
+                  <span className="steps-slide-arrow">
+                    →
+                  </span>
+                </div>
+              </article>
             ))}
+          </div>
+
+          <div className="steps-slide-nav">
+            <div
+              className="steps-slide-dots"
+              aria-label="Four onboarding steps"
+            >
+              {[1, 2, 3, 4,].map((n) => (
+                <span key={n} />
+              ))}
+            </div>
+
+            <div className="steps-slide-buttons">
+              <button
+                type="button"
+                aria-label="Previous card"
+                onClick={() => {
+                  const el = stepsSliderRef.current;
+                  if (!el) return;
+
+                  const card = el.querySelector(".steps-slide-card");
+                  if (!card) return;
+
+                  const gap = parseFloat(getComputedStyle(el).gap) || 0;
+                  const distance = card.getBoundingClientRect().width + gap;
+                  const max = el.scrollWidth - el.clientWidth;
+
+                  el.scrollTo({
+                    left:
+                      el.scrollLeft <= 5
+                        ? max
+                        : Math.max(0, el.scrollLeft - distance),
+                    behavior: "smooth",
+                  });
+                }}
+              >
+                ←
+              </button>
+
+              <button
+                type="button"
+                aria-label="Next card"
+                onClick={() => {
+                  const el = stepsSliderRef.current;
+                  if (!el) return;
+
+                  const card = el.querySelector(".steps-slide-card");
+                  if (!card) return;
+
+                  const gap = parseFloat(getComputedStyle(el).gap) || 0;
+                  const distance = card.getBoundingClientRect().width + gap;
+                  const max = el.scrollWidth - el.clientWidth;
+
+                  el.scrollTo({
+                    left:
+                      el.scrollLeft >= max - 5
+                        ? 0
+                        : Math.min(max, el.scrollLeft + distance),
+                    behavior: "smooth",
+                  });
+                }}
+              >
+                →
+              </button>
+            </div>
           </div>
         </div>
       </section>
+
 
       <Faq faqs={[...(c.faqs || []), ...(cc.faqs || [])]} />
       <Band info={info} />
@@ -2527,7 +2891,7 @@ function CallNextSection() {
             You pay for the CRM.
             <span>Your property website is included.</span>
           </h2>
-{/* 
+          {/* 
           <p className="property-center-description">
             Every plan comes with a public website for your listings,
             your own domain, and the calculators your buyers expect.
@@ -3261,7 +3625,7 @@ function Pricing({ info }) {
   const [int, setInt] = useState('month');
   const { country } = useCountry();
   const cur = country.currency;
-  const setCur = () => {};
+  const setCur = () => { };
   useEffect(() => { track('pricing_view', { product: prod }); }, [prod]);
   const plans = info.plans.filter((p) => p.product === prod);
   const currencies = [...new Set(info.plans.flatMap((p) => Object.keys(p.price)))].sort((a, b) => (a === 'PKR' ? -1 : b === 'PKR' ? 1 : a.localeCompare(b)));
@@ -3550,21 +3914,21 @@ export default function MarketingSite() {
   const loc = useLocation();
   const nav = useNavigate();
   useEffect(() => { api.get('/api/platform/marketing').then((d) => { setInfo(d); configureGa4(d.ga4_id); }).catch((e) => setErr(e.message)); }, []);
-  useEffect(() => { if (!browserOptOut() && !consent()) setBanner(true); return onConsentChange(() => {}); }, []);
+  useEffect(() => { if (!browserOptOut() && !consent()) setBanner(true); return onConsentChange(() => { }); }, []);
   useEffect(() => { window.scrollTo(0, 0); track('page_view'); }, [loc.pathname]);
   if (err) return <div className="lp"><div className="lwrap" style={{ padding: 40 }}><div className="lerr">{err}</div><button className="lbtn" onClick={() => nav(0)}>Try again</button></div></div>;
   if (!info) return <Loading />;
   return (
     <CountryProvider info={info}>
-    <div className="lp">
-      <a href="#main" className="lhp">Skip to content</a>
-      <Header info={info} />
-      <main id="main">
-        {page(loc.pathname, info)}
-      </main>
-      <Footer info={info} onCookies={() => setBanner(true)} />
-      <ConsentBanner show={banner && !browserOptOut()} onClose={() => setBanner(false)} />
-    </div>
+      <div className="lp">
+        <a href="#main" className="lhp">Skip to content</a>
+        <Header info={info} />
+        <main id="main">
+          {page(loc.pathname, info)}
+        </main>
+        <Footer info={info} onCookies={() => setBanner(true)} />
+        <ConsentBanner show={banner && !browserOptOut()} onClose={() => setBanner(false)} />
+      </div>
     </CountryProvider>
   );
 }
