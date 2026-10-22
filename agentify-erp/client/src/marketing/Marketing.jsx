@@ -727,12 +727,22 @@ function Signup({ info }) {
   };
   // straight into the new workspace, already signed in (the one-time code lasts two minutes, so do it now)
   const [unreachable, setUnreachable] = useState(false);
+  const [checking, setChecking] = useState(false);
+  // only go there if the workspace address actually opens; otherwise say so instead of showing a browser error page
+  const enter = async () => {
+    if (!done) return;
+    setChecking(true); setUnreachable(false);
+    const ok = await reachable(done.login_url);
+    setChecking(false);
+    if (ok) window.location.replace(done.enter_url || `${done.login_url}/login`);
+    else setUnreachable(true);
+  };
   useEffect(() => {
     if (!done) return;
     if (done.tenant?.slug) rememberWorkspace(done.tenant.slug);
     if (!done.enter_url) return;
-    // only go there if the workspace address actually opens; otherwise say so instead of showing a browser error page
-    reachable(done.login_url).then((ok) => { if (ok) window.location.replace(done.enter_url); else setUnreachable(true); });
+    enter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done]);
   if (done) {
     const t = done.tenant;
@@ -744,7 +754,7 @@ function Signup({ info }) {
           : <p>{t.trial_note ? `${t.trial_note}. ` : ''}Choose a plan in Settings › Plan &amp; Billing to start working.</p>}
         <p className="lmini">We emailed {t.owner_email} a link to confirm the address.</p>
         {unreachable && <div className="lerr" role="alert" style={{ textAlign: 'left', margin: '12px 0' }}>Your workspace was created at <b>{done.login_url.replace(/^https?:\/\//, '')}</b>, but that address cannot be reached yet. This is a setup step on our side (the website address for workspaces is still being connected). Your data is safe. Please try the button below again in a little while, or contact us.</div>}
-        <a className="lbtn p" href={done.enter_url || `${done.login_url}/login`}>Open your workspace</a>
+        <button type="button" className="lbtn p" onClick={enter} disabled={checking}>{checking ? 'Checking the address…' : unreachable ? 'Check again' : 'Open your workspace'}</button>
       </div></div></section>
     );
   }
