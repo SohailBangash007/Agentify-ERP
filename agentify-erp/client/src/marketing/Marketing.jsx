@@ -811,20 +811,156 @@ function LogoStrip() {
 }
 
 
-const OUTCOMES = [
-  ['Leads stop going cold', 'Call next ranks who needs a call and why, and every outcome sets the next follow-up.'],
-  ['Buyers see the property sooner', 'Send a meeting link on WhatsApp, share your screen and draw on the floor plan.'],
-  ['The numbers are one click away', 'Calls made, how many connected and average call length, per agent.'],
-  ['Money in the right place', 'Instalments, receipts and commissions tracked per sale, with an audit trail.'],
-];
+
 function Outcomes() {
+  const items = [
+    "Never lose a lead",
+    "Book more viewings",
+    "Know your performance",
+    "Keep finances clear",
+  ];
+
   return (
-    <section style={{ paddingBottom: 8 }}><div className="lwrap">
-      <div className="lsh"><h2>Where brokerages lose deals, and what changes</h2></div>
-      <div className="lout">{OUTCOMES.map(([t, d]) => <div key={t}><h3>{t}</h3><p>{d}</p></div>)}</div>
-    </div></section>
+    <section
+      style={{
+        padding: "90px 0",
+        background: "#ffffff",
+        color: "#000000",
+      }}
+    >
+      <div className="lwrap">
+        <div style={{ marginBottom: "48px" }}>
+          <span
+            style={{
+              color: "#4f46e5",
+              fontSize: "11px",
+              fontWeight: 700,
+              letterSpacing: "2px",
+            }}
+          >
+            BUILT FOR BROKERAGES
+          </span>
+
+          <h2
+            style={{
+              margin: "18px 0 0",
+              color: "#000000",
+              fontSize: "clamp(36px, 5vw, 58px)",
+              fontWeight: 750,
+              letterSpacing: "-2px",
+              lineHeight: 1.12,
+            }}
+          >
+            Less admin.
+            <br />
+            <span style={{ color: "#4f46e5" }}>
+              More closed deals.
+            </span>
+          </h2>
+        </div>
+
+        <div
+          style={{
+            borderTop: "1px solid rgba(0, 0, 0, 0.15)",
+          }}
+        >
+          {items.map((item, index) => (
+            <div
+              key={item}
+              className="outcomes-minimal-item"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "55px 1fr 30px",
+                alignItems: "center",
+                gap: "18px",
+                padding: "23px 4px",
+                borderBottom: "1px solid rgba(0, 0, 0, 0.15)",
+                transition: "padding 0.25s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.paddingLeft = "12px";
+                e.currentTarget.style.paddingRight = "12px";
+                e.currentTarget.querySelector(
+                  ".outcomes-arrow"
+                ).style.opacity = "1";
+                e.currentTarget.querySelector(
+                  ".outcomes-arrow"
+                ).style.transform = "translate(0, 0)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.paddingLeft = "4px";
+                e.currentTarget.style.paddingRight = "4px";
+                e.currentTarget.querySelector(
+                  ".outcomes-arrow"
+                ).style.opacity = "0";
+                e.currentTarget.querySelector(
+                  ".outcomes-arrow"
+                ).style.transform = "translate(-5px, 5px)";
+              }}
+            >
+              <span
+                style={{
+                  color: "#4f46e5",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                }}
+              >
+                {String(index + 1).padStart(2, "0")}
+              </span>
+
+              <h3
+                style={{
+                  margin: 0,
+                  color: "#000000",
+                  fontSize: "clamp(18px, 2.3vw, 25px)",
+                  fontWeight: 500,
+                  letterSpacing: "-0.5px",
+                }}
+              >
+                {item}
+              </h3>
+
+              <span
+                className="outcomes-arrow"
+                style={{
+                  color: "#4f46e5",
+                  fontSize: "21px",
+                  opacity: 0,
+                  transform: "translate(-5px, 5px)",
+                  transition: "all 0.25s ease",
+                  textAlign: "center",
+                }}
+              >
+                ↗
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <style>{`
+        @media (max-width: 600px) {
+          .outcomes-minimal-item {
+            grid-template-columns: 32px 1fr 20px !important;
+            gap: 10px !important;
+            padding: 20px 2px !important;
+          }
+
+          .outcomes-minimal-item h3 {
+            font-size: 17px !important;
+          }
+
+          .outcomes-arrow {
+            opacity: 1 !important;
+            transform: none !important;
+          }
+        }
+      `}</style>
+    </section>
   );
 }
+
+
 
 const COMMISSION = { PK: 250000, AE: 25000, US: 6000, UK: 4000, CA: 6000 };
 /** An estimate from the visitor's own numbers. The starting values are placeholders to change, not statistics. */
