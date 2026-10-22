@@ -730,47 +730,221 @@ function Home({ info }) {
             </div>
           </div>
 
-          <div>
-            <span className="ltag2">Meetings and calls</span>
-            <h2 style={{ fontSize: 34, margin: "10px 0" }}>
-              Show the property on a call, not just describe it.
-            </h2>
-            <p>
-              Schedule a video meeting, send each person their own
-              link by email, text message or WhatsApp, and start.
-              Share your screen, point and draw on it, switch on
-              live captions, and keep your call script beside you.
-            </p>
-            <ul className="lcheck">
-              <li>
-                Set the date, time and the longest length of every
-                meeting
-              </li>
-              <li>Guests join from a link, with no account</li>
-              <li>
-                Record the meeting and the phone calls; recordings
-                and transcripts stay in your own workspace
-              </li>
-              <li>
-                See calls made, how many connected and the average
-                call length
-              </li>
-            </ul>
-            <p className="lfine">
-              The pointer and pen are drawn on the shared screen.
-              Browsers do not allow one person to take over another
-              person's computer.
-            </p>
-            <Link
-              className="lbtn p"
-              to="/signup"
-              onClick={() =>
-                track("cta_start_trial", { where: "meetings" })
-              }
-            >
-              Try meetings free for {info.trial_days} days
-            </Link>
-          </div>
+         
+<div
+  style={{
+    maxWidth: "620px",
+    padding: "32px",
+    borderRadius: "24px",
+    background: "linear-gradient(145deg, #ffffff, #f8fafc)",
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 20px 50px rgba(15, 23, 42, 0.08)",
+  }}
+>
+  <span
+    className="ltag2"
+    style={{
+      display: "inline-block",
+      padding: "8px 15px",
+      borderRadius: "30px",
+      background: "linear-gradient(135deg, #ede9fe, #dbeafe)",
+      color: "#6d28d9",
+      fontSize: "13px",
+      fontWeight: 700,
+      letterSpacing: "0.4px",
+      marginBottom: "10px",
+    }}
+  >
+    ✦ Meetings and calls
+  </span>
+
+  <h2
+    style={{
+      fontSize: "clamp(27px, 4vw, 36px)",
+      lineHeight: 1.25,
+      letterSpacing: "-1px",
+      fontWeight: 800,
+      color: "#0f172a",
+      margin: "12px 0 16px",
+    }}
+  >
+    Show the property on a call, not just describe it.
+  </h2>
+
+  <p
+    style={{
+      fontSize: "16px",
+      lineHeight: 1.8,
+      color: "#64748b",
+      marginBottom: "24px",
+    }}
+  >
+    Schedule video meetings and send personal links by email,
+    text message or WhatsApp. Share your screen, draw on
+    property details, enable live captions and keep your
+    call script beside you.
+  </p>
+
+  <ul
+    style={{
+      listStyle: "none",
+      padding: 0,
+      margin: "0 0 24px",
+      display: "flex",
+      flexDirection: "column",
+      gap: "16px",
+    }}
+  >
+    <li
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "12px",
+        color: "#334155",
+        fontSize: "15px",
+        lineHeight: 1.7,
+      }}
+    >
+      <span
+        style={{
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "25px",
+          height: "25px",
+          borderRadius: "50%",
+          background: "#dcfce7",
+          color: "#15803d",
+          fontWeight: 800,
+        }}
+      >
+        ✓
+      </span>
+      <span>
+        <strong style={{ color: "#0f172a" }}>
+          Easy scheduling
+        </strong>
+        <br />
+        Set meeting dates, times and duration limits.
+      </span>
+    </li>
+
+    <li
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "12px",
+        color: "#334155",
+        fontSize: "15px",
+        lineHeight: 1.7,
+      }}
+    >
+      <span
+        style={{
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "25px",
+          height: "25px",
+          borderRadius: "50%",
+          background: "#dcfce7",
+          color: "#15803d",
+          fontWeight: 800,
+        }}
+      >
+        ✓
+      </span>
+      <span>
+        <strong style={{ color: "#0f172a" }}>
+          Join without an account
+        </strong>
+        <br />
+        Guests can join directly using their meeting link.
+      </span>
+    </li>
+
+    <li
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "12px",
+        color: "#334155",
+        fontSize: "15px",
+        lineHeight: 1.7,
+      }}
+    >
+      <span
+        style={{
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "25px",
+          height: "25px",
+          borderRadius: "50%",
+          background: "#dcfce7",
+          color: "#15803d",
+          fontWeight: 800,
+        }}
+      >
+        ✓
+      </span>
+      <span>
+        <strong style={{ color: "#0f172a" }}>
+          Track every conversation
+        </strong>
+        <br />
+        Keep recordings and transcripts in your workspace
+        and review call statistics.
+      </span>
+    </li>
+  </ul>
+
+  {/* <p
+    className="lfine"
+    style={{
+      fontSize: "12px",
+      lineHeight: 1.7,
+      color: "#94a3b8",
+      borderLeft: "3px solid #c4b5fd",
+      paddingLeft: "12px",
+      margin: "0 0 26px",
+    }}
+  >
+    The pointer and pen are drawn on the shared screen.
+    Browsers do not allow one person to take over another
+    person's computer.
+  </p> */}
+
+  <Link
+    className="lbtn p"
+    to="/signup"
+    onClick={() =>
+      track("cta_start_trial", { where: "meetings" })
+    }
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "10px",
+      padding: "14px 24px",
+      borderRadius: "12px",
+      background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+      color: "#ffffff",
+      fontSize: "15px",
+      fontWeight: 700,
+      textDecoration: "none",
+      boxShadow: "0 8px 20px rgba(99, 102, 241, 0.25)",
+      transition: "transform 0.2s ease",
+    }}
+  >
+    Try meetings free for {info.trial_days} days
+    <span style={{ fontSize: "18px" }}>→</span>
+  </Link>
+</div>
+
         </div>
       </section>
 
@@ -1111,6 +1285,22 @@ function Home({ info }) {
                   "Your company gets its own address and its own private database straight away.",
                 icon: "⌘",
                 color: "#1685e7",
+                light: "#eaf5ff",
+              },
+              {
+                title: "Create your workspace",
+                description:
+                  "Your company gets its own address and its own private database straight away.",
+                icon: "⌘",
+                color: "#e17e03",
+                light: "#eaf5ff",
+              },
+              {
+                title: "Create your workspace",
+                description:
+                  "Your company gets its own address and its own private database straight away.",
+                icon: "⌘",
+                color: "#059fc5",
                 light: "#eaf5ff",
               },
               {
@@ -2879,56 +3069,224 @@ function CallNextSection() {
       </section>
 
       {/* BOTTOM SECTION — DARK THEME */}
-      <section className="property-website-section">
-        <div className="lwrap property-center-content">
-          <span className="property-center-eyebrow">
-            <span className="property-eyebrow-line" />
-            INCLUDED WITH EVERY PLAN
-            <span className="property-eyebrow-line" />
-          </span>
+    <section
+  className="property-website-section"
+  style={{
+    background: "#ffffff",
+    color: "#111827",
+    padding: "80px 20px",
+  }}
+>
+  <div
+    className="lwrap property-center-content"
+    style={{
+      maxWidth: "1000px",
+      margin: "0 auto",
+      textAlign: "center",
+    }}
+  >
+    <span
+      className="property-center-eyebrow"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "12px",
+        color: "#6546d7",
+        fontSize: "12px",
+        fontWeight: 750,
+        letterSpacing: "2px",
+        marginBottom: "22px",
+      }}
+    >
+      <span
+        className="property-eyebrow-line"
+        style={{
+          display: "inline-block",
+          width: "28px",
+          height: "2px",
+          background: "#c4b5fd",
+        }}
+      />
+      INCLUDED WITH EVERY PLAN
+      <span
+        className="property-eyebrow-line"
+        style={{
+          display: "inline-block",
+          width: "28px",
+          height: "2px",
+          background: "#c4b5fd",
+        }}
+      />
+    </span>
 
-          <h2 className="property-center-title">
-            You pay for the CRM.
-            <span>Your property website is included.</span>
-          </h2>
-          {/* 
-          <p className="property-center-description">
-            Every plan comes with a public website for your listings,
-            your own domain, and the calculators your buyers expect.
-            No separate website bill.
-          </p> */}
+    <h2
+      className="property-center-title"
+      style={{
+        color: "#111827",
+        fontSize: "clamp(32px, 4.5vw, 48px)",
+        fontWeight: 800,
+        lineHeight: 1.2,
+        letterSpacing: "-1.5px",
+        margin: "0 auto 30px",
+        maxWidth: "800px",
+      }}
+    >
+      You pay for the CRM.
+      <span
+        style={{
+          display: "block",
+          color: "#6546d7",
+          marginTop: "8px",
+        }}
+      >
+        Your property website is included.
+      </span>
+    </h2>
 
-          {Array.isArray(cc.works_with) &&
-            cc.works_with.length > 0 && (
-              <div className="property-center-chips">
-                {cc.works_with.map((item, index) => (
-                  <span
-                    className="property-center-chip"
-                    key={item}
-                    style={{ "--chip-index": index }}
-                  >
-                    <span className="property-chip-check">✓</span>
-                    {item}
-                  </span>
-                ))}
-              </div>
-            )}
-
-          <div className="property-center-signin">
-            <span className="property-signin-icon">✓</span>
-            <div>
-              <strong>Simple and secure sign-in</strong>
-              <span>Sign in with email, Google or Apple.</span>
-            </div>
-          </div>
-
-          <div className="property-center-footer">
-            <span />
-            Built for modern real estate teams
-            <span />
-          </div>
+    {Array.isArray(cc.works_with) &&
+      cc.works_with.length > 0 && (
+        <div
+          className="property-center-chips"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "12px",
+            margin: "0 auto 34px",
+          }}
+        >
+          {cc.works_with.map((item, index) => (
+            <span
+              className="property-center-chip"
+              key={item}
+              style={{
+                "--chip-index": index,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "9px",
+                padding: "11px 16px",
+                border: "1px solid #e5e7eb",
+                borderRadius: "10px",
+                background: "#ffffff",
+                color: "#252b36",
+                fontSize: "14px",
+                fontWeight: 600,
+                boxShadow: "0 3px 10px rgba(17, 24, 39, 0.035)",
+              }}
+            >
+              <span
+                className="property-chip-check"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "50%",
+                  background: "#ede9fe",
+                  color: "#6546d7",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                }}
+              >
+                ✓
+              </span>
+              {item}
+            </span>
+          ))}
         </div>
-      </section>
+      )}
+
+    <div
+      className="property-center-signin"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "14px",
+        textAlign: "left",
+        padding: "18px 24px",
+        maxWidth: "100%",
+        boxSizing: "border-box",
+        border: "1px solid #e9e5fb",
+        borderRadius: "14px",
+        background: "#faf9ff",
+      }}
+    >
+      <span
+        className="property-signin-icon"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          width: "42px",
+          height: "42px",
+          borderRadius: "12px",
+          background: "#ede9fe",
+          color: "#6546d7",
+          fontSize: "20px",
+          fontWeight: 800,
+        }}
+      >
+        ✓
+      </span>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+        <strong
+          style={{
+            color: "#111827",
+            fontSize: "15px",
+            fontWeight: 750,
+          }}
+        >
+          Simple and secure sign-in
+        </strong>
+        <span
+          style={{
+            color: "#5b6473",
+            fontSize: "13px",
+            lineHeight: 1.6,
+          }}
+        >
+          Sign in with email, Google or Apple.
+        </span>
+      </div>
+    </div>
+
+    <div
+      className="property-center-footer"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "14px",
+        marginTop: "36px",
+        color: "#6b7280",
+        fontSize: "12px",
+        fontWeight: 600,
+        letterSpacing: "0.5px",
+      }}
+    >
+      <span
+        style={{
+          width: "30px",
+          height: "1px",
+          background: "#d1d5db",
+        }}
+      />
+      Built for modern real estate teams
+      <span
+        style={{
+          width: "30px",
+          height: "1px",
+          background: "#d1d5db",
+        }}
+      />
+    </div>
+  </div>
+</section>
 
       {/* STYLES */}
       <style>{`
