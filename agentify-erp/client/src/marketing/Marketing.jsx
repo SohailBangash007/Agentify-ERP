@@ -2805,7 +2805,7 @@ function Platform() {
               lineHeight: 1.15,
             }}
           >
-            Everything your  Needs.
+            Everything you  Needs.
             <span style={{ color: "#4f46e5" }}>
               {" "}All in one place.
             </span>
@@ -3068,8 +3068,9 @@ function CallNextSection() {
         </div>
       </section>
 
-      {/* BOTTOM SECTION — DARK THEME */}
-    <section
+      {/* BOTTOM SECTION — */}
+    
+<section
   className="property-website-section"
   style={{
     background: "#ffffff",
@@ -3162,7 +3163,6 @@ function CallNextSection() {
               className="property-center-chip"
               key={item}
               style={{
-                "--chip-index": index,
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "9px",
@@ -3173,7 +3173,30 @@ function CallNextSection() {
                 color: "#252b36",
                 fontSize: "14px",
                 fontWeight: 600,
-                boxShadow: "0 3px 10px rgba(17, 24, 39, 0.035)",
+                boxShadow:
+                  "0 4px 12px rgba(101, 70, 215, 0.07)",
+                transition:
+                  "transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease",
+                animation: "chipFadeIn 0.5s ease both",
+                animationDelay: `${index * 80}ms`,
+                cursor: "default",
+                willChange: "transform",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform =
+                  "translateY(-5px) scale(1.03)";
+                e.currentTarget.style.boxShadow =
+                  "0 12px 28px rgba(101, 70, 215, 0.18)";
+                e.currentTarget.style.borderColor = "#c4b5fd";
+                e.currentTarget.style.background = "#faf8ff";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform =
+                  "translateY(0) scale(1)";
+                e.currentTarget.style.boxShadow =
+                  "0 4px 12px rgba(101, 70, 215, 0.07)";
+                e.currentTarget.style.borderColor = "#e5e7eb";
+                e.currentTarget.style.background = "#ffffff";
               }}
             >
               <span
@@ -3189,6 +3212,9 @@ function CallNextSection() {
                   color: "#6546d7",
                   fontSize: "12px",
                   fontWeight: 800,
+                  flexShrink: 0,
+                  transition:
+                    "transform 0.3s ease, background 0.3s ease",
                 }}
               >
                 ✓
@@ -3233,7 +3259,13 @@ function CallNextSection() {
         ✓
       </span>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "5px",
+        }}
+      >
         <strong
           style={{
             color: "#111827",
@@ -3243,6 +3275,7 @@ function CallNextSection() {
         >
           Simple and secure sign-in
         </strong>
+
         <span
           style={{
             color: "#5b6473",
@@ -3286,6 +3319,26 @@ function CallNextSection() {
       />
     </div>
   </div>
+
+  <style>{`
+    @keyframes chipFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .property-center-chip {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+  `}</style>
 </section>
 
       {/* STYLES */}
